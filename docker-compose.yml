@@ -1,0 +1,21 @@
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      AGENTGUARD_DATABASE_URL: sqlite:////data/agentguard.db
+      AGENTGUARD_CORS_ORIGINS: http://localhost:5173
+      AGENTGUARD_DEMO_MODE: "true"
+    volumes:
+      - agentguard-data:/data
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  agentguard-data:

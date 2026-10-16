@@ -1,0 +1,15 @@
+# Python
+**/.venv/
+**/__pycache__/
+**/.pytest_cache/
+**/*.py[cod]
+**/agentguard.db
+**/*.tsbuildinfo
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Local environment and generated output
+.env
+*.log
