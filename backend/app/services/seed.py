@@ -81,7 +81,11 @@ def ensure_demo_data(db: Session) -> None:
             case = TestCase(
                 suite_id=suite.id,
                 steps=[],
-                judge={"rule_first": True, "needs_llm": item["type"] in {"功能", "RAG", "注入"}},
+                judge={
+                    "rule_first": True,
+                    "ruleset_version": "p0-2026.10",
+                    "llm_role": "supplement_only",
+                },
                 source="seed",
                 **item,
             )
@@ -89,4 +93,12 @@ def ensure_demo_data(db: Session) -> None:
             db.flush()
             suite.case_ids = [*suite.case_ids, case.id]
         db.add(suite)
+    else:
+        existing_cases = db.scalars(select(TestCase).where(TestCase.suite_id == suite.id)).all()
+        for case in existing_cases:
+            case.judge = {
+                "rule_first": True,
+                "ruleset_version": "p0-2026.10",
+                "llm_role": "supplement_only",
+            }
     db.commit()

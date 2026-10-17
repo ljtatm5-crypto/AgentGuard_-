@@ -41,7 +41,11 @@ def generate_suite(payload: TestSuiteGenerate, db: Session = Depends(get_db)):
         case = TestCase(
             suite_id=suite.id,
             steps=[],
-            judge={"rule_first": True, "needs_llm": item["type"] in {"功能", "RAG", "注入"}},
+            judge={
+                "rule_first": True,
+                "ruleset_version": "p0-2026.10",
+                "llm_role": "supplement_only",
+            },
             source="generated",
             **item,
         )

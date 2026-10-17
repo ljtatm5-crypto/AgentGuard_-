@@ -3,6 +3,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.helpers import finding_dict, run_dict, trace_dict
+from app.core.config import get_settings
+from app.core.target_scope import TargetScopeError, validate_target_scope
 from app.db.session import get_db
 from app.models.entities import Agent, Finding, TestCase, TestRun, TestSuite, TraceEvent
 from app.schemas.common import RunCreate
@@ -10,6 +12,7 @@ from app.services.judge import judge_case
 from app.services.runner import run_suite
 
 router = APIRouter(prefix="/runs", tags=["runs"])
+settings = get_settings()
 
 
 def finding_for(db: Session, run_id: str) -> Finding | None:
@@ -28,6 +31,23 @@ def create_run(payload: RunCreate, db: Session = Depends(get_db)):
     suite = db.get(TestSuite, payload.suite_id)
     if not agent or not suite:
         raise HTTPException(404, "Agent 或测试集不存在")
+    if payload.mode == "live":
+        permissions = agent.permissions or {}
+        try:
+            validate_target_scope(
+                endpoint=agent.endpoint,
+                adapter=agent.adapter,
+                target_scope=permissions.get(
+                    "__target_scope__", "local_mock" if agent.adapter == "mock" else "unverified"
+                ),
+                authorization_confirmed=permissions.get("__authorization_confirmed__") == "true",
+                authorization_reference=permissions.get("__authorization_reference__"),
+                allowed_hosts=settings.allowed_target_host_list,
+            )
+        except TargetScopeError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+        if agent.adapter != "mock":
+            raise HTTPException(status_code=501, detail="真实适配器尚未启用；安全门禁已通过，但不会发起外部请求。")
     cases = db.scalars(select(TestCase).where(TestCase.suite_id == suite.id).order_by(TestCase.id)).all()
     if not cases:
         raise HTTPException(400, "测试集没有用例")

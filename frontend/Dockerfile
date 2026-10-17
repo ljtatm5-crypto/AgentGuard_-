@@ -1,5 +1,7 @@
 FROM node:20-alpine AS build
 WORKDIR /app
+ARG VITE_DATA_MODE=mock
+ENV VITE_DATA_MODE=$VITE_DATA_MODE
 COPY package.json package-lock.json* ./
 RUN npm install
 COPY . .

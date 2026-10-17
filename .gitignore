@@ -13,3 +13,4 @@ frontend/dist/
 # Local environment and generated output
 .env
 *.log
+.docx_split_*/

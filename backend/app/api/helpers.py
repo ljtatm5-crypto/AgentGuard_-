@@ -4,6 +4,7 @@ from app.models.entities import Agent, Finding, TestCase, TestRun, TestSuite, Tr
 
 
 def agent_dict(agent: Agent) -> dict[str, Any]:
+    permissions = agent.permissions or {}
     return {
         "id": agent.id,
         "name": agent.name,
@@ -13,7 +14,12 @@ def agent_dict(agent: Agent) -> dict[str, Any]:
         "model": agent.model,
         "knowledge": agent.knowledge,
         "tools": agent.tools,
-        "permissions": agent.permissions,
+        "permissions": {key: value for key, value in permissions.items() if not key.startswith("__")},
+        "target_scope": permissions.get(
+            "__target_scope__", "local_mock" if agent.adapter == "mock" else "unverified"
+        ),
+        "authorization_confirmed": permissions.get("__authorization_confirmed__") == "true",
+        "authorization_reference": permissions.get("__authorization_reference__"),
         "status": agent.status,
         "created_at": agent.created_at,
     }

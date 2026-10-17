@@ -7,11 +7,15 @@ services:
       AGENTGUARD_DATABASE_URL: sqlite:////data/agentguard.db
       AGENTGUARD_CORS_ORIGINS: http://localhost:5173
       AGENTGUARD_DEMO_MODE: "true"
+      AGENTGUARD_ALLOWED_TARGET_HOSTS: localhost,127.0.0.1,host.docker.internal
     volumes:
       - agentguard-data:/data
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        VITE_DATA_MODE: api
     ports:
       - "5173:80"
     depends_on:

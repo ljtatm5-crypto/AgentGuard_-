@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./agentguard.db"
     cors_origins: str = "http://localhost:5173"
     demo_mode: bool = True
+    allowed_target_hosts: str = "localhost,127.0.0.1,::1,host.docker.internal"
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -18,6 +19,10 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [item.strip() for item in self.cors_origins.split(",") if item.strip()]
+
+    @property
+    def allowed_target_host_list(self) -> list[str]:
+        return [item.strip().lower() for item in self.allowed_target_hosts.split(",") if item.strip()]
 
 
 @lru_cache

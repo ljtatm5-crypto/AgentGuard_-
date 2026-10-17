@@ -15,6 +15,9 @@ class AgentCreate(BaseModel):
     permissions: dict[str, str] = Field(
         default_factory=lambda: {"campus_search": "allow", "protected_write": "review"}
     )
+    target_scope: Literal["local_mock", "self_hosted_dify", "authorized_external"] = "local_mock"
+    authorization_confirmed: bool = False
+    authorization_reference: str | None = None
 
 
 class AgentOut(AgentCreate):

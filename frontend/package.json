@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "check:routes": "node scripts/check-routes.mjs",
     "build": "vue-tsc -b && vite build",
     "preview": "vite preview"
   },

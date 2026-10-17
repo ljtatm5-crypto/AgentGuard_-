@@ -6,7 +6,9 @@
 
 `Agent 接入 → 测试集生成 → 批量执行 → 混合判定 → 轨迹审计 → 缺陷/攻击链 → 指标与回归`
 
-默认使用本地模拟 Agent、虚拟查询工具和虚拟写入工具，所有数据落在 SQLite 中。这样可以先把演示链路跑通，再替换 Dify/OpenAI 适配器，不会让外部服务成为开发阻塞点。
+默认使用前端 Mock 数据、本地模拟 Agent、虚拟查询工具和虚拟写入工具。C 可以在后端未完成时打通全部页面路由；切换 API 模式后，后端运行数据落在 SQLite 中。
+
+三项硬约束已经落到代码：A 的固定规则先判且 LLM 不能覆盖规则结论；B 的目标授权和主机白名单门禁；C 的 Mock 优先与完整路由契约。
 
 ## 目录
 
@@ -46,7 +48,9 @@ npm install
 npm run dev
 ```
 
-访问 <http://localhost:5173>。Vite 会把 `/api` 代理到 `http://localhost:8000`。
+访问 <http://localhost:5173>。默认 `VITE_DATA_MODE=mock`，不要求后端启动；复制 `frontend/.env.example` 并改为 `VITE_DATA_MODE=api` 后，Vite 会把 `/api` 代理到 `http://localhost:8000`。
+
+当前路由：`/overview`、`/agents`、`/test-suites`、`/runs`、`/runs/:id`、`/findings`、`/reports`、`/settings`。
 
 ### Docker
 
@@ -62,9 +66,13 @@ docker compose up --build
 4. 打开某条失败用例，查看轨迹、工具权限判定和攻击链。
 5. 在“报告”页查看通过率、风险检出率和修复前后对比占位。
 
-## 接下来接入真实 Dify
+## 接下来接入自建 Dify 靶场
 
-先实现 `backend/app/services/agent_adapter.py`，让它实现 `AgentAdapter` 协议，再在 `services/runner.py` 中按 Agent 的 `adapter` 字段选择 `mock` 或 `dify`。统一响应必须转换成 `TraceEvent`，前端和报告层不直接依赖 Dify 返回格式。
+先实现 `backend/app/services/agent_adapter.py`，让它实现 `AgentAdapter` 协议，再在 `services/runner.py` 中按 Agent 的 `adapter` 字段选择 `mock` 或 `dify`。统一响应必须转换成 `TraceEvent`，前端和报告层不直接依赖 Dify 返回格式。任何非本地目标必须提供授权记录，并将主机加入 `AGENTGUARD_ALLOWED_TARGET_HOSTS`；未通过门禁时不得发起请求。
+
+## 分支流程
+
+唯一允许的流程是 `feature/* → dev → main`。feature 必须先进入 `dev` 联调，后端测试、前端路由检查、生产构建和人工 P0 闭环全部通过后，才能合并到 `main`。详见 `CONTRIBUTING.md`。
 
 ## 方案审阅结论
 

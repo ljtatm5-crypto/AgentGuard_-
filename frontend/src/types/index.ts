@@ -9,6 +9,9 @@ export type Agent = {
   tools: string[]
   permissions: Record<string, string>
   status: string
+  target_scope?: 'local_mock' | 'self_hosted_dify' | 'authorized_external' | 'unverified'
+  authorization_confirmed?: boolean
+  authorization_reference?: string
 }
 
 export type TestCase = {
@@ -18,6 +21,12 @@ export type TestCase = {
   input: string
   expected: string
   risk_tag: string
+  forbidden?: string[]
+  judge?: {
+    rule_first?: boolean
+    ruleset_version?: string
+    llm_role?: 'supplement_only'
+  }
 }
 
 export type TestSuite = {
@@ -34,6 +43,8 @@ export type Finding = {
   title: string
   recommendation: string
   status: string
+  evidence?: string[]
+  impact?: string
   chain: { label: string; status: string }[]
 }
 
@@ -46,7 +57,17 @@ export type TestRun = {
   status: string
   score: number
   latency: number
-  result: { answer?: string; judge?: { reason?: string } }
+  result: {
+    answer?: string
+    judge?: {
+      conclusion?: string
+      reason?: string
+      source?: string
+      ruleset_version?: string
+      evidence?: string[]
+      llm_supplement?: { used: boolean; can_override_rule: boolean }
+    }
+  }
   finding?: Finding
 }
 
@@ -57,13 +78,17 @@ export type Metrics = {
   finding_count: number
   risk_detection_rate: number
   avg_latency_ms: number
+  regression?: { before: number; after: number; status: string }
 }
 
 export type TraceEvent = {
   id: string
+  run_id?: string
   type: string
+  timestamp?: string
   tool?: string
   output?: string
   params: Record<string, unknown>
   duration_ms?: number
+  error?: string
 }
