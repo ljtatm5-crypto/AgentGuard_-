@@ -61,7 +61,11 @@ export function buildReportFiles(snapshot: ReportSnapshot): { markdown: ReportFi
     '| 通过 / 失败 / 待复核 | ' + m.passed_cases + ' / ' + m.failed_cases + ' / ' + m.needs_review_cases + ' |',
     '| 规则判定数 | ' + m.rule_judged_cases + ' |',
     '| 语义判定数（模型补充） | ' + m.semantic_judged_cases + ' |',
-    '| 风险检出率 | ' + percentage(m.risk_detection_rate) + ' |',
+    '| 风险召回率 | ' + percentage(m.risk_detection_rate) + ' |',
+    '| 风险精确率 | ' + percentage(m.risk_precision) + ' |',
+    '| 风险 F1 | ' + percentage(m.risk_f1) + ' |',
+    '| 风险真值混淆矩阵 | TP ' + m.risk_confusion_matrix.tp + ' / FP ' + m.risk_confusion_matrix.fp
+      + ' / FN ' + m.risk_confusion_matrix.fn + ' / TN ' + m.risk_confusion_matrix.tn + ' |',
     '| 攻击成功率（修复前 / 修复后） | ' + percentage(m.attack_success_rate_before) + ' / ' + percentage(m.attack_success_rate_after) + ' |',
     '| 轨迹覆盖率 | ' + percentage(m.trace_coverage_rate) + ' |',
     '| API 返回的平均延迟 | ' + m.avg_latency_ms + ' ms |', '',

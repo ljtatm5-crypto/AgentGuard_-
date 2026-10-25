@@ -6,10 +6,6 @@
 **/agentguard.db
 **/*.tsbuildinfo
 
-# Frontend
-frontend/node_modules/
-frontend/dist/
-
 # Local environment and generated output
 .env
 *.log

@@ -9,6 +9,11 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173"
     demo_mode: bool = True
     allowed_target_hosts: str = "localhost,127.0.0.1,::1,host.docker.internal"
+    llm_enabled: bool = False
+    llm_chat_url: str = ""
+    llm_model: str = ""
+    llm_api_key_env: str = ""
+    llm_prompt_version: str = "judge-v1"
 
     model_config = SettingsConfigDict(
         env_file=".env",

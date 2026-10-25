@@ -24,6 +24,7 @@ if str(BACKEND) not in sys.path:
 
 from app.security import (TEAM_RISK_TAG, PolicyEngine, ScopeGuard, ScopeViolation,
                           default_permissions)
+from app.core.target_scope import TargetScopeError
 from app.security.samples import build_samples, build_seed_cases
 from app.services import agent_adapter
 from app.services.agent_adapter import Invocation, invoke_agent, policy_for
@@ -85,8 +86,8 @@ def test_dify_adapter_refuses_public_endpoint_without_request():
     agent = FakeAgent(adapter="dify", endpoint="https://www.example.com")
     try:
         invoke_agent(agent, "你好")
-    except ScopeViolation as exc:
-        assert "公网" in exc.decision.reason or "外部网站" in exc.decision.reason
+    except (ScopeViolation, TargetScopeError) as exc:
+        assert "公网" in str(exc) or "外部网站" in str(exc) or "自建" in str(exc)
         return
     raise AssertionError("外部目标未被拒绝，存在越界风险")
 
@@ -238,7 +239,7 @@ def test_unauthorized_domains_never_trigger_dns_or_http():
         assert not ScopeGuard().check("https://unlisted-example.org").allowed
         try:
             invoke_agent(FakeAgent(adapter="dify", endpoint="https://unlisted-example.org"), "你好")
-        except ScopeViolation:
+        except (ScopeViolation, TargetScopeError):
             pass
         else:
             raise AssertionError("未授权域名未被拒绝")
@@ -263,7 +264,7 @@ def test_malformed_ports_and_embedded_credentials_are_rejected():
         assert not guard.check(url).allowed
 
 
-def test_private_remote_still_requires_authorization_and_is_not_connected():
+def test_private_remote_requires_authorization_and_server_credential():
     from unittest.mock import patch
     from app.core.target_scope import TargetScopeError
 
@@ -280,10 +281,10 @@ def test_private_remote_still_requires_authorization_and_is_not_connected():
         })
         try:
             invoke_agent(agent, "你好")
-        except NotImplementedError as exc:
-            assert "未发送网络请求" in str(exc)
+        except ValueError as exc:
+            assert "环境变量" in str(exc)
         else:
-            raise AssertionError("真实 Dify 未接入时应明确提示")
+            raise AssertionError("Dify 凭据未配置时不应发起请求")
 
 
 def test_invalid_permissions_and_denied_write_any_fail_closed():

@@ -107,14 +107,18 @@ export default function FindingsPage() {
                         <div className="chain-body">
                           <strong>{n.label}</strong>
                           <p>{n.detail}</p>
-                          <Link
-                            className="evidence-link"
-                            to={`/runs?${new URLSearchParams({ run: n.evidence.run_id, case: n.evidence.case_id, events: n.evidence.event_ids.join(',') })}`}
-                            data-testid="evidence-link"
-                          >
-                            证据：{n.evidence.run_id} / {n.evidence.case_id} /{' '}
-                            {n.evidence.event_ids.join(', ')} <ArrowUpRight size={14} aria-hidden="true" />
-                          </Link>
+                          {n.evidence.event_ids.length > 0 ? (
+                            <Link
+                              className="evidence-link"
+                              to={`/runs?${new URLSearchParams({ run: n.evidence.run_id, case: n.evidence.case_id, events: n.evidence.event_ids.join(',') })}`}
+                              data-testid="evidence-link"
+                            >
+                              证据：{n.evidence.run_id} / {n.evidence.case_id} /{' '}
+                              {n.evidence.event_ids.join(', ')} <ArrowUpRight size={14} aria-hidden="true" />
+                            </Link>
+                          ) : (
+                            <span className="evidence-inferred">推断节点 · 没有可直接回指的事件</span>
+                          )}
                         </div>
                       </li>
                     ))}

@@ -130,7 +130,9 @@ export interface ChainNode {
   kind: 'entry' | 'behavior' | 'impact' | 'fix'
   label: string
   detail: string
-  evidence: EvidenceRef
+  evidence: EvidenceRef & {
+    status?: 'observed' | 'inferred'
+  }
 }
 
 export interface Finding {
@@ -178,6 +180,15 @@ export interface Metrics {
   findings_open: number
   findings_mitigated: number
   risk_detection_rate: number | null
+  risk_precision: number | null
+  risk_f1: number | null
+  risk_ground_truth_cases: number
+  risk_confusion_matrix: {
+    tp: number
+    fp: number
+    fn: number
+    tn: number
+  }
   attack_success_rate_before: number | null
   attack_success_rate_after: number | null
   trace_coverage_rate: number | null

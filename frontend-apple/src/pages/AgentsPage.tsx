@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { CheckCircle, PlugsConnected, Plus, ShieldCheck, X } from '@phosphor-icons/react'
-import { api, ApiRequestError } from '@/api/client'
+import { api, ApiRequestError, USE_MOCK } from '@/api/client'
 import { AsyncBoundary } from '@/components/AsyncBoundary'
 import { PolicyTag } from '@/components/Tags'
 import { useAsync } from '@/hooks/useAsync'
@@ -31,9 +31,14 @@ function mergeAgents(initial: Agent[], connected: Agent[]): Agent[] {
 export default function AgentsPage() {
   const { state, retry } = useAsync(() => api.listAgents(), [])
   const [connectOpen, setConnectOpen] = useState(false)
+  const [connectionMode, setConnectionMode] = useState<'local_sandbox' | 'dify_authorized'>('local_sandbox')
   const [name, setName] = useState('')
   const [agentType, setAgentType] = useState<Agent['agent_type']>('conversation')
   const [model, setModel] = useState('')
+  const [endpoint, setEndpoint] = useState('')
+  const [credentialEnv, setCredentialEnv] = useState('DIFY_AGENT_API_KEY')
+  const [authorizationReference, setAuthorizationReference] = useState('')
+  const [authorizationConfirmed, setAuthorizationConfirmed] = useState(false)
   const [connecting, setConnecting] = useState(false)
   const [connectError, setConnectError] = useState<string | null>(null)
   const [connected, setConnected] = useState<Agent[]>([])
@@ -44,22 +49,48 @@ export default function AgentsPage() {
       setConnectError('请输入智能体名称')
       return
     }
+    if (connectionMode === 'dify_authorized') {
+      if (USE_MOCK) {
+        setConnectError('真实 Dify 接入需要切换到 API 模式并使用后端网关')
+        return
+      }
+      if (!endpoint.trim()) {
+        setConnectError('请输入自建 Dify 的 Chat Messages 接口地址')
+        return
+      }
+      if (!authorizationReference.trim() || !authorizationConfirmed) {
+        setConnectError('请确认授权并填写授权记录编号')
+        return
+      }
+    }
     setConnecting(true)
     try {
-      const created = await api.validateAgent({
+      const payload: Record<string, unknown> = {
         name: name.trim(),
         version: 'v2.0',
-        endpoint: `local://agent-${Date.now().toString(36)}`,
+        endpoint: connectionMode === 'local_sandbox'
+          ? `local://agent-${Date.now().toString(36)}`
+          : endpoint.trim(),
         agent_type: agentType,
-        model: model.trim() || 'deterministic-local-sandbox',
+        model: model.trim() || (connectionMode === 'local_sandbox' ? 'deterministic-local-sandbox' : 'dify-self-hosted'),
         permissions: {},
-      })
+        connection_mode: connectionMode,
+      }
+      if (connectionMode === 'dify_authorized') {
+        payload.credential_env = credentialEnv.trim()
+        payload.authorization_reference = authorizationReference.trim()
+        payload.authorization_confirmed = true
+      }
+      const created = await api.validateAgent(payload)
       setConnected((items) => mergeAgents(items, [created]))
       setName('')
       setModel('')
+      setEndpoint('')
+      setAuthorizationReference('')
+      setAuthorizationConfirmed(false)
       setConnectOpen(false)
     } catch (error) {
-      setConnectError(error instanceof ApiRequestError ? error.message : '连接测试失败，请稍后重试')
+      setConnectError(error instanceof ApiRequestError ? error.message : '资产校验失败，请稍后重试')
     } finally {
       setConnecting(false)
     }
@@ -81,7 +112,7 @@ export default function AgentsPage() {
           data-testid="connect-agent-btn"
         >
           {connectOpen ? <X size={17} /> : <Plus size={17} weight="bold" />}
-          {connectOpen ? '收起' : '接入智能体'}
+          {connectOpen ? '收起' : '创建本地测试资产'}
         </button>
       </header>
 
@@ -90,9 +121,31 @@ export default function AgentsPage() {
           <div className="connect-head">
             <span className="connect-icon"><PlugsConnected size={24} weight="duotone" /></span>
             <div>
-              <h2 id="connect-title">连接一个新的智能体</h2>
-              <p>先接入本地安全沙盒完成连接测试，再为它选择测试集和执行任务。</p>
+              <h2 id="connect-title">{connectionMode === 'local_sandbox' ? '创建本地测试资产' : '接入授权 Dify 智能体'}</h2>
+              <p>{connectionMode === 'local_sandbox'
+                ? '在本地安全沙盒完成资产校验，再为它选择测试集和执行任务。'
+                : '通过服务端授权网关连接自建 Dify；凭据只从服务器环境变量读取。'}</p>
             </div>
+          </div>
+
+          <div className="connect-modes" role="group" aria-label="接入方式">
+            <button
+              type="button"
+              className={connectionMode === 'local_sandbox' ? 'active' : ''}
+              onClick={() => { setConnectionMode('local_sandbox'); setConnectError(null) }}
+            >
+              <strong>本地安全沙盒</strong>
+              <small>无需凭据，可立即验证</small>
+            </button>
+            <button
+              type="button"
+              className={connectionMode === 'dify_authorized' ? 'active' : ''}
+              onClick={() => { setConnectionMode('dify_authorized'); setConnectError(null) }}
+              data-testid="connect-mode-dify"
+            >
+              <strong>授权自建 Dify</strong>
+              <small>{USE_MOCK ? '需 API 模式与服务端凭据' : '仅允许私网或授权目标'}</small>
+            </button>
           </div>
 
           <form className="connect-form" onSubmit={(event) => { event.preventDefault(); void connectAgent() }}>
@@ -126,9 +179,47 @@ export default function AgentsPage() {
                 placeholder="选填，例如 qwen2.5-7b"
               />
             </label>
+            {connectionMode === 'dify_authorized' && (
+              <div className="connect-dify-fields">
+                <label>
+                  Dify Chat Messages 地址
+                  <input
+                    value={endpoint}
+                    onChange={(event) => { setEndpoint(event.target.value); setConnectError(null) }}
+                    placeholder="http://内网Dify/v1/chat-messages"
+                    data-testid="connect-dify-endpoint"
+                  />
+                </label>
+                <label>
+                  服务端凭据环境变量
+                  <input
+                    value={credentialEnv}
+                    onChange={(event) => { setCredentialEnv(event.target.value); setConnectError(null) }}
+                    placeholder="DIFY_AGENT_API_KEY"
+                    data-testid="connect-dify-credential-env"
+                  />
+                </label>
+                <label>
+                  授权记录编号
+                  <input
+                    value={authorizationReference}
+                    onChange={(event) => { setAuthorizationReference(event.target.value); setConnectError(null) }}
+                    placeholder="例如 AUTH-2026-001"
+                  />
+                </label>
+                <label className="connect-confirm">
+                  <input
+                    type="checkbox"
+                    checked={authorizationConfirmed}
+                    onChange={(event) => { setAuthorizationConfirmed(event.target.checked); setConnectError(null) }}
+                  />
+                  <span>我确认该 Dify 为自建或已获书面授权的内部目标</span>
+                </label>
+              </div>
+            )}
             <div className="connect-actions">
               <button className="btn btn-primary" type="submit" disabled={connecting} data-testid="connect-agent-submit">
-                <PlugsConnected size={17} />{connecting ? '正在连接…' : '连接测试'}
+                <PlugsConnected size={17} />{connecting ? '正在校验…' : connectionMode === 'local_sandbox' ? '创建并校验' : '接入并校验'}
               </button>
               <button className="btn" type="button" onClick={() => setConnectOpen(false)}>取消</button>
             </div>
@@ -136,7 +227,9 @@ export default function AgentsPage() {
 
           <div className="connect-safety">
             <ShieldCheck size={18} weight="duotone" />
-            <span>当前连接目标为本地安全沙盒；真实外部网站不可接入。</span>
+            <span>{connectionMode === 'local_sandbox'
+              ? '当前连接目标为本地安全沙盒；真实外部网站不可接入。'
+              : 'API Key 不会传给浏览器或写入数据库，只由服务端按环境变量名读取。'}</span>
           </div>
           {connectError && <p className="form-error" role="alert" data-testid="connect-agent-error">{connectError}</p>}
         </section>
@@ -145,7 +238,7 @@ export default function AgentsPage() {
       {connected.length > 0 && (
         <div className="connect-success" role="status" data-testid="connect-agent-success">
           <CheckCircle size={18} weight="fill" />
-          已连接 {connected.at(-1)?.name}，可在下方资产列表继续配置测试
+          已创建本地测试资产 {connected.at(-1)?.name}，可在下方列表继续配置测试
         </div>
       )}
 
@@ -162,7 +255,7 @@ export default function AgentsPage() {
                   <h2>{agent.name}</h2>
                 </div>
                 <span className={`validate ${agent.validate_status}`}>
-                  {agent.validate_status === 'validated' ? '已连接' : agent.validate_status === 'invalid' ? '连接失败' : '连接中'}
+                  {agent.validate_status === 'validated' ? '已校验' : agent.validate_status === 'invalid' ? '校验失败' : '校验中'}
                 </span>
               </div>
               <p className="page-desc">{agent.purpose}</p>

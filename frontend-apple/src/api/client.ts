@@ -107,8 +107,18 @@ export const api = {
   listSuites: () => request<TestSuite[]>('/test-suites', schemas.suites),
   listCases: (suiteId: string) =>
     request<TestCase[]>(`/test-suites/${suiteId}/cases`, schemas.cases),
-  generateSuite: (payload: { agent_id: string; test_type: string }) =>
+  generateSuite: (payload: { agent_id: string; test_type: string; use_ai?: boolean }) =>
     request('/test-suites/generate', schemas.suiteGeneration, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  acceptGeneratedSuite: (payload: {
+    agent_id: string
+    name: string
+    test_type: string
+    cases: TestCase[]
+  }) =>
+    request('/test-suites/accept', schemas.suiteGeneration, {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
