@@ -31,6 +31,8 @@ def create_run(payload: RunCreate, db: Session = Depends(get_db)):
     suite = db.get(TestSuite, payload.suite_id)
     if not agent or not suite:
         raise HTTPException(404, "Agent 或测试集不存在")
+    if agent.adapter != "mock":
+        raise HTTPException(status_code=501, detail="此接口仅支持 Mock 资产；真实适配器尚未启用，不会用模拟结果替代真实执行。校园靶场请使用 /api/v2/runs。")
     if payload.mode == "live":
         permissions = agent.permissions or {}
         try:
