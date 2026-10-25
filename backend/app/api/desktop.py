@@ -24,7 +24,8 @@ from app.db.session import get_db
 from app.models.entities import Agent, Finding, TestCase, TestRun, TestSuite, TraceEvent
 from app.services.desktop_contract import (
     FINAL_STATUSES, SEED_SUITE_ID, agent_view, case_view,
-    event_view, finding_view, iso, judge_view, metrics_view, risk_tag, run_view, suite_view,
+    event_view, finding_view, iso, judge_view, metrics_view, risk_tag, run_view,
+    save_chain_review, suite_view,
 )
 
 
@@ -602,6 +603,28 @@ def findings(db: Session = Depends(get_db)):
 @router.get("/findings/{finding_id}/chain")
 def chain(finding_id: str, db: Session = Depends(get_db)):
     return finding_response(db, require(db, Finding, finding_id, "finding_not_found", "缺陷"))
+
+
+class ChainReviewIn(BaseModel):
+    status: str = Field("confirmed", description="confirmed / rejected / pending")
+    reviewer: str = Field(..., min_length=1, description="复核人")
+    note: str = ""
+    confidence: float | None = None
+
+
+@router.post("/findings/{finding_id}/chain/{node_id}/review")
+def review_chain_node(finding_id: str, node_id: str, payload: ChainReviewIn,
+                      db: Session = Depends(get_db)):
+    """人工确认或驳回攻击链上的某个节点（P1：推断节点需可确认/驳回）。"""
+    finding = require(db, Finding, finding_id, "finding_not_found", "缺陷")
+    try:
+        entry = save_chain_review(
+            db, finding, node_id=node_id, status=payload.status,
+            reviewer=payload.reviewer, note=payload.note, confidence=payload.confidence,
+        )
+    except ValueError as exc:
+        raise DesktopError(422, "contract_bad_enum", str(exc)) from exc
+    return {"ok": True, "review": entry, "chain": finding_response(db, finding)}
 
 
 @router.get("/metrics")

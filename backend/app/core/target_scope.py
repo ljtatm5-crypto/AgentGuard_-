@@ -1,5 +1,9 @@
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse
+
+if TYPE_CHECKING:  # 仅用于类型标注，避免运行期引入 SQLAlchemy
+    from sqlalchemy.orm import Session
 
 
 class TargetScopeError(ValueError):
@@ -22,8 +26,15 @@ def validate_target_scope(
     authorization_confirmed: bool,
     authorization_reference: str | None,
     allowed_hosts: list[str],
+    db: "Session | None" = None,
+    agent_id: str | None = None,
 ) -> TargetScopeDecision:
-    """Apply the non-negotiable target authorization gate before any live request."""
+    """Apply the non-negotiable target authorization gate before any live request.
+
+    传入 `db` 时，自报的 `authorization_reference` 必须在服务端授权表里能查到
+    一条仍然有效、且主机/端口/作用域/Agent 全部匹配的记录，否则拒绝建连。
+    这样「调用方自己说自己有授权」不再能通过门禁。
+    """
 
     if adapter == "mock":
         if not endpoint.startswith("local://") or target_scope != "local_mock":
@@ -58,6 +69,23 @@ def validate_target_scope(
     decision = ScopeGuard(authorized=normalized_hosts).check(endpoint)
     if not decision.allowed:
         raise TargetScopeError(decision.reason)
+
+    # 服务端授权记录：编号必须真实存在、未过期、未撤销，且目标完全匹配。
+    if db is not None:
+        from app.services.authorization import AuthorizationError, check_authorization
+
+        try:
+            checked = check_authorization(
+                db, reference=authorization_reference, host=host,
+                port=parsed.port or (443 if parsed.scheme == "https" else 80),
+                target_scope=target_scope, agent_id=agent_id,
+            )
+        except AuthorizationError as exc:  # 数据库不可用等异常也必须拒绝
+            raise TargetScopeError(f"授权记录校验失败：{exc}") from exc
+        if not checked.ok:
+            raise TargetScopeError(
+                f"授权编号 {authorization_reference or '(缺失)'} 未通过服务端校验：{checked.reason}"
+            )
 
     label = "自建 Dify 靶场" if target_scope == "self_hosted_dify" else "明确授权靶场"
     return TargetScopeDecision(True, target_scope, host, label)
