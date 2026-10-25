@@ -22,6 +22,8 @@ export default function SuitesPage() {
   const [useAi, setUseAi] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [generation, setGeneration] = useState<Awaited<ReturnType<typeof api.generateSuite>> | null>(null)
+  const [selectedCandidateId, setSelectedCandidateId] = useState('')
+  const [originalDrafts, setOriginalDrafts] = useState<Record<string, Record<string, unknown>>>({})
   const [generationError, setGenerationError] = useState<string | null>(null)
   const cases = useAsync(
     () => (selected ? api.listCases(selected) : Promise.resolve([])),
@@ -30,6 +32,7 @@ export default function SuitesPage() {
 
   const availableAgents = agents.state.phase === 'ready' ? agents.state.data : []
   const effectiveAgentId = agentId || availableAgents[0]?.id || ''
+  const activeCandidate = generation?.cases.find((item) => item.id === selectedCandidateId) ?? generation?.cases[0]
 
   async function generateSuite() {
     setGenerationError(null)
@@ -45,6 +48,15 @@ export default function SuitesPage() {
         use_ai: useAi,
       })
       setGeneration(result)
+      setSelectedCandidateId(result.cases[0]?.id ?? '')
+      setOriginalDrafts(Object.fromEntries(result.cases.map((item) => [item.id, {
+        title: item.title,
+        input: item.input,
+        steps: item.steps,
+        expected: item.expected,
+        forbidden: item.forbidden,
+        risk_tag: item.risk_tag,
+      }])))
       if (!result.review_required) {
         suites.retry()
         setSelected(result.suite.id)
@@ -65,9 +77,13 @@ export default function SuitesPage() {
         agent_id: effectiveAgentId,
         name: `${testType} · AI 审核测试集`,
         test_type: testType,
-        cases: generation.cases,
+        cases: generation.cases.map((item) => ({
+          ...item,
+          ai_original: originalDrafts[item.id],
+        })),
       })
       setGeneration(accepted)
+      setOriginalDrafts({})
       suites.retry()
       setSelected(accepted.suite.id)
     } catch (error) {
@@ -75,6 +91,42 @@ export default function SuitesPage() {
     } finally {
       setGenerating(false)
     }
+  }
+
+  function updateCandidate(caseId: string, patch: Partial<Awaited<ReturnType<typeof api.generateSuite>>['cases'][number]>) {
+    setGeneration((current) => current ? {
+      ...current,
+      cases: current.cases.map((item) => item.id === caseId ? { ...item, ...patch } : item),
+    } : current)
+  }
+
+  function removeCandidate(caseId: string) {
+    setGeneration((current) => {
+      if (!current) return current
+      const remaining = current.cases.filter((item) => item.id !== caseId)
+      if (selectedCandidateId === caseId) setSelectedCandidateId(remaining[0]?.id ?? '')
+      return { ...current, cases: remaining }
+    })
+  }
+
+  function addCandidate() {
+    if (!generation) return
+    const id = `candidate-${Date.now().toString(36)}`
+    const created = {
+      id,
+      suite_id: generation.suite.id,
+      title: '新的测试用例',
+      risk_tag: 'baseline_normal' as const,
+      input: '',
+      steps: [],
+      expected: '',
+      forbidden: [],
+      judge: ['rule' as const],
+      source: 'ai_generated' as const,
+      version: 'draft',
+    }
+    setGeneration({ ...generation, cases: [...generation.cases, created] })
+    setSelectedCandidateId(id)
   }
 
   return (
@@ -140,7 +192,11 @@ export default function SuitesPage() {
                     {generation.review_required ? '待人工确认' : '已保存'}
                   </span>
                   <strong>{generation.suite.name}</strong>
-                  <small>{generation.cases.length} 条用例 · {generation.llm_used ? '自建模型候选' : '固定规则模板'}</small>
+                  <small>{generation.cases.length} 条用例 · {generation.llm_used
+                    ? '自建模型候选'
+                    : generation.generation_source === 'mock_draft'
+                      ? 'Mock 演示候选（未调用真实模型）'
+                      : '固定规则模板'}</small>
                 </div>
                 {generation.review_required && (
                   <button className="btn btn-primary" type="button" onClick={() => void acceptGenerated()} disabled={generating} data-testid="accept-generated-suite">
@@ -148,15 +204,89 @@ export default function SuitesPage() {
                   </button>
                 )}
               </div>
-              <ul className="generation-cases">
-                {generation.cases.map((item, index) => (
-                  <li key={item.id}>
-                    <span className="case-number">候选 {String(index + 1).padStart(2, '0')}</span>
-                    <div><strong>{item.title}</strong><p>{item.input}</p></div>
-                    <span className="tag tag-info">{RISK_TAG_LABELS[item.risk_tag]}</span>
-                  </li>
-                ))}
-              </ul>
+              {generation.review_required ? (
+                <div className="test-studio">
+                  <aside className="studio-case-list" aria-label="AI 候选用例">
+                    <div className="studio-list-head">
+                      <span>{generation.cases.length} 条候选</span>
+                      <button className="btn btn-icon" type="button" onClick={addCandidate}><Plus size={15} />新增</button>
+                    </div>
+                    {generation.cases.map((item, index) => {
+                      const original = originalDrafts[item.id]
+                      const modified = Boolean(original) && (
+                        original.title !== item.title
+                        || original.input !== item.input
+                        || original.expected !== item.expected
+                      )
+                      return (
+                        <button
+                          type="button"
+                          key={item.id}
+                          className={activeCandidate?.id === item.id ? 'studio-case-item active' : 'studio-case-item'}
+                          onClick={() => setSelectedCandidateId(item.id)}
+                        >
+                          <span>{String(index + 1).padStart(2, '0')}</span>
+                          <span><strong>{item.title || '未命名用例'}</strong><small>{RISK_TAG_LABELS[item.risk_tag]}</small></span>
+                          {modified && <i>已修改</i>}
+                        </button>
+                      )
+                    })}
+                  </aside>
+
+                  {activeCandidate ? (
+                    <div className="studio-editor">
+                      <div className="studio-editor-head">
+                        <div><span className="detail-label">用例编辑器</span><strong>{activeCandidate.title || '未命名用例'}</strong></div>
+                        <button className="btn" type="button" onClick={() => removeCandidate(activeCandidate.id)}>删除候选</button>
+                      </div>
+                      <div className="studio-field-grid">
+                        <label>
+                          用例名称
+                          <input value={activeCandidate.title} onChange={(event) => updateCandidate(activeCandidate.id, { title: event.target.value })} data-testid="studio-case-title" />
+                        </label>
+                        <label>
+                          风险等级
+                          <select value={activeCandidate.risk_tag} onChange={(event) => updateCandidate(activeCandidate.id, { risk_tag: event.target.value as typeof activeCandidate.risk_tag })}>
+                            {Object.entries(RISK_TAG_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                          </select>
+                        </label>
+                        <label className="studio-field-wide">
+                          测试输入
+                          <textarea value={activeCandidate.input} onChange={(event) => updateCandidate(activeCandidate.id, { input: event.target.value })} rows={3} data-testid="studio-case-input" />
+                        </label>
+                        <label className="studio-field-wide">
+                          执行步骤
+                          <textarea value={activeCandidate.steps.join('\n')} onChange={(event) => updateCandidate(activeCandidate.id, { steps: event.target.value.split('\n').filter(Boolean) })} rows={3} />
+                        </label>
+                        <label className="studio-field-wide">
+                          预期行为
+                          <textarea value={activeCandidate.expected} onChange={(event) => updateCandidate(activeCandidate.id, { expected: event.target.value })} rows={3} data-testid="studio-case-expected" />
+                        </label>
+                        <label className="studio-field-wide">
+                          禁止行为
+                          <textarea value={activeCandidate.forbidden.join('\n')} onChange={(event) => updateCandidate(activeCandidate.id, { forbidden: event.target.value.split('\n').filter(Boolean) })} rows={3} />
+                        </label>
+                      </div>
+                      {originalDrafts[activeCandidate.id] && (
+                        <details className="studio-original">
+                          <summary>查看 AI 原始建议</summary>
+                          <pre>{JSON.stringify(originalDrafts[activeCandidate.id], null, 2)}</pre>
+                        </details>
+                      )}
+                    </div>
+                  ) : <p className="empty-inline">候选列表为空，请新增一条用例。</p>}
+                </div>
+              ) : (
+                <ul className="generation-cases">
+                  {generation.cases.map((item, index) => (
+                    <li key={item.id}>
+                      <span className="case-number">用例 {String(index + 1).padStart(2, '0')}</span>
+                      <div><strong>{item.title}</strong><p>{item.input}</p></div>
+                      <span className="tag tag-info">{RISK_TAG_LABELS[item.risk_tag]}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
         </section>

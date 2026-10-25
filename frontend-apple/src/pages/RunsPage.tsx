@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { ArrowClockwise, Crosshair, Play, X } from '@phosphor-icons/react'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { ArrowClockwise, ArrowRight, Crosshair, FunnelSimple, Play, X } from '@phosphor-icons/react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api, ApiRequestError } from '@/api/client'
 import { AsyncBoundary } from '@/components/AsyncBoundary'
 import { JudgeSourceTag, PolicyTag, StatusTag } from '@/components/Tags'
@@ -25,6 +25,8 @@ export default function RunsPage() {
   const [suiteId, setSuiteId] = useState('')
   const [launching, setLaunching] = useState(false)
   const [launchError, setLaunchError] = useState<string | null>(null)
+  const [selectedCaseId, setSelectedCaseId] = useState('')
+  const [resultFilter, setResultFilter] = useState<'all' | 'failed' | 'review'>('all')
   const detail = useAsync(
     () => (opened ? api.getRunDetail(opened) : Promise.resolve(null)),
     [opened],
@@ -33,6 +35,11 @@ export default function RunsPage() {
     () => (opened ? api.getTrace(opened) : Promise.resolve([])),
     [opened],
   )
+
+  useEffect(() => {
+    const requestedAgent = searchParams.get('agent')
+    if (requestedAgent) setAgentId(requestedAgent)
+  }, [searchParams])
 
   useEffect(() => {
     if (trace.state.phase !== 'ready' || !opened || (!focusedCase && !focusedEvents)) return
@@ -155,67 +162,138 @@ export default function RunsPage() {
       </section>
 
       {opened && (
-        <>
-          <section className="panel" id="run-details">
-            <div className="panel-toolbar detail-head">
-              <div><span className="eyebrow mono">{opened}</span><h2>单条用例结论</h2></div>
-              <button className="btn btn-icon" onClick={closeRun} aria-label="收起任务详情"><X size={18} aria-hidden="true" /></button>
+        <section className="panel run-workbench" id="run-details" ref={traceSection}>
+          <div className="panel-toolbar detail-head">
+            <div>
+              <span className="eyebrow mono">{opened}</span>
+              <h2>测试执行工作区</h2>
             </div>
-            <AsyncBoundary state={detail.state} onRetry={detail.retry}>
-              {(d) => !d ? null : d.results.length === 0 ? <p className="muted">任务尚未产生用例结论，可稍后刷新查看。</p> : (
-                <div className="table-scroll" tabIndex={0} role="region" aria-label="单条用例结论">
-                  <table data-testid="results-table">
-                    <thead><tr><th>用例</th><th>结论</th><th>判定来源</th><th>置信度</th><th>理由</th><th>证据事件</th></tr></thead>
-                    <tbody>
-                      {d.results.map((r) => (
-                        <tr key={r.case_id} className={focusedCase === r.case_id ? 'trace-case-focused' : undefined}>
-                          <td className="mono">{r.case_id}</td>
-                          <td><StatusTag v={r.status} /></td>
-                          <td><JudgeSourceTag v={r.judge_source} /></td>
-                          <td>{(r.confidence * 100).toFixed(0)}%</td>
-                          <td>{r.reason}</td>
-                          <td className="mono small">{r.evidence.event_ids.join(', ') || '暂无'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </AsyncBoundary>
-          </section>
+            <button className="btn btn-icon" onClick={closeRun} aria-label="收起任务详情"><X size={18} aria-hidden="true" /></button>
+          </div>
 
-          <section className="panel" ref={traceSection}>
-            <h2>执行轨迹</h2>
-            {(focusedCase || eventIds.length > 0) && <div className="trace-focus-banner" data-testid="evidence-focus-banner"><Crosshair size={18} aria-hidden="true" /><span>证据定位 · {focusedCase || '指定事件'}{eventIds.length > 0 ? ' · ' + eventIds.join(', ') : ''}</span><button className="btn" onClick={() => openRun(opened)}>清除定位</button></div>}
-            <AsyncBoundary state={trace.state} isEmpty={(d) => d.length === 0} onRetry={trace.retry}>
-              {(events) => (
+          <AsyncBoundary state={detail.state} onRetry={detail.retry}>
+            {(d) => {
+              if (!d) return null
+              if (d.results.length === 0) return <p className="muted">任务尚未产生用例结论，可稍后刷新查看。</p>
+              const filteredResults = d.results.filter((result) => {
+                if (resultFilter === 'failed') return result.status === 'failed'
+                if (resultFilter === 'review') return result.status === 'needs_review'
+                return true
+              })
+              const activeResult = d.results.find((result) => result.case_id === (selectedCaseId || focusedCase))
+                ?? filteredResults.find((result) => result.status === 'failed')
+                ?? filteredResults[0]
+                ?? d.results[0]
+              return (
                 <>
-                  {(focusedCase || eventIds.length > 0) && !events.some((e) => (!focusedCase || e.case_id === focusedCase) && (!eventIds.length || eventIds.includes(e.id))) && <p className="form-error" role="status">当前轨迹中未找到所引用的事件，请核对任务与用例版本。</p>}
-                  <ol className="timeline" data-testid="trace-timeline">
-                    {events.map((e) => {
-                      const focused = (!focusedCase || e.case_id === focusedCase) && (eventIds.length > 0 ? eventIds.includes(e.id) : focusedCase === e.case_id)
-                      return (
-                        <li key={e.id} className={focused ? 'trace-focused' : undefined} tabIndex={focused ? -1 : undefined} data-evidence-focus={focused ? 'true' : undefined} data-event-id={e.id}>
-                          <span className="tl-time mono">{e.timestamp.replace('T', ' ').slice(11, 19)}</span>
-                          <span className="tl-id mono">{e.id}</span>
-                          <span className="tl-type"><TraceTag type={e.type} /></span>
-                          <span className="tl-case mono">{e.case_id}</span>
-                          <div className="tl-body">
-                            {e.tool && <div className="mono small">工具：{e.tool}</div>}
-                            {e.params && <div className="mono small">参数：{JSON.stringify(e.params)}</div>}
-                            {e.policy_decision && <div>权限决策：<PolicyTag v={e.policy_decision} /></div>}
-                            {e.output && <div>{e.output}</div>}
-                            {e.error && <div className="err">错误：{e.error}</div>}
-                          </div>
-                        </li>
-                      )
-                    })}
-                  </ol>
+                  {(focusedCase || eventIds.length > 0) && (
+                    <div className="trace-focus-banner" data-testid="evidence-focus-banner">
+                      <Crosshair size={18} aria-hidden="true" />
+                      <span>证据定位 · {focusedCase || '指定事件'}{eventIds.length > 0 ? ' · ' + eventIds.join(', ') : ''}</span>
+                      <button className="btn" onClick={() => openRun(opened)}>清除定位</button>
+                    </div>
+                  )}
+
+                  <div className="run-workspace-grid">
+                    <aside className="run-case-rail" aria-label="测试用例结果">
+                      <div className="run-filter-bar">
+                        <span className="run-filter-icon"><FunnelSimple size={15} /></span>
+                        <FilterButton active={resultFilter === 'all'} onClick={() => setResultFilter('all')} label={`全部 ${d.results.length}`} />
+                        <FilterButton active={resultFilter === 'failed'} onClick={() => setResultFilter('failed')} label={`失败 ${d.results.filter((result) => result.status === 'failed').length}`} />
+                        <FilterButton active={resultFilter === 'review'} onClick={() => setResultFilter('review')} label={`待复核 ${d.results.filter((result) => result.status === 'needs_review').length}`} />
+                      </div>
+                      <div className="run-case-list" data-testid="results-table">
+                        {filteredResults.map((result, index) => (
+                          <button
+                            type="button"
+                            key={result.case_id}
+                            className={`run-case-item ${activeResult.case_id === result.case_id ? 'active' : ''} ${focusedCase === result.case_id ? 'trace-case-focused' : ''}`}
+                            onClick={() => setSelectedCaseId(result.case_id)}
+                          >
+                            <span className="run-case-index">{String(index + 1).padStart(2, '0')}</span>
+                            <span>
+                              <strong>{result.case_id}</strong>
+                              <small>{result.reason}</small>
+                            </span>
+                            <StatusTag v={result.status} />
+                          </button>
+                        ))}
+                      </div>
+                    </aside>
+
+                    <section className="run-behavior-panel" aria-label="Agent 行为轨迹">
+                      <div className="workspace-section-head">
+                        <div><span className="detail-label">Agent 行为</span><h3>{activeResult.case_id}</h3></div>
+                        <TraceTag type="policy" />
+                      </div>
+                      <AsyncBoundary state={trace.state} isEmpty={(events) => events.length === 0} onRetry={trace.retry}>
+                        {(events) => {
+                          const caseEvents = events.filter((event) => event.case_id === activeResult.case_id)
+                          return (
+                            <>
+                              {(focusedCase || eventIds.length > 0) && !caseEvents.some((event) => !eventIds.length || eventIds.includes(event.id)) && (
+                                <p className="form-error" role="status">当前轨迹中未找到所引用的事件，请核对任务与用例版本。</p>
+                              )}
+                              <ol className="event-flow" data-testid="trace-timeline">
+                                {caseEvents.map((event, index) => {
+                                  const focused = focusedCase === event.case_id && (eventIds.length === 0 || eventIds.includes(event.id))
+                                  return (
+                                    <li
+                                      key={event.id}
+                                      className={`event-node ${focused ? 'trace-focused' : ''} ${event.error ? 'has-error' : ''}`}
+                                      tabIndex={focused ? -1 : undefined}
+                                      data-evidence-focus={focused ? 'true' : undefined}
+                                      data-event-id={event.id}
+                                    >
+                                      <span className="event-node-index">{String(index + 1).padStart(2, '0')}</span>
+                                      <div className="event-node-card">
+                                        <div className="event-node-head">
+                                          <TraceTag type={event.type} />
+                                          <span className="mono">{event.timestamp.replace('T', ' ').slice(11, 19)}</span>
+                                        </div>
+                                        <strong>{event.tool || TRACE_TYPE_LABELS[event.type]}</strong>
+                                        {event.policy_decision && <div>权限决策：<PolicyTag v={event.policy_decision} /></div>}
+                                        {event.output && <p>{event.output}</p>}
+                                        {event.error && <p className="err">{event.error}</p>}
+                                        <details>
+                                          <summary>查看原始事件</summary>
+                                          <span className="mono">{event.id}</span>
+                                          <pre>{JSON.stringify(event.params, null, 2)}</pre>
+                                        </details>
+                                      </div>
+                                      {index < caseEvents.length - 1 && <ArrowRight className="event-arrow" size={16} aria-hidden="true" />}
+                                    </li>
+                                  )
+                                })}
+                              </ol>
+                            </>
+                          )
+                        }}
+                      </AsyncBoundary>
+                    </section>
+
+                    <aside className={`run-verdict-panel verdict-${activeResult.status}`} aria-label="判定与证据">
+                      <span className="detail-label">判定与证据</span>
+                      <div className="verdict-status"><StatusTag v={activeResult.status} /><JudgeSourceTag v={activeResult.judge_source} /></div>
+                      <h3>{(activeResult.confidence * 100).toFixed(0)}% 置信度</h3>
+                      <p>{activeResult.reason}</p>
+                      <div className="verdict-evidence">
+                        <strong>证据事件</strong>
+                        <span className="mono">{activeResult.evidence.event_ids.join(', ') || '暂无事件'}</span>
+                      </div>
+                      <Link
+                        className="btn"
+                        to={`/runs?${new URLSearchParams({ run: activeResult.evidence.run_id, case: activeResult.evidence.case_id, events: activeResult.evidence.event_ids.join(',') })}`}
+                      >
+                        在轨迹中定位 <ArrowRight size={15} />
+                      </Link>
+                    </aside>
+                  </div>
                 </>
-              )}
-            </AsyncBoundary>
-          </section>
-        </>
+              )
+            }}
+          </AsyncBoundary>
+        </section>
       )}
     </div>
   )
@@ -224,4 +302,8 @@ export default function RunsPage() {
 function TraceTag({ type }: { type: TraceEventType }) {
   const tone: Record<TraceEventType, string> = { input: 'tag-neutral', retrieval: 'tag-info', tool: 'tag-info', policy: 'tag-warning', response: 'tag-neutral', error: 'tag-danger' }
   return <span className={'tag ' + tone[type]}>{TRACE_TYPE_LABELS[type]}</span>
+}
+
+function FilterButton({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
+  return <button type="button" className={active ? 'active' : ''} onClick={onClick}>{label}</button>
 }

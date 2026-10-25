@@ -344,6 +344,17 @@ def accept_generated_suite(payload: AcceptGeneratedRequest, db: Session = Depend
         if not name or not input_text or not expected:
             raise DesktopError(422, "contract_missing_field", f"第 {index + 1} 条候选缺少名称、输入或预期")
         matched_template = next((case for case in templates if risk_tag(case.risk_tag) == tag), templates[0])
+        ai_original = item.get("ai_original") if isinstance(item.get("ai_original"), dict) else None
+        human_modified = bool(ai_original) and any(
+            ai_original.get(key) != value
+            for key, value in {
+                "title": name,
+                "input": input_text,
+                "expected": expected,
+                "forbidden": item.get("forbidden") if isinstance(item.get("forbidden"), list) else [],
+                "risk_tag": tag,
+            }.items()
+        )
         case = TestCase(
             suite_id=suite.id,
             name=name,
@@ -356,6 +367,8 @@ def accept_generated_suite(payload: AcceptGeneratedRequest, db: Session = Depend
                 **dict(matched_template.judge or {}),
                 "reviewed_at": datetime.now(timezone.utc).isoformat(),
                 "review_method": "human_accept",
+                "ai_original": ai_original,
+                "human_modified": human_modified,
             },
             risk_tag=tag,
             source="ai_generated",

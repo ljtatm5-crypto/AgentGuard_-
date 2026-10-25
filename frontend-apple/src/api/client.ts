@@ -116,7 +116,7 @@ export const api = {
     agent_id: string
     name: string
     test_type: string
-    cases: TestCase[]
+    cases: Array<TestCase & { ai_original?: Record<string, unknown> }>
   }) =>
     request('/test-suites/accept', schemas.suiteGeneration, {
       method: 'POST',
