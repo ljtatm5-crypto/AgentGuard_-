@@ -13,9 +13,10 @@ services:
 
   frontend:
     build:
-      context: ./frontend
+      context: ./frontend-apple
       args:
-        VITE_DATA_MODE: api
+        VITE_USE_MOCK: "false"
+        VITE_API_BASE: ""
     ports:
       - "5173:80"
     depends_on:

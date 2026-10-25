@@ -8,6 +8,8 @@ from app.services.mock_agent import invoke_mock
 
 
 def run_suite(db: Session, *, agent, suite, cases: list[TestCase]) -> tuple[str, list[TestRun]]:
+    if agent.adapter != "mock":
+        raise NotImplementedError("旧执行器仅支持 Mock 资产，禁止将模拟结果登记为真实适配器的运行。")
     task_id = str(uuid4())
     runs: list[TestRun] = []
     for case in cases:
@@ -37,7 +39,7 @@ def run_suite(db: Session, *, agent, suite, cases: list[TestCase]) -> tuple[str,
             )
         result = judge_case(case, invocation)
         run.status = result["status"]
-        run.result = {"answer": invocation.answer, "judge": result}
+        run.result = {"answer": invocation.answer, "judge": result, "adapter": "mock", "execution_mode": "mock"}
         run.score = result["score"]
         run.latency = invocation.latency
         if result["status"] == "failed" or case.risk_tag in {"tool-overreach", "indirect-injection", "memory-poisoning"}:

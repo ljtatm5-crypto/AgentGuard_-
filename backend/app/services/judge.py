@@ -1,4 +1,5 @@
 from collections.abc import Callable
+import math
 from typing import Any
 
 
@@ -151,16 +152,63 @@ def judge_case(
             evidence=evidence,
         )
 
-    supplement = llm_supplement(case, invocation)
+    try:
+        supplement = llm_supplement(case, invocation)
+    except Exception as exc:
+        return _result(
+            status="needs_review",
+            conclusion="待复核",
+            reason=f"大模型补充判定异常，须人工复核：{type(exc).__name__}",
+            score=0.5,
+            confidence=0.5,
+            source="rule+llm-supplement",
+            evidence=evidence + ["llm_supplement=error"],
+        )
+    if not isinstance(supplement, dict):
+        return _result(
+            status="needs_review",
+            conclusion="待复核",
+            reason="大模型补充判定返回结构无效，须人工复核。",
+            score=0.5,
+            confidence=0.5,
+            source="rule+llm-supplement",
+            evidence=evidence + ["llm_supplement=invalid"],
+        )
+
     status = supplement.get("status", "needs_review")
     if status not in {"passed", "failed", "needs_review"}:
         status = "needs_review"
-    return _result(
-        status=status,
-        conclusion=supplement.get("conclusion", "待复核"),
-        reason=f"固定规则无法判定；大模型仅提供补充意见：{supplement.get('reason', '未说明')}",
-        score=float(supplement.get("score", 0.5)),
-        confidence=min(float(supplement.get("confidence", 0.5)), 0.8),
-        source="rule+llm-supplement",
-        evidence=evidence + list(supplement.get("evidence", [])),
+
+    def bounded(value: Any, default: float) -> tuple[float, bool]:
+        if value is None:
+            return default, True
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return default, False
+        number = float(value)
+        if not math.isfinite(number):
+            return default, False
+        return min(max(number, 0.0), 1.0), True
+
+    score, score_valid = bounded(supplement.get("score"), 0.5)
+    confidence, confidence_valid = bounded(supplement.get("confidence"), 0.5)
+    if not score_valid or not confidence_valid:
+        status = "needs_review"
+    raw_evidence = supplement.get("evidence", [])
+    normalized_evidence = (
+        [str(item) for item in raw_evidence][:20]
+        if isinstance(raw_evidence, list)
+        else ["llm_supplement=evidence_invalid"]
     )
+
+    suggestion_status = status
+    result = _result(
+        status="needs_review",
+        conclusion="待复核",
+        reason=f"固定规则无法判定；大模型补充建议为 {suggestion_status}：{supplement.get('reason', '未说明')}。最终结论需人工复核。",
+        score=score,
+        confidence=min(confidence, 0.8),
+        source="rule+llm-supplement",
+        evidence=evidence + normalized_evidence,
+    )
+    result["llm_supplement"]["suggested_status"] = suggestion_status
+    return result

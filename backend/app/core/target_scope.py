@@ -35,16 +35,29 @@ def validate_target_scope(
     if not authorization_confirmed or not (authorization_reference or "").strip():
         raise TargetScopeError("缺少书面授权/自建靶场记录，禁止连接该目标。")
 
-    parsed = urlparse(endpoint)
-    host = (parsed.hostname or "").lower()
+    try:
+        parsed = urlparse(endpoint)
+        host = (parsed.hostname or "").lower()
+        port = parsed.port
+    except ValueError as exc:
+        raise TargetScopeError("目标地址或端口格式无效。") from exc
     if parsed.scheme not in {"http", "https"} or not host:
         raise TargetScopeError("非 Mock Agent 的 endpoint 必须是有效的 HTTP(S) 地址。")
+    if parsed.username is not None or parsed.password is not None or port == 0:
+        raise TargetScopeError("目标地址不得包含账号密码，端口必须有效。")
 
     normalized_hosts = {item.strip().lower() for item in allowed_hosts if item.strip()}
     if host not in normalized_hosts:
         raise TargetScopeError(
             f"目标主机 {host} 不在 AGENTGUARD_ALLOWED_TARGET_HOSTS 白名单中，禁止访问。"
         )
+
+    # 配置白名单不是公网测试许可。旧 API 与新适配器必须使用同一硬性边界。
+    from app.security.scope import ScopeGuard
+
+    decision = ScopeGuard(authorized=normalized_hosts).check(endpoint)
+    if not decision.allowed:
+        raise TargetScopeError(decision.reason)
 
     label = "自建 Dify 靶场" if target_scope == "self_hosted_dify" else "明确授权靶场"
     return TargetScopeDecision(True, target_scope, host, label)

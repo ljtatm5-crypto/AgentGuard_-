@@ -1,0 +1,59 @@
+@media (max-width: 767px) {
+  .sidebar nav {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+
+  .nav-item {
+    min-width: 0;
+    padding-inline: 1px;
+    font-size: 8px;
+  }
+
+  .nav-label {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .nav-label-long {
+    display: none;
+  }
+
+  .nav-label-short {
+    display: inline;
+  }
+
+  .settings-status {
+    grid-template-columns: 1fr;
+    padding: 23px;
+    gap: 20px;
+    border-radius: 20px;
+  }
+
+  .settings-status-copy h2 {
+    font-size: 25px;
+  }
+
+  .contract-card {
+    padding: 18px;
+  }
+
+  .settings-grid {
+    grid-template-columns: 1fr;
+    gap: 13px;
+  }
+
+  .constraint-card,
+  .constraint-card:last-child {
+    min-height: 0;
+    grid-column: auto;
+  }
+
+  .release-track {
+    grid-template-columns: 1fr;
+  }
+
+  .release-panel {
+    padding: 20px;
+  }
+}
