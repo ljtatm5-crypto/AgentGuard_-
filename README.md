@@ -19,7 +19,7 @@ agentguard/
 │  ├─ app/models/           六类统一数据对象
 │  ├─ app/services/         模拟 Agent、执行器、判定器、种子数据
 │  └─ tests/                API 冒烟测试
-├─ frontend/                Vue 3 + TypeScript + Element Plus + ECharts
+├─ frontend-apple/          React + TypeScript + MSW + 苹果毛玻璃桌面端
 ├─ docker-compose.yml       一键启动开发环境
 └─ .env.example
 ```
@@ -43,12 +43,14 @@ uv run uvicorn app.main:app --reload --port 8000
 需要 Node 18+：
 
 ```powershell
-cd frontend
+cd frontend-apple
 npm install
 npm run dev
 ```
 
-访问 <http://localhost:5173>。默认 `VITE_DATA_MODE=mock`，不要求后端启动；复制 `frontend/.env.example` 并改为 `VITE_DATA_MODE=api` 后，Vite 会把 `/api` 代理到 `http://localhost:8000`。
+访问 <http://127.0.0.1:5173>。默认 `VITE_USE_MOCK=true`，不要求后端启动；API 模式设置
+`VITE_USE_MOCK=false`，Vite 会把 `/api` 代理到 `http://127.0.0.1:8000`。Mock 与真实后端统一使用
+`/api/v2` 契约。
 
 当前路由：`/overview`、`/agents`、`/test-suites`、`/runs`、`/runs/:id`、`/findings`、`/reports`、`/settings`。
 
@@ -63,7 +65,7 @@ docker compose up --build
 1. 在“Agent 资产”页确认默认的校园智能助手。
 2. 在“测试集”页生成/查看六类测试用例。
 3. 在“执行任务”页启动一次批量运行。
-4. 打开某条失败用例，查看轨迹、工具权限判定和攻击链。
+4. 打开 `/runs/:id`，查看轨迹、工具权限判定和攻击链。
 5. 在“报告”页查看通过率、风险检出率和修复前后对比占位。
 
 ## 接下来接入自建 Dify 靶场
@@ -72,7 +74,10 @@ docker compose up --build
 
 ## 分支流程
 
-唯一允许的流程是 `feature/* → dev → main`。feature 必须先进入 `dev` 联调，后端测试、前端路由检查、生产构建和人工 P0 闭环全部通过后，才能合并到 `main`。详见 `CONTRIBUTING.md`。
+唯一允许的流程是 `feature/* → dev → main`。`dev` 就是 integration 分支；Git 不允许同时存在
+`dev` 与 `dev/integration` 两个 ref，因此不使用会造成引用冲突的分支名。feature 必须先进入
+`dev` 联调，后端测试、前端 Mock/API 路由检查、生产构建和人工 P0 闭环全部通过后，才能合并到
+`main`。详见 `CONTRIBUTING.md`。
 
 ## 方案审阅结论
 

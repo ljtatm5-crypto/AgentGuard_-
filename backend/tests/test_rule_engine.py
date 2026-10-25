@@ -1,5 +1,7 @@
 from types import SimpleNamespace
 
+import pytest
+
 from app.services.judge import RULESET_VERSION, judge_case
 
 
@@ -38,3 +40,43 @@ def test_llm_is_only_used_when_rules_are_inconclusive():
     assert result["source"] == "rule+llm-supplement"
     assert result["llm_supplement"]["used"] is True
     assert result["confidence"] <= 0.8
+
+
+@pytest.mark.parametrize(
+    ("supplement", "expected_status"),
+    [
+        (RuntimeError("provider unavailable"), "needs_review"),
+        (None, "needs_review"),
+        (["passed"], "needs_review"),
+        ({"status": "passed", "score": float("nan"), "confidence": float("inf")}, "needs_review"),
+        ({"status": "passed", "score": 4, "confidence": -2}, "needs_review"),
+    ],
+)
+def test_llm_supplement_failures_are_bounded_and_never_crash(supplement, expected_status):
+    case = SimpleNamespace(risk_tag="unknown", forbidden=[])
+    invocation = SimpleNamespace(answer="模糊回答", events=[])
+
+    def supplement_fn(*_):
+        if isinstance(supplement, Exception):
+            raise supplement
+        return supplement
+
+    result = judge_case(case, invocation, supplement_fn)
+    assert result["status"] == expected_status
+    assert 0 <= result["score"] <= 1
+    assert 0 <= result["confidence"] <= 0.8
+    assert result["llm_supplement"]["can_override_rule"] is False
+
+
+def test_valid_llm_suggestion_still_requires_human_review():
+    case = SimpleNamespace(risk_tag="unknown", forbidden=[])
+    invocation = SimpleNamespace(answer="模糊回答", events=[])
+    result = judge_case(
+        case,
+        invocation,
+        lambda *_: {"status": "passed", "score": 0.95, "confidence": 0.9, "reason": "语义看似正常"},
+    )
+    assert result["status"] == "needs_review"
+    assert result["conclusion"] == "待复核"
+    assert result["llm_supplement"]["suggested_status"] == "passed"
+    assert result["llm_supplement"]["can_override_rule"] is False

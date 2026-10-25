@@ -3,10 +3,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import agents, findings, metrics, runs, suites
+from app.api import agents, desktop, findings, metrics, runs, suites
 from app.core.config import get_settings
 from app.db.session import SessionLocal, init_db
 from app.services.seed import ensure_demo_data
+from app.services.desktop_contract import ensure_desktop_data
 
 settings = get_settings()
 
@@ -17,6 +18,7 @@ async def lifespan(_: FastAPI):
     db = SessionLocal()
     try:
         ensure_demo_data(db)
+        ensure_desktop_data(db)
     finally:
         db.close()
     yield
@@ -47,3 +49,4 @@ app.include_router(suites.router, prefix="/api")
 app.include_router(runs.router, prefix="/api")
 app.include_router(findings.router, prefix="/api")
 app.include_router(metrics.router, prefix="/api")
+app.include_router(desktop.router, prefix="/api/v2")

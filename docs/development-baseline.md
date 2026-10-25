@@ -4,7 +4,7 @@
 |---|---|---|---|
 | A | 固定规则与禁止项 | `backend/app/services/judge.py` | 规则命中不可被 LLM 覆盖的单元测试 |
 | B | 自建/授权靶场和目标白名单 | `backend/app/core/target_scope.py` | 公网非白名单目标被拒绝的单元测试 |
-| C | Mock 数据和全部页面路由 | `frontend/src/mocks`、`frontend/src/router`、`frontend/src/views` | `npm run check:routes` 与 `npm run build` |
+| C | Mock 数据和全部页面路由 | `frontend-apple/src/mock`、`frontend-apple/src/App.tsx`、`frontend-apple/src/pages` | `npm run check:mock`、`npm run test:smoke` 与 `npm run build` |
 
 ## 当前 P0 页面路由
 

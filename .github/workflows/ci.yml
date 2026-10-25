@@ -1,0 +1,69 @@
+name: AgentGuard integration gate
+
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev, main]
+
+jobs:
+  merge-path:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce feature -> dev -> main
+        shell: bash
+        run: |
+          if [[ "${{ github.base_ref }}" == "dev" && "${{ github.head_ref }}" != feature/* ]]; then
+            echo "Only feature/* branches may merge into dev."
+            exit 1
+          fi
+          if [[ "${{ github.base_ref }}" == "main" && "${{ github.head_ref }}" != "dev" ]]; then
+            echo "Only dev may merge into main."
+            exit 1
+          fi
+
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install backend
+        working-directory: backend
+        run: pip install -e . pytest
+      - name: Backend tests
+        working-directory: backend
+        run: pytest -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend-apple/package-lock.json
+      - name: Install frontend
+        working-directory: frontend-apple
+        run: npm ci
+      - name: Static and mock gates
+        working-directory: frontend-apple
+        run: |
+          npm run lint
+          npm run typecheck
+          npm run check:mock
+          npm run build
+      - name: Install browser
+        working-directory: frontend-apple
+        run: npx playwright install --with-deps chromium
+      - name: Mock route smoke
+        working-directory: frontend-apple
+        run: npx playwright test --grep-invert "生成演示截图"
+      - name: Real API contract
+        working-directory: frontend-apple
+        env:
+          VITE_USE_MOCK: "false"
+        run: npx playwright test e2e/api.spec.ts
