@@ -16,7 +16,7 @@ import { findings } from './fixtures/findings'
 import { buildMockMetrics } from './fixtures/metrics'
 import { runs } from './fixtures/runs'
 import { traceEvents, traceByRun } from './fixtures/trace'
-import { API_PREFIX } from '@/api/contract'
+import { mockApiPath } from '@/api/contract'
 import { mockJudgeTable, verdictForMockRun } from './fixtures/judgments'
 
 /** 可变状态：新任务返回独立的本地合成示例，不发出任何 Agent 请求。 */
@@ -56,12 +56,12 @@ const buildJudgeResults = (run: TestRun): JudgeResult[] =>
 
 export const handlers = [
   // ---------- Agent 资产（B 提供） ----------
-  http.get(`${API_PREFIX}/agents`, async () => {
+  http.get(mockApiPath('/agents'), async () => {
     await delay(180)
     return HttpResponse.json([...agentState.values()] satisfies Agent[])
   }),
 
-  http.post(`${API_PREFIX}/agents/validate`, async ({ request }) => {
+  http.post(mockApiPath('/agents/validate'), async ({ request }) => {
     await delay(320)
     const body = (await request.json()) as {
       name?: string
@@ -101,7 +101,7 @@ export const handlers = [
     return HttpResponse.json(created)
   }),
 
-  http.get(`${API_PREFIX}/agents/:id`, async ({ params }) => {
+  http.get(mockApiPath('/agents/:id'), async ({ params }) => {
     await delay(150)
     const found = agentState.get(String(params.id))
     if (!found) return notFound('Agent', String(params.id))
@@ -109,19 +109,19 @@ export const handlers = [
   }),
 
   // ---------- 测试集与用例（A 提供） ----------
-  http.get(`${API_PREFIX}/test-suites`, async () => {
+  http.get(mockApiPath('/test-suites'), async () => {
     await delay(200)
     return HttpResponse.json(suites satisfies TestSuite[])
   }),
 
-  http.get(`${API_PREFIX}/test-suites/:id/cases`, async ({ params }) => {
+  http.get(mockApiPath('/test-suites/:id/cases'), async ({ params }) => {
     await delay(200)
     if (!suites.some((s) => s.id === params.id)) return notFound('测试集', String(params.id))
     const list = cases.filter((c) => c.suite_id === params.id) satisfies TestCase[]
     return HttpResponse.json(list)
   }),
 
-  http.post(`${API_PREFIX}/test-suites/generate`, async ({ request }) => {
+  http.post(mockApiPath('/test-suites/generate'), async ({ request }) => {
     await delay(600)
     const body = (await request.json()) as { agent_id?: string; test_type?: string }
     if (!body.agent_id) return err('VALIDATION_ERROR', 'agent_id 为必填字段', 422)
@@ -156,12 +156,12 @@ export const handlers = [
   }),
 
   // ---------- 执行任务（A 提供） ----------
-  http.get(`${API_PREFIX}/runs`, async () => {
+  http.get(mockApiPath('/runs'), async () => {
     await delay(200)
     return HttpResponse.json(Array.from(runState.values()))
   }),
 
-  http.post(`${API_PREFIX}/runs`, async ({ request }) => {
+  http.post(mockApiPath('/runs'), async ({ request }) => {
     await delay(280)
     const body = (await request.json()) as { agent_id?: string; suite_id?: string }
     if (!body.agent_id) return err('VALIDATION_ERROR', 'agent_id 为必填字段', 422)
@@ -196,21 +196,21 @@ export const handlers = [
     return HttpResponse.json(run, { status: 201 })
   }),
 
-  http.get(`${API_PREFIX}/runs/:id`, async ({ params }) => {
+  http.get(mockApiPath('/runs/:id'), async ({ params }) => {
     await delay(200)
     const run = runState.get(String(params.id))
     if (!run) return notFound('运行记录', String(params.id))
     return HttpResponse.json({ run, results: buildJudgeResults(run) })
   }),
 
-  http.post(`${API_PREFIX}/runs/:id/judge`, async ({ params }) => {
+  http.post(mockApiPath('/runs/:id/judge'), async ({ params }) => {
     await delay(260)
     const run = runState.get(String(params.id))
     if (!run) return notFound('运行记录', String(params.id))
     return HttpResponse.json(buildJudgeResults(run))
   }),
 
-  http.get(`${API_PREFIX}/runs/:id/trace`, async ({ params }) => {
+  http.get(mockApiPath('/runs/:id/trace'), async ({ params }) => {
     await delay(220)
     const runId = String(params.id)
     if (!runState.has(runId)) return notFound('运行记录', runId)
@@ -218,12 +218,12 @@ export const handlers = [
   }),
 
   // ---------- 缺陷与攻击链（B 提供样本，A 判定） ----------
-  http.get(`${API_PREFIX}/findings`, async () => {
+  http.get(mockApiPath('/findings'), async () => {
     await delay(200)
     return HttpResponse.json(findings)
   }),
 
-  http.get(`${API_PREFIX}/findings/:id/chain`, async ({ params }) => {
+  http.get(mockApiPath('/findings/:id/chain'), async ({ params }) => {
     await delay(200)
     const found = findings.find((f) => f.id === params.id)
     if (!found) return notFound('缺陷', String(params.id))
@@ -231,7 +231,7 @@ export const handlers = [
   }),
 
   // ---------- 指标聚合 ----------
-  http.get(`${API_PREFIX}/metrics`, async () => {
+  http.get(mockApiPath('/metrics'), async () => {
     await delay(240)
     return HttpResponse.json(buildMockMetrics(Array.from(runState.values())) satisfies Metrics)
   }),
