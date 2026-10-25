@@ -6,6 +6,7 @@ import { USE_MOCK } from './api/client'
 import './styles.css'
 import './apple.css'
 import './mobile.css'
+import './legibility.css'
 
 async function bootstrap() {
   if (USE_MOCK) {

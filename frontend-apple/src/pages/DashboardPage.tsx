@@ -16,13 +16,24 @@ export default function DashboardPage() {
   const metrics = useAsync(() => api.getMetrics(), [])
   const reduce = useReducedMotion()
   return <div className="dashboard-page">
-    <header className="page-head dashboard-head"><div><h1>总览</h1><p className="page-desc">从测试执行到问题回溯，一处看清。</p></div><Link to="/runs" className="btn btn-primary"><Plus size={17} weight="bold" />启动新测试</Link></header>
+    <header className="page-head dashboard-head"><div><h1>总览</h1><p className="page-desc">规则先判、批量回归、轨迹审计与授权靶场，一处看清。</p></div><Link to="/runs" className="btn btn-primary"><Plus size={17} weight="bold" />启动新测试</Link></header>
     <AsyncBoundary state={metrics.state} onRetry={metrics.retry}>{m => {
       const passRate = m.completed_cases ? m.passed_cases / m.completed_cases * 100 : 0
       const ruleRate = m.completed_cases ? m.rule_judged_cases / m.completed_cases * 100 : 0
       return <>
         <MotionSurface className="overview-hero">
-          <div className="hero-copy"><span className="hero-label"><CheckCircle size={17} weight="duotone" />智能体质量工作台</span><h2>让每一次测试，<br /><span>都有据可循。</span></h2><p>看见行为，理解风险。<br />把每一个发现，变成下一次改进。</p><Link to="/reports" className="hero-link">查看验证报告 <ArrowUpRight size={17} /></Link></div>
+          <div className="hero-copy">
+            <span className="hero-label"><CheckCircle size={17} weight="duotone" />智能体质量与安全验证平台</span>
+            <h2>让每一次测试，<br /><span>都有据可循。</span></h2>
+            <p>固定规则先行判定，批量回归定位风险；从执行轨迹到攻击链，每一个结论都能回看证据。</p>
+            <div className="hero-features" aria-label="平台核心功能">
+              <span className="hero-feature"><b>01</b><span><strong>规则先行</strong><small>确定性判定</small></span></span>
+              <span className="hero-feature"><b>02</b><span><strong>批量回归</strong><small>修复前后对照</small></span></span>
+              <span className="hero-feature"><b>03</b><span><strong>轨迹审计</strong><small>证据可回指</small></span></span>
+              <span className="hero-feature"><b>04</b><span><strong>授权靶场</strong><small>外部目标默认拒绝</small></span></span>
+            </div>
+            <Link to="/reports" className="hero-link">查看验证报告 <ArrowUpRight size={17} /></Link>
+          </div>
           <div className="hero-summary"><div className="quality-ring" style={{ '--ring-value': `${passRate}%` } as CSSProperties}><motion.div className="quality-ring-inner" initial={reduce ? false : { scale: .85, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 130, damping: 20 }}><span>当前通过率</span><strong><CountUp value={passRate} decimals={1} suffix="%" /></strong><small>{USE_MOCK ? 'Mock 测试样例' : '本地执行记录'}</small></motion.div></div><div className="hero-summary-notes"><span><i className="status-mark status-passed" />{m.passed_cases} 项通过</span><span><i className="status-mark status-failed" />{m.failed_cases} 项失败</span><span><i className="status-mark status-review" />{m.needs_review_cases} 项待复核</span></div></div>
         </MotionSurface>
         <section className="grid-4 stat-grid" aria-label="测试指标">

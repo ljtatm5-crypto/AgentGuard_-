@@ -13,7 +13,7 @@ const ROUTES = [
   { path: '/runs/run-001', marker: '[data-testid="results-table"]', name: '运行详情' },
   { path: '/findings', marker: '[data-testid="findings-table"]', name: '攻击链与缺陷' },
   { path: '/reports', marker: '[data-testid="compare-table"]', name: '报告与回归' },
-  { path: '/settings', marker: '[data-testid="settings-constraints"]', name: '设置' },
+  { path: '/settings', marker: '[data-testid="settings-page"]', name: '设置' },
 ]
 
 const NAV_ROUTES = ROUTES.filter((route) => route.name !== '运行详情')
