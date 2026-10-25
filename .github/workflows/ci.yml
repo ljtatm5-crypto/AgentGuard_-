@@ -61,7 +61,7 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Mock route smoke
         working-directory: frontend-apple
-        run: npx playwright test --grep-invert "生成演示截图"
+        run: npx playwright test e2e/smoke.spec.ts e2e/flows.spec.ts
       - name: Real API contract
         working-directory: frontend-apple
         env:

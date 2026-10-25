@@ -1,0 +1,384 @@
+/* One-step legibility pass: preserve density while lifting the smallest text. */
+.brand-sub,
+.workspace-switch small,
+.nav-caption,
+.sidebar-foot small,
+.source-note,
+.hero-summary-notes,
+.card-hint,
+.panel-subtitle,
+.text-link,
+.cell-note,
+.tag,
+.validate,
+.app-footer,
+.mode-pill,
+.contract-card > span,
+.contract-card small,
+.constraint-check,
+.release-index,
+.release-track small,
+.tl-time,
+.tl-id,
+.tl-case {
+  font-size: 11px;
+}
+
+.workspace-switch strong,
+.workspace-note strong,
+.workspace-note a,
+.breadcrumb,
+.search-trigger,
+.hero-label,
+.hero-link,
+.card-label,
+.stat-icon,
+.task-title,
+.progress-text,
+.dist-value,
+.evidence-link,
+.key {
+  font-size: 12px;
+}
+
+.page-desc,
+.hero-copy p,
+.panel h3,
+.panel-subtitle,
+.case-item p,
+.scope-box,
+.cmp-label,
+.cmp-value,
+.trace-focus-banner,
+.chain-body p {
+  font-size: 13px;
+}
+
+table {
+  font-size: 13px;
+}
+
+th,
+.mono,
+.row-open {
+  font-size: 12px;
+}
+
+.hero-copy p {
+  max-width: 46ch;
+  line-height: 1.85;
+  margin-bottom: 14px;
+}
+
+.hero-features {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  max-width: 440px;
+  margin: 0 0 18px;
+}
+
+.hero-feature {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .38);
+  box-shadow: inset 0 1px 0 var(--edge);
+}
+
+[data-theme="dark"] .hero-feature {
+  background: rgba(255, 255, 255, .045);
+}
+
+.hero-feature > b {
+  flex-shrink: 0;
+  color: var(--accent);
+  font: 600 10px/1 ui-monospace, 'SF Mono', Consolas, monospace;
+}
+
+.hero-feature > span {
+  display: grid;
+  min-width: 0;
+}
+
+.hero-feature strong {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -.15px;
+}
+
+.hero-feature small {
+  margin-top: 2px;
+  color: var(--text-3);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.constraint-card h2 {
+  font-size: 18px;
+}
+
+.constraint-card p,
+.release-note,
+.settings-status-copy p {
+  font-size: 13px;
+}
+
+.settings-facts {
+  display: grid;
+  gap: 5px;
+  padding: 18px 20px;
+  border: 1px solid var(--edge);
+  border-radius: 18px;
+  background: var(--glass);
+  box-shadow: inset 0 1px 0 var(--edge), 0 8px 24px rgba(50, 77, 120, .055);
+}
+
+.settings-facts > span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-facts > span:last-child {
+  border-bottom: 0;
+}
+
+.settings-facts small {
+  color: var(--text-3);
+  font-size: 11px;
+}
+
+.settings-facts strong {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.settings-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(260px, .65fr);
+  gap: 18px;
+  margin-bottom: 20px;
+}
+
+.settings-layout .panel {
+  margin-bottom: 0;
+}
+
+.settings-options .panel-head {
+  margin-bottom: 8px;
+}
+
+.setting-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 15px;
+  padding: 19px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.setting-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 4px;
+}
+
+.setting-row-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--edge);
+  border-radius: 13px;
+  color: var(--accent);
+  background: var(--track);
+}
+
+.setting-row h3 {
+  margin: 0 0 4px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.setting-row p {
+  max-width: 54ch;
+  margin: 0;
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.75;
+}
+
+.setting-status {
+  padding: 5px 9px;
+  border-radius: 8px;
+  color: var(--success);
+  background: var(--positive-bg);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.settings-security {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  background: linear-gradient(145deg, var(--surface), var(--track));
+}
+
+.security-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  margin-bottom: 22px;
+  border: 1px solid var(--edge);
+  border-radius: 15px;
+  color: var(--success);
+  background: var(--glass);
+}
+
+.settings-security h2 {
+  margin: 7px 0 9px;
+  font-size: 19px;
+}
+
+.settings-security > p {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.security-status {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  margin-top: auto;
+  padding: 15px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--glass);
+  color: var(--success);
+}
+
+.security-status > span {
+  display: grid;
+  gap: 2px;
+}
+
+.security-status strong {
+  color: var(--text);
+  font-size: 12px;
+}
+
+.security-status small {
+  color: var(--text-3);
+  font-size: 10px;
+}
+
+.system-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+}
+
+.system-info h2 {
+  margin: 5px 0 0;
+  font-size: 17px;
+}
+
+.system-info dl {
+  display: flex;
+  gap: 32px;
+  margin: 0;
+}
+
+.system-info dl > div {
+  display: grid;
+  gap: 3px;
+}
+
+.system-info dt {
+  color: var(--text-3);
+  font-size: 10px;
+}
+
+.system-info dd {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+@media (max-width: 767px) {
+  .nav-item {
+    font-size: 9px;
+  }
+
+  .hero-features {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+  }
+
+  .hero-feature {
+    padding: 9px 11px;
+  }
+
+  .hero-feature small {
+    white-space: normal;
+  }
+
+  .page-desc {
+    font-size: 12px;
+  }
+
+  .settings-facts {
+    padding: 14px 16px;
+  }
+
+  .settings-layout {
+    grid-template-columns: 1fr;
+    gap: 13px;
+  }
+
+  .setting-row {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: 12px;
+    padding: 17px 0;
+  }
+
+  .setting-status {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .settings-security {
+    min-height: 310px;
+  }
+
+  .security-status {
+    margin-top: 24px;
+  }
+
+  .system-info {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .system-info dl {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+    gap: 12px;
+  }
+}

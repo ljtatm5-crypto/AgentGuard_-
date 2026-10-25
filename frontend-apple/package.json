@@ -8,9 +8,9 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit --pretty",
-    "test:smoke": "playwright test --grep-invert \"生成演示截图\"",
+    "test:smoke": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-smoke.ps1",
     "test:api": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-api.ps1",
-    "test:screenshots": "playwright test screenshots.spec.ts",
+    "test:screenshots": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-screenshots.ps1",
     "test:smoke:install": "playwright install chromium",
     "check:mock": "vite-node scripts/check-mock.ts",
     "lint": "eslint src --max-warnings 0"
