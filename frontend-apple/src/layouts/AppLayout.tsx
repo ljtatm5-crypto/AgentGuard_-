@@ -65,7 +65,7 @@ export default function AppLayout() {
             <div className="brand-sub">每一次测试，都有据可循</div>
           </div>
         </div>
-        <div className="workspace-switch"><span className="workspace-avatar">A</span><div><strong>校园助手工作空间</strong><small>团队项目</small></div><CaretRight size={14} /></div>
+        <div className="workspace-switch"><span className="workspace-avatar">A</span><div><strong>智能体测试工作空间</strong><small>多类型 Agent</small></div><CaretRight size={14} /></div>
         <span className="nav-caption">工作空间</span>
         <nav aria-label="主要导航">
           {NAV.map((n) => (
