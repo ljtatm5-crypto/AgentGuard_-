@@ -107,10 +107,22 @@ test('可以从测试集页面生成并打开新测试集', async ({ page }) => 
   await expect(page.getByTestId('case-list')).toBeVisible()
 })
 
-test('Mock 模式不会伪装成真实 AI 生成', async ({ page }) => {
+test('Mock AI 候选明确标注模拟并支持编辑后保存', async ({ page }) => {
   await page.goto('/test-suites')
   await page.getByTestId('generate-suite-btn').click()
   await page.locator('.generator-ai-toggle input').check()
   await page.getByTestId('generate-suite-submit').click()
-  await expect(page.getByTestId('generate-suite-error')).toContainText('不会伪装成真实大模型生成')
+  await expect(page.getByTestId('generation-result')).toContainText('Mock 演示候选（未调用真实模型）')
+  await page.getByTestId('studio-case-title').fill('人工修改后的测试用例')
+  await expect(page.getByText('人工修改后的测试用例').first()).toBeVisible()
+  await page.getByTestId('accept-generated-suite').click()
+  await expect(page.getByTestId('generation-result')).toContainText('已保存')
+  await expect(page.getByTestId('suites-table')).toContainText('AI 审核测试集')
+})
+
+test('报告页显示逐用例修复差异', async ({ page }) => {
+  await page.goto('/reports')
+  await expect(page.locator('.diff-table')).toBeVisible()
+  await expect(page.getByRole('region', { name: '逐用例修复差异' })).toContainText('用例')
+  await expect(page.locator('.diff-badge').first()).toBeVisible()
 })

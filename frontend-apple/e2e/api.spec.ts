@@ -44,5 +44,6 @@ test('真实 API 模式可收紧权限并接入其他类型智能体', async ({ 
   expect(connected.status).toBe(200)
   expect(connected.body.agent_type).toBe('workflow')
   await page.reload()
+  await page.getByRole('button', { name: new RegExp(agentName) }).click()
   await expect(page.getByRole('heading', { name: agentName })).toBeVisible()
 })

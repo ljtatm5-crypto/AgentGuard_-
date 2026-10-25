@@ -170,7 +170,7 @@ const suiteGenerationSchema = z.object({
   suite: suiteSchema,
   cases: z.array(caseSchema),
   review_required: z.boolean(),
-  generation_source: z.enum(['reviewed_rule_templates', 'llm_draft', 'human_reviewed_ai_draft']),
+  generation_source: z.enum(['reviewed_rule_templates', 'llm_draft', 'mock_draft', 'human_reviewed_ai_draft', 'mock_reviewed_draft']),
   llm_used: z.boolean(),
   prompt_version: z.string().optional(),
 })

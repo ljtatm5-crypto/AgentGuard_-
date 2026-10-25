@@ -139,7 +139,30 @@ export const handlers = [
     if (!body.agent_id) return err('VALIDATION_ERROR', 'agent_id 为必填字段', 422)
     if (!agentState.has(body.agent_id)) return notFound('Agent', body.agent_id)
     if (body.use_ai) {
-      return err('llm_not_configured', 'Mock 演示不会伪装成真实大模型生成；请使用 API 模式并配置自建模型', 503)
+      const draftId = `mock-draft-${Date.now().toString(36)}`
+      const requested = body.test_type ?? 'security'
+      const selected = cases.filter((item) => requested === 'security' || item.risk_tag.includes(requested)).slice(0, 3)
+      const pool = selected.length > 0 ? selected : cases.slice(0, 3)
+      return HttpResponse.json({
+        suite: {
+          id: draftId,
+          name: `${requested} · Mock AI 演示候选`,
+          type: requested,
+          version: 'draft',
+          case_ids: [],
+        },
+        cases: pool.map((item, index) => ({
+          ...item,
+          id: `${draftId}-${index + 1}`,
+          suite_id: draftId,
+          title: `演示候选：${item.title}`,
+          source: 'ai_generated',
+          version: 'draft',
+        })),
+        review_required: true,
+        generation_source: 'mock_draft',
+        llm_used: false,
+      })
     }
     const requested = (body.test_type ?? 'security').trim().toLowerCase()
     const aliases: Record<string, string[]> = {
@@ -177,6 +200,40 @@ export const handlers = [
       cases: generatedCases,
       review_required: false,
       generation_source: 'reviewed_rule_templates',
+      llm_used: false,
+    })
+  }),
+
+  http.post(mockApiPath('/test-suites/accept'), async ({ request }) => {
+    await delay(320)
+    const body = (await request.json()) as {
+      name?: string
+      test_type?: string
+      cases?: Array<TestCase & { ai_original?: Record<string, unknown> }>
+    }
+    if (!body.name || !body.cases?.length) return err('VALIDATION_ERROR', '请输入测试集名称并保留至少一条用例', 422)
+    const suiteId = `suite-reviewed-${Date.now().toString(36)}`
+    const reviewedCases = body.cases.map((item, index) => ({
+      ...item,
+      id: `${suiteId}-${index + 1}`,
+      suite_id: suiteId,
+      source: 'ai_generated' as const,
+      version: '1.0',
+    }))
+    reviewedCases.forEach((item) => caseState.set(item.id, item))
+    const reviewedSuite: TestSuite = {
+      id: suiteId,
+      name: body.name,
+      type: body.test_type ?? 'mixed',
+      version: '1.0',
+      case_ids: reviewedCases.map((item) => item.id),
+    }
+    suiteState.set(suiteId, reviewedSuite)
+    return HttpResponse.json({
+      suite: reviewedSuite,
+      cases: reviewedCases,
+      review_required: false,
+      generation_source: 'mock_reviewed_draft',
       llm_used: false,
     })
   }),

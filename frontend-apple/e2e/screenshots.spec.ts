@@ -32,6 +32,14 @@ test('生成演示截图', async ({ page }, testInfo) => {
   await page.waitForTimeout(500)
   await page.screenshot({ path: 'docs/screenshots/03b-测试集-用例详情.png', fullPage: true })
 
+  await page.getByRole('button', { name: '收起用例详情' }).click()
+  await page.getByTestId('generate-suite-btn').click()
+  await page.locator('.generator-ai-toggle input').check()
+  await page.getByTestId('generate-suite-submit').click()
+  await page.getByTestId('generation-result').waitFor()
+  await page.waitForTimeout(500)
+  await page.screenshot({ path: 'docs/screenshots/03c-测试工作室-AI候选.png', fullPage: true })
+
   // 执行任务页展开轨迹
   await page.goto('/runs')
   await page.getByRole('button', { name: '详情与轨迹' }).first().click()

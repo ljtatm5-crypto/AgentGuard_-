@@ -7,6 +7,7 @@ import './styles.css'
 import './apple.css'
 import './mobile.css'
 import './legibility.css'
+import './workspace.css'
 
 const routerBase = import.meta.env.BASE_URL.replace(/\/$/, '') || '/'
 
