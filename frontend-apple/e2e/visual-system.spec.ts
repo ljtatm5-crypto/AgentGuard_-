@@ -139,6 +139,15 @@ test('Trace nodes and studio controls keep readable runtime sizes', async ({ pag
   expect(traceSizes.nodeTitle).toBeGreaterThanOrEqual(15)
   expect(traceSizes.verdict).toBeGreaterThanOrEqual(14)
 
+  const disclosure = page.locator('.event-node-card details').first()
+  await disclosure.locator('summary').focus()
+  await page.keyboard.press('Enter')
+  await expect(disclosure).toHaveAttribute('open', '')
+
+  await page.locator('.event-node').first().focus()
+  await page.keyboard.press('Enter')
+  await expect(page.locator('.event-node.event-selected')).toHaveCount(1)
+
   await page.locator('.event-node').first().click()
   await expect(page.locator('.event-node.event-selected')).toHaveCount(1)
   await expect(page.locator('.verdict-event-focus')).toBeVisible()
@@ -180,4 +189,24 @@ test('Evidence flow and regression states remain explicit', async ({ page }) => 
   expect(new Set(diffLabels).size).toBeGreaterThan(0)
   const diffClasses = await page.locator('.diff-badge').evaluateAll((nodes) => nodes.map((node) => node.className))
   expect(diffClasses.every((className) => /diff-(fixed|regression|existing|not-comparable|unchanged)/.test(className))).toBe(true)
+})
+
+test('Dark appearance keeps workspace surfaces theme-aware', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('agentguard-appearance', 'dark'))
+  await page.setViewportSize({ width: 1366, height: 768 })
+  await openRoute(page, '/runs')
+  await page.getByRole('button', { name: '详情与轨迹' }).first().click()
+  await page.getByTestId('trace-timeline').waitFor()
+
+  const theme = await page.evaluate(() => document.documentElement.dataset.theme)
+  expect(theme).toBe('dark')
+
+  const surfaces = await page.evaluate(() => ({
+    behavior: getComputedStyle(document.querySelector('.run-behavior-panel')!).backgroundImage,
+    verdict: getComputedStyle(document.querySelector('.run-verdict-panel')!).backgroundImage,
+    caseRail: getComputedStyle(document.querySelector('.run-case-rail')!).backgroundColor,
+  }))
+  expect(surfaces.behavior).not.toMatch(/rgb\(250|rgb\(255/)
+  expect(surfaces.verdict).not.toMatch(/rgb\(250|rgb\(255/)
+  expect(surfaces.caseRail).not.toBe('rgba(0, 0, 0, 0)')
 })

@@ -2529,6 +2529,138 @@
   font-size: 14px;
 }
 
+/* Dark appearance keeps the aurora material while replacing light-only surfaces. */
+[data-theme="dark"] .command-context {
+  background:
+    radial-gradient(circle at 92% 10%, rgba(55, 112, 101, .34), transparent 32%),
+    linear-gradient(145deg, rgba(38, 57, 65, .94), rgba(28, 46, 53, .76));
+}
+
+[data-theme="dark"] .command-health {
+  background:
+    linear-gradient(150deg, rgba(36, 57, 63, .96), rgba(28, 54, 54, .84));
+}
+
+[data-theme="dark"] .evidence-preview,
+[data-theme="dark"] .suite-generator {
+  background:
+    radial-gradient(circle at 90% 0, rgba(57, 108, 102, .22), transparent 36%),
+    linear-gradient(145deg, rgba(37, 56, 63, .9), rgba(27, 46, 53, .78));
+}
+
+[data-theme="dark"] .trace-signature,
+[data-theme="dark"] .agent-summary-strip,
+[data-theme="dark"] .settings-facts {
+  background: rgba(255, 255, 255, .045);
+}
+
+[data-theme="dark"] .trace-node,
+[data-theme="dark"] .stat-card,
+[data-theme="dark"] .agent-tile,
+[data-theme="dark"] .agent-tile:nth-child(even),
+[data-theme="dark"] .case-item,
+[data-theme="dark"] .event-node-card,
+[data-theme="dark"] .attack-node.chain-node {
+  border-color: rgba(228, 244, 246, .1);
+  background: var(--solid-clear);
+}
+
+[data-theme="dark"] .trace-node.trace-verdict {
+  border-color: rgba(114, 210, 206, .2);
+  background: linear-gradient(145deg, #223d40, #203539);
+}
+
+[data-theme="dark"] .tasks-panel,
+[data-theme="dark"] .risk-panel,
+[data-theme="dark"] .metrics-panel,
+[data-theme="dark"] .connect-panel,
+[data-theme="dark"] .launch-panel,
+[data-theme="dark"] .run-workbench,
+[data-theme="dark"] .export-panel {
+  background: var(--glass-strong);
+}
+
+[data-theme="dark"] .agent-monogram,
+[data-theme="dark"] .connect-icon,
+[data-theme="dark"] .generator-icon,
+[data-theme="dark"] .security-icon {
+  border-color: rgba(228, 244, 246, .1);
+  background: linear-gradient(145deg, #314b54, #293f49);
+}
+
+[data-theme="dark"] .agent-resource-list li,
+[data-theme="dark"] .empty-inline,
+[data-theme="dark"] .scope-box,
+[data-theme="dark"] .verdict-evidence,
+[data-theme="dark"] .studio-original pre,
+[data-theme="dark"] .event-node-card pre {
+  border-color: var(--line);
+  background: var(--solid-muted);
+}
+
+[data-theme="dark"] .scope-box {
+  background: linear-gradient(145deg, rgba(78, 65, 43, .64), rgba(58, 49, 35, .45));
+}
+
+[data-theme="dark"] .connect-modes button.active,
+[data-theme="dark"] .studio-case-item.active,
+[data-theme="dark"] .run-filter-bar button.active,
+[data-theme="dark"] .run-case-item.active {
+  border-color: rgba(230, 244, 246, .1);
+  background: var(--solid-clear);
+}
+
+[data-theme="dark"] .run-case-rail,
+[data-theme="dark"] .run-behavior-panel,
+[data-theme="dark"] .run-verdict-panel {
+  border-color: rgba(228, 244, 246, .1);
+  background: rgba(32, 50, 59, .88);
+}
+
+[data-theme="dark"] .run-behavior-panel {
+  background:
+    radial-gradient(circle at 50% 48%, rgba(47, 91, 91, .34), transparent 66%),
+    rgba(28, 47, 55, .92);
+}
+
+[data-theme="dark"] .run-verdict-panel {
+  background: linear-gradient(145deg, rgba(37, 57, 64, .96), rgba(28, 46, 53, .9));
+}
+
+[data-theme="dark"] .verdict-event-focus {
+  border-color: rgba(114, 210, 206, .16);
+  background: var(--cyan-soft);
+}
+
+[data-theme="dark"] .attack-canvas {
+  background-color: rgba(29, 47, 55, .9);
+  background-image: radial-gradient(rgba(156, 205, 207, .15) .8px, transparent .8px);
+}
+
+[data-theme="dark"] .attack-node.inferred {
+  background: rgba(255, 255, 255, .035);
+}
+
+[data-theme="dark"] .attack-node-evidence {
+  background: linear-gradient(145deg, rgba(37, 57, 64, .96), rgba(28, 46, 53, .9));
+}
+
+[data-theme="dark"] .settings-status {
+  background:
+    radial-gradient(circle at 86% 8%, rgba(57, 108, 102, .3), transparent 36%),
+    linear-gradient(145deg, rgba(38, 57, 65, .94), rgba(28, 46, 53, .82));
+}
+
+[data-theme="dark"] .mode-pill,
+[data-theme="dark"] .settings-facts > span,
+[data-theme="dark"] .security-status {
+  background: rgba(255, 255, 255, .045);
+}
+
+[data-theme="dark"] .settings-security {
+  background: linear-gradient(150deg, rgba(36, 57, 63, .94), rgba(28, 54, 54, .82));
+}
+
 @media (max-width: 1260px) {
   .command-center-grid {
     grid-template-columns: minmax(0, 1.05fr) minmax(300px, .95fr);

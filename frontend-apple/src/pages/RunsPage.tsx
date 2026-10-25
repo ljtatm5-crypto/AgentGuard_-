@@ -255,6 +255,7 @@ export default function RunsPage() {
                                       aria-current={selectedEventId === event.id ? 'true' : undefined}
                                       onClick={() => setSelectedEventId(event.id)}
                                       onKeyDown={(keyEvent) => {
+                                        if (keyEvent.target !== keyEvent.currentTarget) return
                                         if (keyEvent.key === 'Enter' || keyEvent.key === ' ') {
                                           keyEvent.preventDefault()
                                           setSelectedEventId(event.id)

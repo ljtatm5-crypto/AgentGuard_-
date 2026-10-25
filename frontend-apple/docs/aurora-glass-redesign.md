@@ -92,6 +92,8 @@
 - 执行轨迹节点选择与 14px 以上正文。
 - 测试工作室字段字号与候选编辑可读性。
 - Evidence Flow 节点选择、回归状态类别完整性。
+- 轨迹节点内“查看原始事件”的键盘展开不被节点选择拦截。
+- 深色外观下执行工作区继续使用主题化深色表面。
 
 截图结果：
 
@@ -107,7 +109,7 @@
 - `npm run typecheck`：通过。
 - `npm run build`：通过。
 - `npm run test:smoke`：24 项通过。
-- `npx playwright test e2e/visual-system.spec.ts`：5 项通过。
+- `npx playwright test e2e/visual-system.spec.ts`：6 项通过。
 - `npm run test:api`：真实 API 契约 1 项通过。
 - `npm run test:screenshots`：截图生成通过。
 - 后端 `pytest -q`：62 项通过。
