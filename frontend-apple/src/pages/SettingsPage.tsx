@@ -102,7 +102,7 @@ export default function SettingsPage() {
         <dl>
           <div><dt>产品版本</dt><dd>v0.1.0</dd></div>
           <div><dt>支持类型</dt><dd>多类智能体</dd></div>
-          <div><dt>当前演示</dt><dd>校园助手</dd></div>
+          <div><dt>测试范围</dt><dd>多类型智能体</dd></div>
           <div><dt>证据保留</dt><dd>本地运行记录</dd></div>
         </dl>
       </section>

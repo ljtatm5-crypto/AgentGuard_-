@@ -23,6 +23,7 @@ test('生成演示截图', async ({ page }, testInfo) => {
   for (const s of SHOTS) {
     await page.goto(s.path)
     await page.waitForLoadState('networkidle')
+    await page.waitForTimeout(900)
     await page.screenshot({ path: `docs/screenshots/${s.name}.png`, fullPage: s.full })
   }
 
@@ -52,9 +53,27 @@ test('生成演示截图', async ({ page }, testInfo) => {
   await page.waitForTimeout(500)
   await page.screenshot({ path: 'docs/screenshots/05b-攻击链节点.png', fullPage: true })
 
+  mkdirSync('docs/screenshots/viewports', { recursive: true })
+  await page.setViewportSize({ width: 1366, height: 768 })
+  await page.goto('/overview')
+  await page.waitForLoadState('networkidle')
+  await page.waitForTimeout(900)
+  await page.screenshot({ path: 'docs/screenshots/viewports/1366x768-总览.png', fullPage: true })
+  await page.goto('/runs')
+  await page.getByRole('button', { name: '详情与轨迹' }).first().click()
+  await page.waitForTimeout(500)
+  await page.screenshot({ path: 'docs/screenshots/viewports/1366x768-执行轨迹.png', fullPage: true })
+
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/overview')
+  await page.waitForLoadState('networkidle')
+  await page.waitForTimeout(900)
+  await page.screenshot({ path: 'docs/screenshots/viewports/1440x900-总览.png', fullPage: true })
+
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/overview')
   await page.waitForLoadState('networkidle')
+  await page.waitForTimeout(900)
   await page.screenshot({ path: 'docs/screenshots/08-移动端-总览.png', fullPage: true })
 
   await page.setViewportSize({ width: 1440, height: 1000 })
