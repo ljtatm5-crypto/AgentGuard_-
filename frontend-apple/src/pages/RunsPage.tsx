@@ -26,6 +26,7 @@ export default function RunsPage() {
   const [launching, setLaunching] = useState(false)
   const [launchError, setLaunchError] = useState<string | null>(null)
   const [selectedCaseId, setSelectedCaseId] = useState('')
+  const [selectedEventId, setSelectedEventId] = useState('')
   const [resultFilter, setResultFilter] = useState<'all' | 'failed' | 'review'>('all')
   const detail = useAsync(
     () => (opened ? api.getRunDetail(opened) : Promise.resolve(null)),
@@ -184,6 +185,10 @@ export default function RunsPage() {
                 ?? filteredResults.find((result) => result.status === 'failed')
                 ?? filteredResults[0]
                 ?? d.results[0]
+              const selectCase = (caseId: string) => {
+                setSelectedCaseId(caseId)
+                setSelectedEventId('')
+              }
               return (
                 <>
                   {(focusedCase || eventIds.length > 0) && (
@@ -208,7 +213,7 @@ export default function RunsPage() {
                             type="button"
                             key={result.case_id}
                             className={`run-case-item ${activeResult.case_id === result.case_id ? 'active' : ''} ${focusedCase === result.case_id ? 'trace-case-focused' : ''}`}
-                            onClick={() => setSelectedCaseId(result.case_id)}
+                            onClick={() => selectCase(result.case_id)}
                           >
                             <span className="run-case-index">{String(index + 1).padStart(2, '0')}</span>
                             <span>
@@ -224,7 +229,10 @@ export default function RunsPage() {
                     <section className="run-behavior-panel" aria-label="Agent 行为轨迹">
                       <div className="workspace-section-head">
                         <div><span className="detail-label">Agent 行为</span><h3>{activeResult.case_id}</h3></div>
-                        <TraceTag type="policy" />
+                        <div className="trace-header-meta">
+                          <span>点击节点聚焦证据</span>
+                          <TraceTag type="policy" />
+                        </div>
                       </div>
                       <AsyncBoundary state={trace.state} isEmpty={(events) => events.length === 0} onRetry={trace.retry}>
                         {(events) => {
@@ -240,10 +248,19 @@ export default function RunsPage() {
                                   return (
                                     <li
                                       key={event.id}
-                                      className={`event-node ${focused ? 'trace-focused' : ''} ${event.error ? 'has-error' : ''}`}
-                                      tabIndex={focused ? -1 : undefined}
+                                      className={`event-node ${focused ? 'trace-focused' : ''} ${selectedEventId === event.id ? 'event-selected' : ''} ${event.error ? 'has-error' : ''}`}
+                                      tabIndex={0}
                                       data-evidence-focus={focused ? 'true' : undefined}
                                       data-event-id={event.id}
+                                      aria-current={selectedEventId === event.id ? 'true' : undefined}
+                                      onClick={() => setSelectedEventId(event.id)}
+                                      onKeyDown={(keyEvent) => {
+                                        if (keyEvent.target !== keyEvent.currentTarget) return
+                                        if (keyEvent.key === 'Enter' || keyEvent.key === ' ') {
+                                          keyEvent.preventDefault()
+                                          setSelectedEventId(event.id)
+                                        }
+                                      }}
                                     >
                                       <span className="event-node-index">{String(index + 1).padStart(2, '0')}</span>
                                       <div className="event-node-card">
@@ -277,6 +294,22 @@ export default function RunsPage() {
                       <div className="verdict-status"><StatusTag v={activeResult.status} /><JudgeSourceTag v={activeResult.judge_source} /></div>
                       <h3>{(activeResult.confidence * 100).toFixed(0)}% 置信度</h3>
                       <p>{activeResult.reason}</p>
+                      {(() => {
+                        const selectedEvent = trace.state.phase === 'ready'
+                          ? trace.state.data.find((event) => event.id === selectedEventId && event.case_id === activeResult.case_id)
+                          : undefined
+                        return selectedEvent ? (
+                          <div className="verdict-event-focus" aria-live="polite">
+                            <span>当前轨迹节点</span>
+                            <strong>{selectedEvent.tool || TRACE_TYPE_LABELS[selectedEvent.type]}</strong>
+                            <small>{selectedEvent.timestamp.replace('T', ' ').slice(11, 19)} · {selectedEvent.id}</small>
+                            {selectedEvent.output && <p>{selectedEvent.output}</p>}
+                            <span className={activeResult.evidence.event_ids.includes(selectedEvent.id) ? 'focus-linked' : ''}>
+                              {activeResult.evidence.event_ids.includes(selectedEvent.id) ? '已关联本次判定证据' : '供人工审计的轨迹节点'}
+                            </span>
+                          </div>
+                        ) : null
+                      })()}
                       <div className="verdict-evidence">
                         <strong>证据事件</strong>
                         <span className="mono">{activeResult.evidence.event_ids.join(', ') || '暂无事件'}</span>

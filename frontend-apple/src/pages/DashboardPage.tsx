@@ -1,7 +1,18 @@
 import type { CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, useReducedMotion } from 'motion/react'
-import { ArrowRight, ArrowUpRight, Plus, Stack, Checks, Timer, SlidersHorizontal, CheckCircle, WarningCircle } from '@phosphor-icons/react'
+import {
+  ArrowRight,
+  ArrowUpRight,
+  Checks,
+  CheckCircle,
+  CirclesThreePlus,
+  Plus,
+  SlidersHorizontal,
+  Stack,
+  Timer,
+  WarningCircle,
+} from '@phosphor-icons/react'
 import { api, USE_MOCK } from '@/api/client'
 import { AsyncBoundary } from '@/components/AsyncBoundary'
 import { SeverityTag, StatusTag } from '@/components/Tags'
@@ -14,53 +25,95 @@ export default function DashboardPage() {
   const runs = useAsync(() => api.listRuns(), [])
   const findings = useAsync(() => api.listFindings(), [])
   const metrics = useAsync(() => api.getMetrics(), [])
+  const agents = useAsync(() => api.listAgents(), [])
   const reduce = useReducedMotion()
+  const currentAgent = agents.state.phase === 'ready' ? agents.state.data[0] : null
   return <div className="dashboard-page">
-    <header className="page-head dashboard-head"><div><h1>总览</h1><p className="page-desc">面向多类智能体，统一完成规则判定、批量回归、轨迹审计与授权测试。</p></div><Link to="/runs" className="btn btn-primary"><Plus size={17} weight="bold" />启动新测试</Link></header>
+    <header className="page-head dashboard-head">
+      <div>
+        <span className="page-kicker">Security validation workspace</span>
+        <h1>安全测试工作台</h1>
+        <p className="page-desc">面向多类智能体，统一完成规则判定、批量回归、轨迹审计与授权测试。</p>
+      </div>
+      <div className="page-head-actions">
+        <span className={`mode-chip ${USE_MOCK ? 'is-mock' : 'is-live'}`}><i />{USE_MOCK ? 'Mock 演示' : '本地数据'}</span>
+        <Link to="/runs" className="btn btn-primary"><Plus size={18} weight="bold" />启动新测试</Link>
+      </div>
+    </header>
     <AsyncBoundary state={metrics.state} onRetry={metrics.retry}>{m => {
       const passRate = m.completed_cases ? m.passed_cases / m.completed_cases * 100 : 0
       const ruleRate = m.completed_cases ? m.rule_judged_cases / m.completed_cases * 100 : 0
       return <>
-        <MotionSurface className="overview-hero">
-          <div className="hero-copy">
-            <span className="hero-label"><CheckCircle size={17} weight="duotone" />智能体质量与安全验证平台</span>
-            <h2>让每一次测试，<br /><span>都有据可循。</span></h2>
-            <p>面向对话、RAG、工具调用与工作流智能体，以固定规则先行判定，从执行轨迹到攻击链，每一个结论都能回看证据。</p>
-            <div className="hero-features" aria-label="平台核心功能">
-              <span className="hero-feature"><b>01</b><span><strong>规则先行</strong><small>确定性判定</small></span></span>
-              <span className="hero-feature"><b>02</b><span><strong>批量回归</strong><small>修复前后对照</small></span></span>
-              <span className="hero-feature"><b>03</b><span><strong>轨迹审计</strong><small>证据可回指</small></span></span>
-              <span className="hero-feature"><b>04</b><span><strong>授权靶场</strong><small>外部目标默认拒绝</small></span></span>
+        <section className="command-center-grid">
+          <MotionSurface className="command-context">
+            <div className="command-context-top">
+              <div>
+                <span className="eyebrow">当前验证环境</span>
+                <h2>{currentAgent?.name ?? (agents.state.phase === 'loading' ? '正在读取 Agent 资产' : '等待选择待测 Agent')}</h2>
+                <p>{currentAgent?.purpose ?? '从 Agent 资产选择待测智能体，或创建本地安全沙盒资产后开始验证。'}</p>
+              </div>
+              <span className="command-context-icon"><CirclesThreePlus size={27} weight="duotone" /></span>
             </div>
-            <Link to="/reports" className="hero-link">查看验证报告 <ArrowUpRight size={17} /></Link>
-          </div>
-          <div className="hero-summary">
-            <div className="quality-ring" style={{ '--ring-value': `${passRate}%` } as CSSProperties}>
-              <motion.div className="quality-ring-inner" initial={reduce ? false : { scale: .85, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 130, damping: 20 }}>
-                <span>当前通过率</span>
-                <strong><CountUp value={passRate} decimals={1} suffix="%" /></strong>
-                <small>{USE_MOCK ? 'Mock 测试样例' : '本地执行记录'}</small>
-              </motion.div>
+            <div className="command-context-facts">
+              <span><small>Agent 类型</small><strong>{currentAgent?.agent_type === 'rag' ? 'RAG 知识库' : currentAgent?.agent_type === 'tool' ? '工具调用' : currentAgent?.agent_type === 'workflow' ? '工作流' : currentAgent ? '对话型' : '多类型'}</strong></span>
+              <span><small>规则判定</small><strong>{ruleRate.toFixed(0)}%</strong></span>
+              <span><small>授权边界</small><strong>本地 / 明确授权</strong></span>
             </div>
-            <div className="hero-summary-notes">
-              <span><i className="status-mark status-passed" />{m.passed_cases} 项通过</span>
-              <span><i className="status-mark status-failed" />{m.failed_cases} 项失败</span>
-              <span><i className="status-mark status-review" />{m.needs_review_cases} 项待复核</span>
+            <div className="command-context-actions">
+              <Link to="/agents" className="text-link">管理 Agent 资产 <ArrowRight size={16} /></Link>
+              <Link to="/runs" className="text-link">查看执行任务 <ArrowRight size={16} /></Link>
             </div>
-            <div className="trace-signature" aria-label="可追溯执行链">
-              <div className="trace-signature-head"><span>可追溯执行链</span><small>证据实时串联</small></div>
-              <div className="trace-track" aria-hidden="true">
-                <span className="trace-node"><b>输入</b><small>01</small></span>
-                <i className="trace-link" />
-                <span className="trace-node"><b>策略</b><small>02</small></span>
-                <i className="trace-link" />
-                <span className="trace-node"><b>工具</b><small>03</small></span>
-                <i className="trace-link" />
-                <span className="trace-node trace-verdict"><b>判定</b><small>04</small></span>
+          </MotionSurface>
+
+          <MotionSurface className="command-health" delay={.05}>
+            <div className="command-health-head">
+              <div>
+                <span className="eyebrow">质量概览</span>
+                <h2>通过率</h2>
+              </div>
+              <span className="health-badge"><CheckCircle size={17} weight="fill" />规则优先</span>
+            </div>
+            <div className="command-health-score">
+              <div className="quality-ring" style={{ '--ring-value': `${passRate}%` } as CSSProperties}>
+                <motion.div className="quality-ring-inner" initial={reduce ? false : { opacity: 0, scale: .92 }} animate={{ opacity: 1, scale: 1 }} transition={{ type: 'spring', stiffness: 150, damping: 22 }}>
+                  <strong><CountUp value={passRate} decimals={1} suffix="%" /></strong>
+                  <small>{m.completed_cases} 项已完成</small>
+                </motion.div>
+              </div>
+              <div className="hero-summary-notes">
+                <span><i className="status-mark status-passed" /><b>{m.passed_cases}</b> 项通过</span>
+                <span><i className="status-mark status-failed" /><b>{m.failed_cases}</b> 项失败</span>
+                <span><i className="status-mark status-review" /><b>{m.needs_review_cases}</b> 项待复核</span>
               </div>
             </div>
-          </div>
-        </MotionSurface>
+            <Link to="/reports" className="hero-link">查看验证报告 <ArrowUpRight size={17} /></Link>
+          </MotionSurface>
+
+          <MotionSurface className="evidence-preview" delay={.1}>
+            <div className="evidence-preview-head">
+              <div>
+                <span className="eyebrow">Evidence Flow</span>
+                <h2>从输入到判定，一条链回看</h2>
+              </div>
+              <span className="tag tag-info">证据可回指</span>
+            </div>
+            <div className="trace-signature" aria-label="可追溯执行链">
+              <div className="trace-track">
+                <span className="trace-node"><small>01</small><b>输入</b><em>问题与上下文</em></span>
+                <i className="trace-link" />
+                <span className="trace-node"><small>02</small><b>策略</b><em>固定规则先行</em></span>
+                <i className="trace-link" />
+                <span className="trace-node"><small>03</small><b>工具</b><em>调用与权限</em></span>
+                <i className="trace-link" />
+                <span className="trace-node trace-verdict"><small>04</small><b>判定</b><em>证据与结论</em></span>
+              </div>
+            </div>
+            <div className="evidence-preview-foot">
+              <span><strong>{m.semantic_judged_cases}</strong> 项启用语义补充</span>
+              <span>实际观测与推断关系分开呈现</span>
+            </div>
+          </MotionSurface>
+        </section>
         <section className="grid-4 stat-grid" aria-label="测试指标">
           <StatCard label="累计测试用例" value={m.total_cases} hint={`已完成 ${m.completed_cases} 项`} icon={<Stack size={21} weight="duotone" />} delay={.04} />
           <StatCard label="已通过用例" value={m.passed_cases} hint={`${m.failed_cases} 项失败，${m.needs_review_cases} 项待复核`} icon={<Checks size={21} weight="duotone" />} delay={.09} />

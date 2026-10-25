@@ -200,6 +200,13 @@ function DiffTable({ before, after, beforeRun, afterRun }: {
     else if (beforeResult.status !== 'passed' && afterResult.status !== 'passed') change = '仍存在'
     return { caseId, beforeResult, afterResult, change }
   })
+  const changeClass = (change: string) => {
+    if (change === '已修复') return 'fixed'
+    if (change === '新增回归') return 'regression'
+    if (change === '仍存在') return 'existing'
+    if (change === '无法比较') return 'not-comparable'
+    return 'unchanged'
+  }
   return (
     <div className="table-scroll" tabIndex={0} role="region" aria-label="逐用例修复差异">
       <table className="diff-table">
@@ -212,7 +219,7 @@ function DiffTable({ before, after, beforeRun, afterRun }: {
               <td className="mono">{row.caseId}</td>
               <td>{row.beforeResult ? <StatusTag v={row.beforeResult.status} /> : <span className="muted">缺失</span>}</td>
               <td>{row.afterResult ? <StatusTag v={row.afterResult.status} /> : <span className="muted">缺失</span>}</td>
-              <td><span className={`diff-badge diff-${row.change === '已修复' ? 'fixed' : row.change === '新增回归' ? 'regression' : 'same'}`}>{row.change}</span></td>
+              <td><span className={`diff-badge diff-${changeClass(row.change)}`}><i aria-hidden="true" />{row.change}</span></td>
             </tr>
           ))}
         </tbody>
