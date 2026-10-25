@@ -10,7 +10,7 @@ import type {
   TraceEvent,
 } from '@/types/api'
 import { ApiRequestError, schemas } from './schemas'
-import { API_PREFIX, apiPath } from './contract'
+import { API_PREFIX, apiPath, mockApiPath } from './contract'
 
 export { ApiRequestError }
 
@@ -34,7 +34,7 @@ const RETRY_DELAY_MS = 400
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 async function request<T>(path: string, schema: ZodType<T>, init?: RequestInit): Promise<T> {
-  const url = USE_MOCK ? apiPath(path) : `${BASE}${apiPath(path)}`
+  const url = USE_MOCK ? mockApiPath(path) : `${BASE}${apiPath(path)}`
 
   let lastError: unknown
   for (let attempt = 0; attempt <= RETRY_LIMIT; attempt++) {

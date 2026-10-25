@@ -24,6 +24,16 @@ VITE_API_BASE=            # 留空时由 Vite 将 /api 代理到 http://127.0.0.
 
 页面代码零改动 —— 这是全项目唯一的数据源切换点。
 
+## GitHub Pages
+
+GitHub Pages 地址：
+
+<https://ljtatm5-crypto.github.io/AgentGuard_-/>
+
+Pages 构建使用 `VITE_USE_MOCK=true` 和仓库子路径 `/AgentGuard_-/`。`main` 分支更新后，
+`.github/workflows/pages.yml` 会自动构建并部署静态前端；FastAPI 后端不会运行在
+GitHub Pages 上。
+
 ---
 
 ## 分支策略（硬性）
