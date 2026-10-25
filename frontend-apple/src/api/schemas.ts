@@ -39,6 +39,9 @@ const evidenceRef = z.object({
   case_id: z.string(),
   event_ids: z.array(z.string()),
 })
+const chainEvidenceRef = evidenceRef.extend({
+  status: z.enum(['observed', 'inferred']).optional(),
+})
 
 const agentSchema = z.object({
   id: z.string(),
@@ -144,7 +147,7 @@ const findingSchema = z.object({
       kind: z.enum(['entry', 'behavior', 'impact', 'fix']),
       label: z.string(),
       detail: z.string(),
-      evidence: evidenceRef,
+      evidence: chainEvidenceRef,
     }),
   ),
 })
@@ -167,8 +170,9 @@ const suiteGenerationSchema = z.object({
   suite: suiteSchema,
   cases: z.array(caseSchema),
   review_required: z.boolean(),
-  generation_source: z.enum(['reviewed_rule_templates']),
-  llm_used: z.literal(false),
+  generation_source: z.enum(['reviewed_rule_templates', 'llm_draft', 'human_reviewed_ai_draft']),
+  llm_used: z.boolean(),
+  prompt_version: z.string().optional(),
 })
 
 const metricsSchema = z.object({
@@ -184,6 +188,15 @@ const metricsSchema = z.object({
   findings_open: z.number(),
   findings_mitigated: z.number(),
   risk_detection_rate: z.number().nullable(),
+  risk_precision: z.number().nullable(),
+  risk_f1: z.number().nullable(),
+  risk_ground_truth_cases: z.number(),
+  risk_confusion_matrix: z.object({
+    tp: z.number(),
+    fp: z.number(),
+    fn: z.number(),
+    tn: z.number(),
+  }),
   attack_success_rate_before: z.number().nullable(),
   attack_success_rate_after: z.number().nullable(),
   trace_coverage_rate: z.number().nullable(),

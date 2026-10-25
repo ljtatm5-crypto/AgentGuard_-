@@ -95,3 +95,22 @@ test('客户可以从 Agent 资产页接入并测试其他智能体', async ({ p
   await page.getByTestId('nav-执行任务').click()
   await expect(page.getByTestId('select-agent')).toContainText('财务知识问答智能体')
 })
+
+test('可以从测试集页面生成并打开新测试集', async ({ page }) => {
+  await page.goto('/test-suites')
+  await page.getByTestId('generate-suite-btn').click()
+  await page.getByTestId('generate-suite-type').selectOption('injection')
+  await page.getByTestId('generate-suite-submit').click()
+  await expect(page.getByTestId('generation-result')).toContainText('固定规则模板')
+  await expect(page.getByTestId('generation-result')).toContainText('已保存')
+  await expect(page.getByTestId('suites-table')).toContainText('injection · 固定规则模板')
+  await expect(page.getByTestId('case-list')).toBeVisible()
+})
+
+test('Mock 模式不会伪装成真实 AI 生成', async ({ page }) => {
+  await page.goto('/test-suites')
+  await page.getByTestId('generate-suite-btn').click()
+  await page.locator('.generator-ai-toggle input').check()
+  await page.getByTestId('generate-suite-submit').click()
+  await expect(page.getByTestId('generate-suite-error')).toContainText('不会伪装成真实大模型生成')
+})

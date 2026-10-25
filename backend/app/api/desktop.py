@@ -6,6 +6,7 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from hashlib import sha256
 import json
+import os
 import re
 from types import SimpleNamespace
 from typing import Any
@@ -64,6 +65,14 @@ class RunCreate(BaseModel):
 class GenerateRequest(BaseModel):
     agent_id: str = Field(min_length=1)
     test_type: str = "security"
+    use_ai: bool = False
+
+
+class AcceptGeneratedRequest(BaseModel):
+    agent_id: str = Field(min_length=1)
+    name: str = Field(min_length=1, max_length=160)
+    test_type: str = Field(min_length=1, max_length=40)
+    cases: list[dict[str, Any]] = Field(min_length=1, max_length=12)
 
 
 def require(db: Session, model, object_id: str, code: str, label: str):
@@ -109,10 +118,8 @@ def agent(agent_id: str, db: Session = Depends(get_db)):
 
 @router.post("/agents/validate")
 def validate_agent(payload: dict[str, Any], db: Session = Depends(get_db)):
-    """v2 registers local assets only; B deliberately disables remote execution."""
+    """校验本地沙盒或明确授权的自建 Dify，不保存任何明文凭据。"""
     endpoint = str(payload.get("endpoint", ""))
-    if not endpoint.startswith("local://"):
-        raise DesktopError(403, "scope_public_target_denied", "当前版本只接入平台提供的本地测试沙盒；内部 Dify 仍需独立配置与授权")
     scope = payload.get("authorized_scope") or {}
     if not isinstance(scope, dict):
         raise DesktopError(422, "contract_bad_type", "authorized_scope 必须为对象")
@@ -120,13 +127,68 @@ def validate_agent(payload: dict[str, Any], db: Session = Depends(get_db)):
         raise DesktopError(403, "scope_denied", "外部目标不在授权范围内")
     name = str(payload.get("name", "")).strip()
     version = str(payload.get("version", "v2.0"))
-    if not name or not re.fullmatch(r"local://[a-z0-9][a-z0-9-]{1,62}", endpoint):
-        raise DesktopError(422, "contract_missing_field", "请提供名称，并选择安全的本地测试沙盒")
+    if not name:
+        raise DesktopError(422, "contract_missing_field", "请输入智能体名称")
     if version not in {"v1.0", "v2.0"}:
-        raise DesktopError(422, "contract_bad_enum", "本地测试沙盒版本须为 v1.0 或 v2.0")
+        raise DesktopError(422, "contract_bad_enum", "智能体版本须为 v1.0 或 v2.0")
     agent_type = str(payload.get("agent_type", "conversation"))
     if agent_type not in {"conversation", "rag", "tool", "workflow"}:
         raise DesktopError(422, "contract_bad_enum", "智能体类型须为 conversation、rag、tool 或 workflow")
+
+    connection_mode = str(payload.get("connection_mode", "local_sandbox"))
+    if connection_mode not in {"local_sandbox", "dify_authorized"}:
+        raise DesktopError(422, "contract_bad_enum", "连接方式须为 local_sandbox 或 dify_authorized")
+    if connection_mode == "local_sandbox" and not endpoint.startswith("local://"):
+        raise DesktopError(403, "scope_public_target_denied", "本地测试资产不能使用外部 HTTP(S) 地址")
+    if connection_mode == "dify_authorized":
+        from app.core.config import get_settings
+        from app.core.target_scope import TargetScopeError, validate_target_scope
+
+        authorization_reference = str(payload.get("authorization_reference", "")).strip()
+        credential_env = str(payload.get("credential_env", "")).strip()
+        if not payload.get("authorization_confirmed") or not authorization_reference:
+            raise DesktopError(403, "scope_denied", "接入自建 Dify 前必须确认授权并填写授权记录编号")
+        if not re.fullmatch(r"[A-Z][A-Z0-9_]{2,63}", credential_env):
+            raise DesktopError(422, "contract_bad_enum", "凭据环境变量名格式无效")
+        if not os.getenv(credential_env):
+            raise DesktopError(422, "credential_missing", f"服务端环境变量 {credential_env} 未配置")
+        try:
+            validate_target_scope(
+                endpoint=endpoint,
+                adapter="dify",
+                target_scope="self_hosted_dify",
+                authorization_confirmed=True,
+                authorization_reference=authorization_reference,
+                allowed_hosts=get_settings().allowed_target_host_list,
+            )
+        except TargetScopeError as exc:
+            raise DesktopError(403, "scope_denied", str(exc)) from exc
+        permissions = {
+            "tool:dify_chat": "allow",
+            "__agent_type__": agent_type,
+            "__target_scope__": "self_hosted_dify",
+            "__authorization_confirmed__": "true",
+            "__authorization_reference__": authorization_reference,
+            "__credential_env__": credential_env,
+        }
+        created = Agent(
+            name=name,
+            version=version,
+            endpoint=endpoint,
+            adapter="dify",
+            model=str(payload.get("model") or "dify-self-hosted"),
+            knowledge=[],
+            tools=[{"name": "dify_chat", "description": "调用自建 Dify 对话接口", "side_effect": "none"}],
+            permissions=permissions,
+            status="validated",
+        )
+        db.add(created)
+        db.commit()
+        db.refresh(created)
+        return agent_view(created)
+
+    if not re.fullmatch(r"local://[a-z0-9][a-z0-9-]{1,62}", endpoint):
+        raise DesktopError(422, "contract_missing_field", "请选择安全的本地测试沙盒")
     from app.security.policy import default_permissions
     base = db.get(Agent, "desktop-campus-v2" if version == "v2.0" else "desktop-campus-v1")
     permissions = default_permissions(strict=version == "v2.0")
@@ -188,9 +250,54 @@ def cases(suite_id: str, db: Session = Depends(get_db)):
 
 @router.post("/test-suites/generate")
 def generate_suite(payload: GenerateRequest, db: Session = Depends(get_db)):
-    require(db, Agent, payload.agent_id, "agent_not_found", "智能体")
+    asset = require(db, Agent, payload.agent_id, "agent_not_found", "智能体")
     template = require(db, TestSuite, SEED_SUITE_ID, "suite_not_found", "本地模板")
     source = suite_cases(db, template)
+    if payload.use_ai:
+        from app.services.llm_provider import (
+            LLMUnavailable,
+            build_generation_prompt,
+            get_default_llm,
+            normalize_generated_cases,
+        )
+
+        llm = get_default_llm()
+        system, user = build_generation_prompt(asset, payload.test_type, source)
+        try:
+            generated_payload = llm.complete_json(system=system, user=user)
+            generated_cases = normalize_generated_cases(generated_payload, source)
+        except LLMUnavailable as exc:
+            raise DesktopError(503, "llm_not_configured", str(exc)) from exc
+        draft_id = f"draft-{uuid4()}"
+        return {
+            "suite": {
+                "id": draft_id,
+                "name": f"{payload.test_type} · AI 候选测试集",
+                "type": payload.test_type,
+                "version": "draft",
+                "case_ids": [],
+            },
+            "cases": [
+                {
+                    "id": f"{draft_id}-{index + 1}",
+                    "suite_id": draft_id,
+                    "title": item["name"],
+                    "risk_tag": item["risk_tag"],
+                    "input": item["input"],
+                    "steps": item["steps"],
+                    "expected": item["expected"],
+                    "forbidden": item["forbidden"],
+                    "judge": ["rule"],
+                    "source": "ai_generated",
+                    "version": "draft",
+                }
+                for index, item in enumerate(generated_cases)
+            ],
+            "review_required": True,
+            "generation_source": "llm_draft",
+            "llm_used": True,
+            "prompt_version": llm.prompt_version,
+        }
     requested = payload.test_type.lower().strip()
     aliases = {"injection": {"direct_injection", "indirect_injection"}, "注入": {"direct_injection", "indirect_injection"},
                "memory": {"memory_poisoning"}, "记忆": {"memory_poisoning"}, "permission": {"tool_abuse"}, "工具权限": {"tool_abuse"},
@@ -218,6 +325,53 @@ def generate_suite(payload: GenerateRequest, db: Session = Depends(get_db)):
     db.commit()
     return {"suite": suite_view(generated, cloned), "cases": [case_view(c, generated) for c in cloned],
             "review_required": False, "generation_source": "reviewed_rule_templates", "llm_used": False}
+
+
+@router.post("/test-suites/accept")
+def accept_generated_suite(payload: AcceptGeneratedRequest, db: Session = Depends(get_db)):
+    require(db, Agent, payload.agent_id, "agent_not_found", "智能体")
+    template = require(db, TestSuite, SEED_SUITE_ID, "suite_not_found", "本地模板")
+    templates = suite_cases(db, template)
+    suite = TestSuite(name=payload.name, type=payload.test_type, version="1.0", status="ready")
+    db.add(suite)
+    db.flush()
+    created = []
+    for index, item in enumerate(payload.cases):
+        tag = risk_tag(str(item.get("risk_tag", "")))
+        name = str(item.get("name") or item.get("title") or "").strip()
+        input_text = str(item.get("input", "")).strip()
+        expected = str(item.get("expected", "")).strip()
+        if not name or not input_text or not expected:
+            raise DesktopError(422, "contract_missing_field", f"第 {index + 1} 条候选缺少名称、输入或预期")
+        matched_template = next((case for case in templates if risk_tag(case.risk_tag) == tag), templates[0])
+        case = TestCase(
+            suite_id=suite.id,
+            name=name,
+            type="ai_generated",
+            input=input_text,
+            steps=item.get("steps") if isinstance(item.get("steps"), list) else [],
+            expected=expected,
+            forbidden=item.get("forbidden") if isinstance(item.get("forbidden"), list) else [],
+            judge={
+                **dict(matched_template.judge or {}),
+                "reviewed_at": datetime.now(timezone.utc).isoformat(),
+                "review_method": "human_accept",
+            },
+            risk_tag=tag,
+            source="ai_generated",
+        )
+        db.add(case)
+        db.flush()
+        created.append(case)
+    suite.case_ids = [case.id for case in created]
+    db.commit()
+    return {
+        "suite": suite_view(suite, created),
+        "cases": [case_view(case, suite) for case in created],
+        "review_required": False,
+        "generation_source": "human_reviewed_ai_draft",
+        "llm_used": True,
+    }
 
 
 def judge_invocation(case: TestCase, invocation) -> dict:
@@ -314,8 +468,8 @@ def create_run(payload: RunCreate, db: Session = Depends(get_db)):
 
     asset = require(db, Agent, payload.agent_id, "agent_not_found", "智能体")
     suite = require(db, TestSuite, payload.suite_id, "suite_not_found", "测试集")
-    if asset.adapter not in {"campus", "local", "mock"}:
-        raise DesktopError(403, "scope_denied", "当前桌面演示仅执行自建本地靶场")
+    if asset.adapter not in {"campus", "local", "mock", "dify"}:
+        raise DesktopError(403, "scope_denied", "不支持的智能体连接类型")
     if asset.status != "validated":
         raise DesktopError(409, "agent_not_validated", "请先校验智能体配置")
     selected = suite_cases(db, suite)

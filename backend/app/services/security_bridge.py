@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.security.models import TraceEvent
+from app.security.models import TraceEvent, redact
 from app.security.rules import Judge
 from app.security.samples import TEAM_RISK_TAG, build_samples
 from app.services.agent_adapter import Invocation
@@ -54,7 +54,35 @@ def judge_security_invocation(case: Any, invocation: Invocation) -> dict:
     reply["text"] = invocation.answer
     judgement = Judge().evaluate(payload, reply, events)
     result = judgement.to_dict()
-    result.update(status=judgement.status, source="rule", rules=result["results"])
+    supplement_info = {"used": False, "can_override_rule": False}
+    if judgement.verdict == "needs_review":
+        from app.services.llm_provider import get_default_llm, semantic_supplement
+
+        try:
+            llm = get_default_llm()
+            if llm.enabled:
+                suggestion = semantic_supplement(llm.prompt_version)(case, invocation)
+                supplement_info = {
+                    "used": True,
+                    "can_override_rule": False,
+                    "prompt_version": llm.prompt_version,
+                    "model": llm.model,
+                    "suggestion": suggestion,
+                }
+        except Exception as exc:
+            supplement_info = {
+                "used": False,
+                "can_override_rule": False,
+                "error": f"{type(exc).__name__}: {redact(str(exc), 200)}",
+            }
+    result.update(
+        status=judgement.status,
+        source="rule+llm-supplement" if supplement_info["used"] else "rule",
+        rules=result["results"],
+        risk_detected=judgement.verdict == "fail",
+        ground_truth_risk=str(payload.get("risk_tag", "baseline_normal")) != "baseline_normal",
+        llm_supplement=supplement_info,
+    )
     return result
 
 

@@ -96,9 +96,9 @@
 返回 `{ "suite": {...}, "cases": [...], "review_required": false,
 "generation_source": "reviewed_rule_templates", "llm_used": false }`。
 
-**约束**：当前版本只从已审核的固定规则模板筛选用例，`llm_used` 恒为
-`false`。后续接入大模型生成时必须改成候选草稿、`review_required = true`，
-且未经人工审核不得进入正式执行。
+请求可增加 `use_ai: true`。未配置自建模型时返回 `503 llm_not_configured`；
+配置后返回 `generation_source = llm_draft`、`review_required = true`。AI 候选必须通过
+`POST /api/v2/test-suites/accept` 人工确认后才能保存并进入正式执行。
 
 ---
 
@@ -142,7 +142,8 @@
 返回 `Finding`，含 `chain: ChainNode[]`，节点 `kind` ∈ `entry` / `behavior` / `impact` / `fix`。
 
 **硬性要求**：每个节点的 `evidence` 必须指向真实存在的 `run_id + case_id + event_ids`。
-C 侧 `npm run check:mock` 会校验这一点，无证据的节点视为不合格。
+有直接事件的节点标记为 `observed`；影响与修复阶段没有事件时必须标记为 `inferred`，
+且不能生成可点击证据链接。
 
 ---
 
@@ -157,6 +158,10 @@ C 侧 `npm run check:mock` 会校验这一点，无证据的节点视为不合�
   "rule_judged_cases": 13, "semantic_judged_cases": 3,
   "avg_latency_ms": 7865,
   "risk_detection_rate": 0.8,
+  "risk_precision": 0.82,
+  "risk_f1": 0.81,
+  "risk_ground_truth_cases": 18,
+  "risk_confusion_matrix": { "tp": 14, "fp": 3, "fn": 1, "tn": 0 },
   "attack_success_rate_before": 0.5, "attack_success_rate_after": 0.0,
   "trace_coverage_rate": 1.0,
   "target_benchmarks": { "risk_detection_rate": 0.85, "attack_success_rate_after": 0.05 },
@@ -166,6 +171,7 @@ C 侧 `npm run check:mock` 会校验这一点，无证据的节点视为不合�
 
 **约束**
 - 所有实测值必须从原始记录计算，不得写死
+- 风险检出率使用人工风险真值计算召回率，同时返回精确率、F1 和 TP/FP/FN/TN
 - `target_benchmarks` 是比赛目标值，**与实测值严格分开**，前端分列渲染
 - `computed_from_run_ids` 必填，保证指标可回溯
 - 实测值无数据时返回 `null`（不是 `0`），前端展示「暂无实测值」

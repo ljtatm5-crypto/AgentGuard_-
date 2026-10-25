@@ -3,11 +3,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import threading
 import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Any
+
+import httpx
 
 from app.security.agent_core import CampusAssistantV1, CampusAssistantV2
 from app.security.memory import MemoryStore
@@ -175,17 +178,17 @@ def invoke_agent(agent: Any, input_text: str, risk_tag: str = "normal",
         return Invocation(reply.text, events, int((time.perf_counter() - started) * 1000),
                           _assess_risk(events, reply.text, reply.flags), "campus", version, raw)
     if adapter in {"dify", "openai", "openai_compat"}:
-        return _invoke_remote(agent, input_text, adapter)
+        return _invoke_remote(agent, input_text, adapter, session_id=session_id)
     raise ValueError(f"未知 adapter: {adapter}")
 
 
-def _invoke_remote(agent: Any, input_text: str, adapter: str) -> Invocation:
-    """验证范围后明确报告未接入；本交付没有任何发起 HTTP 请求的代码。"""
+def _invoke_remote(agent: Any, input_text: str, adapter: str, session_id: str | None = None) -> Invocation:
+    """调用受控自建 Dify；不跟随重定向、不走系统代理、仅允许授权私网目标。"""
     from app.core.config import get_settings
     from app.core.target_scope import validate_target_scope
+    from app.security.models import now_iso
 
     endpoint = str(getattr(agent, "endpoint", "") or "")
-    get_runtime().guard.assert_allowed(endpoint)
     permissions = dict(getattr(agent, "permissions", None) or {})
     validate_target_scope(
         endpoint=endpoint, adapter=adapter,
@@ -194,7 +197,97 @@ def _invoke_remote(agent: Any, input_text: str, adapter: str) -> Invocation:
         authorization_reference=permissions.get("__authorization_reference__"),
         allowed_hosts=get_settings().allowed_target_host_list,
     )
-    raise NotImplementedError("当前交付仅启用本机校园靶场；真实 Dify 适配器尚未接入，未发送网络请求。")
+    get_runtime().guard.assert_allowed(endpoint)
+    if adapter != "dify":
+        raise NotImplementedError("当前仅实现 Dify 适配器；其它远程适配器尚未接入。")
+    credential_env = str(permissions.get("__credential_env__", ""))
+    api_key = os.getenv(credential_env, "") if credential_env else ""
+    if not api_key:
+        raise ValueError(f"服务端环境变量 {credential_env or '(未配置)'} 中没有可用凭据")
+
+    started = time.perf_counter()
+    with httpx.Client(timeout=30, follow_redirects=False, trust_env=False) as client:
+        response = client.post(
+            endpoint,
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={
+                "inputs": {},
+                "query": input_text,
+                "response_mode": "blocking",
+                "conversation_id": "",
+                "user": session_id or "agentguard",
+            },
+        )
+        response.raise_for_status()
+        payload = response.json()
+
+    nested = payload.get("data")
+    answer = str(payload.get("answer") or (nested.get("answer") if isinstance(nested, dict) else "") or "")
+    conversation_id = str(payload.get("conversation_id") or "")
+    trace_events = [
+        {
+            "id": new_id("evt"),
+            "run_id": session_id or "remote",
+            "type": "user_input",
+            "timestamp": now_iso(),
+            "tool": "",
+            "params": {"content": input_text},
+            "output": "",
+            "error": "",
+        },
+        {
+            "id": new_id("evt"),
+            "run_id": session_id or "remote",
+            "type": "response",
+            "timestamp": now_iso(),
+            "tool": "",
+            "params": {"conversation_id": conversation_id},
+            "output": answer,
+            "error": "",
+        },
+    ]
+    metadata = payload.get("metadata")
+    resources = metadata.get("retrieved_resources", []) if isinstance(metadata, dict) else []
+    for resource in resources or []:
+        trace_events.insert(
+            -1,
+            {
+                "id": new_id("evt"),
+                "run_id": session_id or "remote",
+                "type": "retrieval",
+                "timestamp": now_iso(),
+                "tool": "",
+                "params": {"resource": resource},
+                "output": "",
+                "error": "",
+            },
+        )
+    events = [
+        {
+            "id": event["id"],
+            "type": "input" if event["type"] == "user_input" else event["type"],
+            "tool": None,
+            "params": event["params"],
+            "output": event["output"] or None,
+            "error": None,
+            "duration_ms": 0,
+        }
+        for event in trace_events
+    ]
+    raw = {
+        "answer": answer,
+        "conversation_id": conversation_id,
+        "trace_events": trace_events,
+    }
+    return Invocation(
+        answer=answer,
+        events=events,
+        latency=int((time.perf_counter() - started) * 1000),
+        risk_triggered=False,
+        adapter="dify",
+        agent_version=str(getattr(agent, "version", "") or ""),
+        raw=raw,
+    )
 
 
 def release_session(agent_id: str, session_id: str) -> None:
