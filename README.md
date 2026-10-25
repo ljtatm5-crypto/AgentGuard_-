@@ -54,6 +54,8 @@ npm run dev
 
 当前路由：`/overview`、`/agents`、`/test-suites`、`/runs`、`/runs/:id`、`/findings`、`/reports`、`/settings`。
 
+GitHub Pages 演示：<https://ljtatm5-crypto.github.io/AgentGuard_-/>
+
 ### Docker
 
 ```powershell
