@@ -86,7 +86,7 @@ export default function SettingsPage() {
           <span className="security-icon"><ShieldCheck size={26} weight="duotone" /></span>
           <span className="eyebrow">安全访问范围</span>
           <h2>仅限授权测试环境</h2>
-          <p>测试任务只面向团队自建靶场或已明确授权的内部环境，真实外部网站不会进入测试目标。</p>
+          <p>测试任务只面向平台安全环境或客户明确授权的内部系统，真实外部网站不会进入测试目标。</p>
           <div className="security-status">
             <CloudSlash size={18} weight="duotone" />
             <span><strong>外部网站访问已关闭</strong><small>目标范围在服务端统一校验</small></span>

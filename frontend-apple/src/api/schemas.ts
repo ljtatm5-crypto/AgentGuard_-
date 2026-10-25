@@ -44,6 +44,7 @@ const agentSchema = z.object({
   id: z.string(),
   version: z.string(),
   name: z.string(),
+  agent_type: z.enum(['conversation', 'rag', 'tool', 'workflow']),
   purpose: z.string(),
   endpoint: z.string(),
   model: z.string(),
@@ -78,9 +79,6 @@ const suiteSchema = z.object({
   type: z.string(),
   version: z.string(),
   case_ids: z.array(z.string()),
-  created_by: z.string(),
-  reviewer: z.string().nullable(),
-  reviewed_at: z.string().nullable(),
 })
 
 const caseSchema = z.object({

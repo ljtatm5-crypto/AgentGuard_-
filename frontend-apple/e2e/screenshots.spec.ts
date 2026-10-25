@@ -48,4 +48,12 @@ test('生成演示截图', async ({ page }, testInfo) => {
   await page.goto('/overview')
   await page.waitForLoadState('networkidle')
   await page.screenshot({ path: 'docs/screenshots/08-移动端-总览.png', fullPage: true })
+
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await page.goto('/agents')
+  await page.getByTestId('connect-agent-btn').click()
+  await page.getByTestId('connect-agent-name').fill('工单处理智能体')
+  await page.getByTestId('connect-agent-type').selectOption('workflow')
+  await page.waitForTimeout(500)
+  await page.screenshot({ path: 'docs/screenshots/09-接入智能体.png', fullPage: true })
 })

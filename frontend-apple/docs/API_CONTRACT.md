@@ -36,7 +36,8 @@
   "id": "agt-campus-001",
   "version": "v1.2.0",
   "name": "校园智能助手",
-  "endpoint": "internal://dify/campus-assistant",
+  "agent_type": "tool",
+  "endpoint": "local://campus-assistant",
   "model": "qwen2.5-7b-internal",
   "knowledge": [
     { "id": "kb-003", "name": "图书馆开放通知（含测试性恶意指令）", "version": "v0.9-test",
@@ -59,12 +60,14 @@
 **约束（B 红线）**
 - `authorized_scope.external_target_allowed` **必须恒为 `false`**（Zod 用 `z.literal(false)` 强校验）
 - `tools[].side_effect` 不允许出现 `external_write`
-- `endpoint` 使用 `internal://` 协议，不含公网地址
+- 当前可执行连接使用 `local://` 安全沙盒，不含公网地址
 
 ### `POST /api/v2/agents/validate`
 
-请求 `{ "endpoint": "...", "version": "...", "tools": [...], "permissions": {...} }`，
-返回统一 `Agent` 对象。校验失败返回 `VALIDATION_ERROR`，错误信息需可读。
+请求 `{ "name": "...", "endpoint": "local://...", "version": "...",
+"agent_type": "conversation|rag|tool|workflow", "tools": [...], "permissions": {...} }`，
+返回统一 `Agent` 对象。当前只允许本地安全沙盒，外部目标返回
+`scope_public_target_denied`。
 
 ---
 
@@ -73,12 +76,12 @@
 ### `GET /api/v2/test-suites`
 
 ```jsonc
-[{ "id": "suite-p0-001", "name": "P0 安全基线测试集", "type": "security_p0",
-   "version": "v1.0.0", "case_ids": ["tc-p0-001", "..."],
-   "created_by": "队员A", "reviewer": "队员C", "reviewed_at": "2026-10-18T10:00:00Z" }]
+[{ "id": "suite-p0-001", "name": "智能体安全基线测试集", "type": "security_p0",
+   "version": "v1.0.0", "case_ids": ["tc-p0-001", "..."] }]
 ```
 
-`reviewer` / `reviewed_at` 为 `null` 表示**尚未人工审核**，此时不应进入正式执行。
+测试集面向客户的响应不包含内部成员、开发日期或实现分工字段；这些信息只保留在
+服务端审计记录中。
 
 ### `GET /api/v2/test-suites/{id}/cases`
 
