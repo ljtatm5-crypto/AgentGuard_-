@@ -72,7 +72,14 @@ docker compose up --build
 
 ## 接下来接入自建 Dify 靶场
 
-先实现 `backend/app/services/agent_adapter.py`，让它实现 `AgentAdapter` 协议，再在 `services/runner.py` 中按 Agent 的 `adapter` 字段选择 `mock` 或 `dify`。统一响应必须转换成 `TraceEvent`，前端和报告层不直接依赖 Dify 返回格式。任何非本地目标必须提供授权记录，并将主机加入 `AGENTGUARD_ALLOWED_TARGET_HOSTS`；未通过门禁时不得发起请求。
+自建 Dify 已支持受控接入。将目标主机加入 `AGENTGUARD_ALLOWED_TARGET_HOSTS`，在服务端
+设置 API Key 环境变量（例如 `DIFY_AGENT_API_KEY`），然后在 Agent 资产页选择
+“授权自建 Dify”，填写 Chat Messages 完整地址、凭据环境变量名和授权记录编号。
+适配器不跟随重定向、不读取系统代理，公网未知目标仍然拒绝。
+
+可选自建大模型通过 `AGENTGUARD_LLM_ENABLED`、`AGENTGUARD_LLM_CHAT_URL`、
+`AGENTGUARD_LLM_MODEL` 和 `AGENTGUARD_LLM_API_KEY_ENV` 配置。AI 用例必须人工确认后保存；
+语义判定只能补充规则不足，不能覆盖确定性结论。
 
 ## 分支流程
 

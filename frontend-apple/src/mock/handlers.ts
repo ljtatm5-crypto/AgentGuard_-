@@ -21,6 +21,8 @@ import { mockJudgeTable, verdictForMockRun } from './fixtures/judgments'
 
 /** 可变状态：新任务返回独立的本地合成示例，不发出任何 Agent 请求。 */
 const agentState = new Map<string, Agent>(agents.map((agent) => [agent.id, { ...agent }]))
+const suiteState = new Map<string, TestSuite>(suites.map((suite) => [suite.id, { ...suite }]))
+const caseState = new Map<string, TestCase>(cases.map((item) => [item.id, { ...item }]))
 const runState = new Map<string, TestRun>(runs.map((r) => [r.id, { ...r }]))
 const generatedTraces = new Map<string, TraceEvent[]>()
 const eventsForRun = (id: string) => generatedTraces.get(id) ?? traceByRun(id)
@@ -30,9 +32,19 @@ const err = (error_code: string, message: string, status = 400) =>
   HttpResponse.json({ error_code, message } satisfies ApiError, { status })
 
 const notFound = (what: string, id: string) => err('RESOURCE_NOT_FOUND', `${what} 不存在：${id}`, 404)
+const withEvidenceStatus = (finding: (typeof findings)[number]) => ({
+  ...finding,
+  chain: finding.chain.map((node) => ({
+    ...node,
+    evidence: {
+      ...node.evidence,
+      status: node.evidence.event_ids.length > 0 ? 'observed' as const : 'inferred' as const,
+    },
+  })),
+})
 
 const buildJudgeResults = (run: TestRun): JudgeResult[] =>
-  cases
+  [...caseState.values()]
     .filter((c) => c.suite_id === run.suite_id)
     .slice(0, run.completed)
     .map((c) => {
@@ -111,21 +123,24 @@ export const handlers = [
   // ---------- 测试集与用例（A 提供） ----------
   http.get(mockApiPath('/test-suites'), async () => {
     await delay(200)
-    return HttpResponse.json(suites satisfies TestSuite[])
+    return HttpResponse.json([...suiteState.values()] satisfies TestSuite[])
   }),
 
   http.get(mockApiPath('/test-suites/:id/cases'), async ({ params }) => {
     await delay(200)
-    if (!suites.some((s) => s.id === params.id)) return notFound('测试集', String(params.id))
-    const list = cases.filter((c) => c.suite_id === params.id) satisfies TestCase[]
+    if (!suiteState.has(String(params.id))) return notFound('测试集', String(params.id))
+    const list = [...caseState.values()].filter((c) => c.suite_id === params.id) satisfies TestCase[]
     return HttpResponse.json(list)
   }),
 
   http.post(mockApiPath('/test-suites/generate'), async ({ request }) => {
     await delay(600)
-    const body = (await request.json()) as { agent_id?: string; test_type?: string }
+    const body = (await request.json()) as { agent_id?: string; test_type?: string; use_ai?: boolean }
     if (!body.agent_id) return err('VALIDATION_ERROR', 'agent_id 为必填字段', 422)
     if (!agentState.has(body.agent_id)) return notFound('Agent', body.agent_id)
+    if (body.use_ai) {
+      return err('llm_not_configured', 'Mock 演示不会伪装成真实大模型生成；请使用 API 模式并配置自建模型', 503)
+    }
     const requested = (body.test_type ?? 'security').trim().toLowerCase()
     const aliases: Record<string, string[]> = {
       injection: ['direct_injection', 'indirect_injection'],
@@ -141,14 +156,25 @@ export const handlers = [
     if (!selected.length) {
       return err('unsupported_test_type', '没有对应的本地规则模板', 422)
     }
-    return HttpResponse.json({
-      suite: {
+    const generatedId = `suite-generated-${Date.now().toString(36)}`
+    const generatedCases = selected.map((item, index) => ({
+      ...item,
+      id: `case-generated-${Date.now().toString(36)}-${index}`,
+      suite_id: generatedId,
+      source: 'manual' as const,
+    }))
+    generatedCases.forEach((item) => caseState.set(item.id, item))
+    const generatedSuite: TestSuite = {
         ...suites[0],
+        id: generatedId,
         name: `${body.test_type ?? 'security'} · 固定规则模板`,
         type: body.test_type ?? 'security',
-        case_ids: selected.map((item) => item.id),
-      },
-      cases: selected,
+        case_ids: generatedCases.map((item) => item.id),
+    }
+    suiteState.set(generatedSuite.id, generatedSuite)
+    return HttpResponse.json({
+      suite: generatedSuite,
+      cases: generatedCases,
       review_required: false,
       generation_source: 'reviewed_rule_templates',
       llm_used: false,
@@ -167,12 +193,12 @@ export const handlers = [
     if (!body.agent_id) return err('VALIDATION_ERROR', 'agent_id 为必填字段', 422)
     if (!body.suite_id) return err('VALIDATION_ERROR', 'suite_id 为必填字段', 422)
     if (!agentState.has(body.agent_id)) return notFound('Agent', body.agent_id)
-    if (!suites.some((s) => s.id === body.suite_id)) return notFound('测试集', body.suite_id)
+    if (!suiteState.has(body.suite_id)) return notFound('测试集', body.suite_id)
 
     const seq = runState.size + 1
     const selectedAgent = agentState.get(body.agent_id)!
-    const selectedSuite = suites.find((s) => s.id === body.suite_id)!
-    const selectedCases = cases.filter((c) => c.suite_id === body.suite_id)
+    const selectedSuite = suiteState.get(body.suite_id)!
+    const selectedCases = [...caseState.values()].filter((c) => c.suite_id === body.suite_id)
     const summary = selectedCases.map((c) => mockJudgeTable[c.id]!)
     const run: TestRun = {
       id: `run-${String(seq).padStart(3, '0')}`,
@@ -220,14 +246,14 @@ export const handlers = [
   // ---------- 缺陷与攻击链（B 提供样本，A 判定） ----------
   http.get(mockApiPath('/findings'), async () => {
     await delay(200)
-    return HttpResponse.json(findings)
+    return HttpResponse.json(findings.map(withEvidenceStatus))
   }),
 
   http.get(mockApiPath('/findings/:id/chain'), async ({ params }) => {
     await delay(200)
     const found = findings.find((f) => f.id === params.id)
     if (!found) return notFound('缺陷', String(params.id))
-    return HttpResponse.json(found)
+    return HttpResponse.json(withEvidenceStatus(found))
   }),
 
   // ---------- 指标聚合 ----------
