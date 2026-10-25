@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { CheckCircle, PlugsConnected, Plus, ShieldCheck, X } from '@phosphor-icons/react'
+import { Link } from 'react-router-dom'
+import { ArrowUpRight, CheckCircle, Play, PlugsConnected, Plus, ShieldCheck, X } from '@phosphor-icons/react'
 import { api, ApiRequestError, USE_MOCK } from '@/api/client'
 import { AsyncBoundary } from '@/components/AsyncBoundary'
 import { PolicyTag } from '@/components/Tags'
@@ -42,6 +43,7 @@ export default function AgentsPage() {
   const [connecting, setConnecting] = useState(false)
   const [connectError, setConnectError] = useState<string | null>(null)
   const [connected, setConnected] = useState<Agent[]>([])
+  const [selectedAgentId, setSelectedAgentId] = useState('')
 
   async function connectAgent() {
     setConnectError(null)
@@ -83,6 +85,7 @@ export default function AgentsPage() {
       }
       const created = await api.validateAgent(payload)
       setConnected((items) => mergeAgents(items, [created]))
+      setSelectedAgentId(created.id)
       setName('')
       setModel('')
       setEndpoint('')
@@ -243,88 +246,124 @@ export default function AgentsPage() {
       )}
 
       <AsyncBoundary state={state} isEmpty={(d) => d.length === 0} onRetry={retry}>
-        {(agents) =>
-          mergeAgents(agents, connected).map((agent) => (
-            <section className="panel agent-card" key={agent.id} data-testid="agent-card">
-              <div className="panel-head">
-                <div>
-                  <div className="agent-type-row">
-                    <span className="agent-type-tag">{agentTypeLabel[agent.agent_type]}</span>
-                    <span className="mono version">{agent.version}</span>
+        {(agents) => {
+          const catalog = mergeAgents(agents, connected)
+          const selectedAgent = catalog.find((agent) => agent.id === selectedAgentId) ?? catalog[0]
+          return (
+            <>
+              <section className="agent-summary-strip" aria-label="Agent 资产概览">
+                <div><span>接入资产</span><strong>{catalog.length}</strong></div>
+                <div><span>已完成校验</span><strong>{catalog.filter((agent) => agent.validate_status === 'validated').length}</strong></div>
+                <div><span>外部目标</span><strong>0</strong></div>
+                <p>先选择资产查看权限与知识配置，再进入测试工作区。</p>
+              </section>
+
+              <div className="agent-catalog-grid" data-testid="agent-catalog">
+                {catalog.map((agent) => (
+                  <article className={`agent-tile ${selectedAgent?.id === agent.id ? 'active' : ''}`} key={agent.id}>
+                    <button
+                      className="agent-tile-main"
+                      type="button"
+                      onClick={() => setSelectedAgentId(agent.id)}
+                      aria-pressed={selectedAgent?.id === agent.id}
+                    >
+                      <span className="agent-monogram">{agent.name.slice(0, 2)}</span>
+                      <span className="agent-tile-copy">
+                        <span className="agent-type-row">
+                          <span className="agent-type-tag">{agentTypeLabel[agent.agent_type]}</span>
+                          <span className="mono version">{agent.version}</span>
+                        </span>
+                        <strong>{agent.name}</strong>
+                        <small>{agent.endpoint}</small>
+                      </span>
+                      <span className={`validate ${agent.validate_status}`}>
+                        {agent.validate_status === 'validated' ? '已校验' : agent.validate_status === 'invalid' ? '校验失败' : '校验中'}
+                      </span>
+                    </button>
+                    <div className="agent-tile-meta">
+                      <span>{agent.knowledge.length} 个知识库</span>
+                      <span>{agent.tools.length} 个工具</span>
+                      <Link to={`/runs?agent=${agent.id}`}>开始测试 <Play size={13} weight="fill" /></Link>
+                    </div>
+                  </article>
+                ))}
+              </div>
+
+              {selectedAgent && (
+                <section className="panel agent-card agent-detail" data-testid="agent-card">
+                  <div className="agent-detail-head">
+                    <div>
+                      <div className="agent-type-row">
+                        <span className="agent-type-tag">{agentTypeLabel[selectedAgent.agent_type]}</span>
+                        <span className="mono version">{selectedAgent.version}</span>
+                      </div>
+                      <h2>{selectedAgent.name}</h2>
+                      <p>{selectedAgent.purpose}</p>
+                    </div>
+                    <div className="agent-detail-actions">
+                      <span className={`validate ${selectedAgent.validate_status}`}>
+                        {selectedAgent.validate_status === 'validated' ? '已校验' : selectedAgent.validate_status === 'invalid' ? '校验失败' : '校验中'}
+                      </span>
+                      <Link className="btn btn-primary" to={`/runs?agent=${selectedAgent.id}`}>
+                        启动测试 <ArrowUpRight size={16} />
+                      </Link>
+                    </div>
                   </div>
-                  <h2>{agent.name}</h2>
-                </div>
-                <span className={`validate ${agent.validate_status}`}>
-                  {agent.validate_status === 'validated' ? '已校验' : agent.validate_status === 'invalid' ? '校验失败' : '校验中'}
-                </span>
-              </div>
-              <p className="page-desc">{agent.purpose}</p>
-              <dl className="kv">
-                <dt>接入地址</dt>
-                <dd className="mono">{agent.endpoint}</dd>
-                <dt>模型</dt>
-                <dd className="mono">{agent.model}</dd>
-              </dl>
 
-              <h3>知识库</h3>
-              {agent.knowledge.length > 0 ? (
-                <div className="table-scroll" tabIndex={0} role="region" aria-label={`${agent.name}知识库`}>
-                  <table>
-                    <thead>
-                      <tr><th>名称</th><th>版本</th><th>来源</th><th>类型</th></tr>
-                    </thead>
-                    <tbody>
-                      {agent.knowledge.map((knowledge) => (
-                        <tr key={knowledge.id}>
-                          <td>{knowledge.name}</td>
-                          <td className="mono">{knowledge.version}</td>
-                          <td>{knowledge.source}</td>
-                          <td>
-                            <span className={`tag ${knowledge.kind === 'malicious' ? 'tag-danger' : knowledge.kind === 'conflict' ? 'tag-warning' : 'tag-neutral'}`}>
-                              {knowledge.kind === 'normal' ? '正常' : knowledge.kind === 'conflict' ? '冲突' : '含测试性恶意指令'}
+                  <div className="agent-detail-grid">
+                    <section className="agent-detail-block">
+                      <span className="detail-label">连接信息</span>
+                      <dl className="agent-facts">
+                        <div><dt>接入地址</dt><dd className="mono">{selectedAgent.endpoint}</dd></div>
+                        <div><dt>模型</dt><dd className="mono">{selectedAgent.model}</dd></div>
+                        <div><dt>测试范围</dt><dd>{selectedAgent.authorized_scope.target_type === 'internal_mock' ? '本地安全沙盒' : '已授权内部环境'}</dd></div>
+                      </dl>
+                    </section>
+
+                    <section className="agent-detail-block">
+                      <span className="detail-label">知识库</span>
+                      {selectedAgent.knowledge.length > 0 ? (
+                        <ul className="agent-resource-list">
+                          {selectedAgent.knowledge.map((knowledge) => (
+                            <li key={knowledge.id}>
+                              <span><strong>{knowledge.name}</strong><small>{knowledge.source} · {knowledge.version}</small></span>
+                              <span className={`tag ${knowledge.kind === 'malicious' ? 'tag-danger' : knowledge.kind === 'conflict' ? 'tag-warning' : 'tag-neutral'}`}>
+                                {knowledge.kind === 'normal' ? '正常' : knowledge.kind === 'conflict' ? '冲突' : '隔离样本'}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : <p className="empty-inline">暂未绑定知识库</p>}
+                    </section>
+
+                    <section className="agent-detail-block agent-tools-block">
+                      <span className="detail-label">工具与权限</span>
+                      <ul className="agent-resource-list">
+                        {selectedAgent.tools.map((tool) => (
+                          <li key={tool.name}>
+                            <span><strong className="mono">{tool.name}</strong><small>{tool.description}</small></span>
+                            <span className="tool-policy">
+                              <span className="tag tag-neutral">{sideEffectLabel[tool.side_effect]}</span>
+                              {selectedAgent.permissions[tool.name] ? <PolicyTag v={selectedAgent.permissions[tool.name]} /> : <span className="muted">未配置</span>}
                             </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : <p className="empty-inline">暂未绑定知识库，可在接入正式环境后补充。</p>}
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+                  </div>
 
-              <h3>工具与权限</h3>
-              <div className="table-scroll" tabIndex={0} role="region" aria-label={`${agent.name}工具与权限`}>
-                <table>
-                  <thead>
-                    <tr><th>工具</th><th>说明</th><th>副作用</th><th>权限决策</th></tr>
-                  </thead>
-                  <tbody>
-                    {agent.tools.map((tool) => (
-                      <tr key={tool.name}>
-                        <td className="mono">{tool.name}</td>
-                        <td>{tool.description}</td>
-                        <td>
-                          <span className={tool.side_effect === 'external_write' ? 'tag tag-danger' : 'tag tag-neutral'}>
-                            {sideEffectLabel[tool.side_effect]}
-                          </span>
-                        </td>
-                        <td>{agent.permissions[tool.name] ? <PolicyTag v={agent.permissions[tool.name]} /> : '未配置'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <h3>授权范围</h3>
-              <div className="scope-box" data-testid="authorized-scope">
-                <p>
-                  <strong>{agent.authorized_scope.target_type === 'internal_mock' ? '本地安全沙盒' : '已授权内部环境'}</strong>
-                  <span className="tag tag-danger">禁止外部站点目标</span>
-                </p>
-                <p className="muted">{agent.authorized_scope.note}</p>
-              </div>
-            </section>
-          ))
-        }
+                  <div className="scope-box" data-testid="authorized-scope">
+                    <p>
+                      <strong>授权范围</strong>
+                      <span className="tag tag-danger">禁止外部站点目标</span>
+                    </p>
+                    <p className="muted">{selectedAgent.authorized_scope.note}</p>
+                  </div>
+                </section>
+              )}
+            </>
+          )
+        }}
       </AsyncBoundary>
     </div>
   )

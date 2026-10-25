@@ -1,11 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { CheckCircle, DownloadSimple, FileCsv, FileText } from '@phosphor-icons/react'
+import { ArrowRight, CheckCircle, DownloadSimple, FileCsv, FileText } from '@phosphor-icons/react'
 import { api, ApiRequestError, USE_MOCK } from '@/api/client'
 import { AsyncBoundary } from '@/components/AsyncBoundary'
 import { StatusTag } from '@/components/Tags'
 import { useAsync } from '@/hooks/useAsync'
 import { buildReportFiles, downloadReportFile } from '@/utils/export'
+import type { JudgeResult, TestRun } from '@/types/api'
 
 export default function ReportsPage() {
   const metrics = useAsync(() => api.getMetrics(), [])
@@ -109,6 +110,13 @@ export default function ReportsPage() {
         <p className="muted small">仅比较同测试集、同用例的修复前后记录；没有成对记录时显示暂无数据。运行 ID 列表表示全部聚合范围，不代表单次修复对照。</p>
       </section>
 
+      <section className="panel">
+        <h2>逐用例修复差异</h2>
+        <AsyncBoundary state={runs.state} isEmpty={(data) => data.length < 2} onRetry={runs.retry}>
+          {(data) => <RunComparison runs={data} />}
+        </AsyncBoundary>
+      </section>
+
       <section className="panel export-panel">
         <div className="panel-toolbar"><h2>导出报告</h2><span className={`tag ${USE_MOCK ? 'tag-warning' : 'tag-info'}`}>{USE_MOCK ? 'Mock 示例数据' : '本地 API 数据'}</span></div>
         <p className="page-desc">
@@ -127,6 +135,91 @@ export default function ReportsPage() {
         {exportStatus && <p className="export-status" role="status" aria-live="polite" data-testid="export-status"><CheckCircle size={18} aria-hidden="true" />{exportStatus}</p>}
         {exportError && <p className="form-error" role="alert" data-testid="export-error">{exportError}</p>}
       </section>
+    </div>
+  )
+}
+
+function RunComparison({ runs }: { runs: TestRun[] }) {
+  const chronological = [...runs].sort((left, right) => left.started_at.localeCompare(right.started_at))
+  const [beforeId, setBeforeId] = useState(chronological.at(-2)?.id ?? '')
+  const [afterId, setAfterId] = useState(chronological.at(-1)?.id ?? '')
+  useEffect(() => {
+    if (!chronological.some((run) => run.id === beforeId)) setBeforeId(chronological.at(-2)?.id ?? '')
+    if (!chronological.some((run) => run.id === afterId)) setAfterId(chronological.at(-1)?.id ?? '')
+  }, [chronological, beforeId, afterId])
+
+  const beforeRun = chronological.find((run) => run.id === beforeId)
+  const afterRun = chronological.find((run) => run.id === afterId)
+  const details = useAsync(
+    () => beforeRun && afterRun
+      ? Promise.all([api.getRunDetail(beforeRun.id), api.getRunDetail(afterRun.id)])
+      : Promise.resolve(null),
+    [beforeRun?.id, afterRun?.id],
+  )
+  const sameSuite = beforeRun && afterRun && beforeRun.suite_id === afterRun.suite_id
+
+  return (
+    <div className="report-diff">
+      <div className="report-diff-controls">
+        <label>
+          修复前
+          <select value={beforeId} onChange={(event) => setBeforeId(event.target.value)}>
+            {chronological.map((run) => <option key={run.id} value={run.id}>{run.agent_version} · {run.task_id}</option>)}
+          </select>
+        </label>
+        <ArrowRight size={18} aria-hidden="true" />
+        <label>
+          修复后
+          <select value={afterId} onChange={(event) => setAfterId(event.target.value)}>
+            {chronological.map((run) => <option key={run.id} value={run.id}>{run.agent_version} · {run.task_id}</option>)}
+          </select>
+        </label>
+      </div>
+      {!sameSuite && <p className="form-error" role="alert">两次运行必须使用同一测试集才能做逐用例对比。</p>}
+      <AsyncBoundary state={details.state} onRetry={details.retry}>
+        {(data) => !data || !sameSuite ? null : <DiffTable before={data[0].results} after={data[1].results} beforeRun={beforeRun} afterRun={afterRun} />}
+      </AsyncBoundary>
+    </div>
+  )
+}
+
+function DiffTable({ before, after, beforeRun, afterRun }: {
+  before: JudgeResult[]
+  after: JudgeResult[]
+  beforeRun?: TestRun
+  afterRun?: TestRun
+}) {
+  const caseIds = [...new Set([...before.map((item) => item.case_id), ...after.map((item) => item.case_id)])]
+  const rows = caseIds.map((caseId) => {
+    const beforeResult = before.find((item) => item.case_id === caseId)
+    const afterResult = after.find((item) => item.case_id === caseId)
+    let change = '未变化'
+    if (!beforeResult || !afterResult) change = '无法比较'
+    else if (beforeResult.status !== 'passed' && afterResult.status === 'passed') change = '已修复'
+    else if (beforeResult.status === 'passed' && afterResult.status !== 'passed') change = '新增回归'
+    else if (beforeResult.status !== 'passed' && afterResult.status !== 'passed') change = '仍存在'
+    return { caseId, beforeResult, afterResult, change }
+  })
+  return (
+    <div className="table-scroll" tabIndex={0} role="region" aria-label="逐用例修复差异">
+      <table className="diff-table">
+        <thead>
+          <tr><th>用例</th><th>修复前</th><th>修复后</th><th>变化</th></tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.caseId}>
+              <td className="mono">{row.caseId}</td>
+              <td>{row.beforeResult ? <StatusTag v={row.beforeResult.status} /> : <span className="muted">缺失</span>}</td>
+              <td>{row.afterResult ? <StatusTag v={row.afterResult.status} /> : <span className="muted">缺失</span>}</td>
+              <td><span className={`diff-badge diff-${row.change === '已修复' ? 'fixed' : row.change === '新增回归' ? 'regression' : 'same'}`}>{row.change}</span></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="diff-footnote">
+        对比范围：<span className="mono">{beforeRun?.task_id}</span> 与 <span className="mono">{afterRun?.task_id}</span>
+      </p>
     </div>
   )
 }
