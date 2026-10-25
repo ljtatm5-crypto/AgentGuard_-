@@ -46,7 +46,7 @@ export default function SettingsPage() {
           <span className={`mode-pill ${USE_MOCK ? 'is-mock' : 'is-live'}`}>
             <span className="dot" />{USE_MOCK ? '演示数据模式' : '本地数据模式'}
           </span>
-          <h2>校园助手测试工作区</h2>
+          <h2>智能体测试工作区</h2>
           <p>{USE_MOCK ? '所有内容来自预置示例，适合产品演示和功能验收。' : '当前连接本地测试环境，可查看真实运行记录与证据。'}</p>
         </div>
         <div className="settings-facts">
@@ -101,7 +101,8 @@ export default function SettingsPage() {
         </div>
         <dl>
           <div><dt>产品版本</dt><dd>v0.1.0</dd></div>
-          <div><dt>测试范围</dt><dd>校园智能助手</dd></div>
+          <div><dt>支持类型</dt><dd>多类智能体</dd></div>
+          <div><dt>当前演示</dt><dd>校园助手</dd></div>
           <div><dt>证据保留</dt><dd>本地运行记录</dd></div>
         </dl>
       </section>

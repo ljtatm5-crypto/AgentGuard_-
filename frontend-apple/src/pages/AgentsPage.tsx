@@ -16,7 +16,7 @@ export default function AgentsPage() {
     <div className="agents-page">
       <header className="page-head">
         <h1>Agent 资产</h1>
-        <p className="page-desc">被测 Agent 的版本、知识库、工具与权限。授权范围仅限自建靶场或已获授权的内部环境。</p>
+        <p className="page-desc">统一管理不同智能体的版本、知识库、工具与权限；支持对话、RAG、工具调用和工作流 Agent。授权范围仅限自建靶场或已获授权的内部环境。</p>
       </header>
 
       <AsyncBoundary state={state} isEmpty={(d) => d.length === 0} onRetry={retry}>

@@ -16,7 +16,7 @@ export default function DashboardPage() {
   const metrics = useAsync(() => api.getMetrics(), [])
   const reduce = useReducedMotion()
   return <div className="dashboard-page">
-    <header className="page-head dashboard-head"><div><h1>总览</h1><p className="page-desc">规则先判、批量回归、轨迹审计与授权靶场，一处看清。</p></div><Link to="/runs" className="btn btn-primary"><Plus size={17} weight="bold" />启动新测试</Link></header>
+    <header className="page-head dashboard-head"><div><h1>总览</h1><p className="page-desc">面向多类智能体，统一完成规则判定、批量回归、轨迹审计与授权测试。</p></div><Link to="/runs" className="btn btn-primary"><Plus size={17} weight="bold" />启动新测试</Link></header>
     <AsyncBoundary state={metrics.state} onRetry={metrics.retry}>{m => {
       const passRate = m.completed_cases ? m.passed_cases / m.completed_cases * 100 : 0
       const ruleRate = m.completed_cases ? m.rule_judged_cases / m.completed_cases * 100 : 0
@@ -25,7 +25,7 @@ export default function DashboardPage() {
           <div className="hero-copy">
             <span className="hero-label"><CheckCircle size={17} weight="duotone" />智能体质量与安全验证平台</span>
             <h2>让每一次测试，<br /><span>都有据可循。</span></h2>
-            <p>固定规则先行判定，批量回归定位风险；从执行轨迹到攻击链，每一个结论都能回看证据。</p>
+            <p>面向对话、RAG、工具调用与工作流智能体，以固定规则先行判定，从执行轨迹到攻击链，每一个结论都能回看证据。</p>
             <div className="hero-features" aria-label="平台核心功能">
               <span className="hero-feature"><b>01</b><span><strong>规则先行</strong><small>确定性判定</small></span></span>
               <span className="hero-feature"><b>02</b><span><strong>批量回归</strong><small>修复前后对照</small></span></span>
