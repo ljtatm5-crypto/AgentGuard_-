@@ -25,7 +25,7 @@ Mock 与真实后端共用 `src/types/api.ts` 的类型定义，任何一端违�
 | 文件 | 内容 | 条数 |
 |---|---|---|
 | `fixtures/agents.ts` | 校园智能助手 v1.2.0，3 个知识库（正常/冲突/含恶意指令），2 个工具 | 1 |
-| `fixtures/suites.ts` | P0 安全基线测试集 v1.0.0 + 六类用例 | 6 |
+| `fixtures/suites.ts` | 智能体安全基线测试集 v1.0.0 + 六类用例 | 6 |
 | `fixtures/runs.ts` | 修复前 v1.0.0（失败）、修复后 v1.1.0（通过）、当前 v1.2.0（运行中） | 3 |
 | `fixtures/trace.ts` | 六种事件类型，覆盖六条用例 | 18 |
 | `fixtures/findings.ts` | 4 条缺陷，含完整攻击链 | 4 |

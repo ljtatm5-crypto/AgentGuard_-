@@ -6,6 +6,12 @@ import { JudgeSourceTag } from '@/components/Tags'
 import { useAsync } from '@/hooks/useAsync'
 import { RISK_TAG_LABELS } from '@/types/enums'
 
+const SUITE_TYPE_LABELS: Record<string, string> = {
+  security_p0: '安全与行为风险',
+  mixed: '综合质量与安全',
+  security: '安全回归',
+}
+
 export default function SuitesPage() {
   const suites = useAsync(() => api.listSuites(), [])
   const [selected, setSelected] = useState<string | null>(null)
@@ -19,7 +25,7 @@ export default function SuitesPage() {
       <header className="page-head">
         <h1>测试集</h1>
         <p className="page-desc">
-          覆盖六类 P0 用例：五类风险场景 + 一类正常对照。AI 生成内容仅为候选，正式入集需人工审核。
+          覆盖提示词注入、知识库风险、工具越权、记忆污染与任务漂移，并提供正常业务对照。
         </p>
       </header>
 
@@ -33,9 +39,9 @@ export default function SuitesPage() {
                 <tr>
                   <th>名称</th>
                   <th>版本</th>
-                  <th>类型</th>
+                  <th>覆盖范围</th>
                   <th>用例数</th>
-                  <th>审核人</th>
+                  <th>状态</th>
                   <th><span className="sr-only">操作</span></th>
                 </tr>
               </thead>
@@ -44,17 +50,12 @@ export default function SuitesPage() {
                   <tr key={s.id} className={selected === s.id ? 'row-active' : undefined}>
                     <td>{s.name}</td>
                     <td className="mono">{s.version}</td>
-                    <td>{s.type}</td>
+                    <td>{SUITE_TYPE_LABELS[s.type] ?? '自定义测试'}</td>
                     <td>{s.case_ids.length}</td>
                     <td>
-                      {s.reviewer ? (
-                        <>
-                          {s.reviewer}
-                          <span className="muted block">{s.reviewed_at?.slice(0, 10)}</span>
-                        </>
-                      ) : (
-                        <span className="tag tag-warning">待审核</span>
-                      )}
+                      <span className={`tag ${s.case_ids.length ? 'tag-success' : 'tag-warning'}`}>
+                        {s.case_ids.length ? '已就绪' : '待配置'}
+                      </span>
                     </td>
                     <td>
                       <button className="btn" onClick={() => setSelected(s.id)} aria-expanded={selected === s.id} aria-controls="suite-details">
@@ -79,15 +80,12 @@ export default function SuitesPage() {
           <AsyncBoundary state={cases.state} isEmpty={(d) => d.length === 0} onRetry={cases.retry}>
             {(data) => (
               <ul className="case-list" data-testid="case-list">
-                {data.map((c) => (
+                {data.map((c, index) => (
                   <li key={c.id} className="case-item">
                     <div className="case-head">
-                      <span className="mono muted">{c.id}</span>
+                      <span className="case-number">用例 {String(index + 1).padStart(2, '0')}</span>
                       <strong>{c.title}</strong>
                       <span className="tag tag-info">{RISK_TAG_LABELS[c.risk_tag]}</span>
-                      <span className="tag tag-neutral">
-                        {c.source === 'ai_generated' ? 'AI 生成候选' : '人工编写'}
-                      </span>
                     </div>
                     <p>
                       <span className="key">输入</span>

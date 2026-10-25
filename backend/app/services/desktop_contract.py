@@ -15,6 +15,12 @@ RISK_TAGS = {"direct_injection", "indirect_injection", "memory_poisoning", "tool
 TAG_ALIASES = {"direct-injection": "direct_injection", "indirect-injection": "indirect_injection", "memory-poisoning": "memory_poisoning", "tool-overreach": "tool_abuse", "goal-drift": "goal_drift"}
 SEED_SUITE_ID = "desktop-security-v1"
 SEED_AGENT_IDS = {"v2.0": "desktop-campus-v2", "v1.0": "desktop-campus-v1"}
+AGENT_TYPE_LABELS = {
+    "conversation": "对话型",
+    "rag": "知识库 RAG",
+    "tool": "工具调用",
+    "workflow": "工作流",
+}
 
 
 def iso(value: datetime | str | None) -> str | None:
@@ -35,7 +41,11 @@ def ensure_desktop_data(db: Session) -> None:
 
     changed = False
     for version, agent_id in SEED_AGENT_IDS.items():
-        if db.get(Agent, agent_id):
+        existing_agent = db.get(Agent, agent_id)
+        if existing_agent:
+            if "__agent_type__" not in (existing_agent.permissions or {}):
+                existing_agent.permissions = {**(existing_agent.permissions or {}), "__agent_type__": "tool"}
+                changed = True
             continue
         fixed = version.startswith("v2")
         db.add(Agent(
@@ -46,12 +56,16 @@ def ensure_desktop_data(db: Session) -> None:
                        for kind, name in [("normal", "校园公开知识"), ("conflict", "版本冲突样本"), ("malicious", "隔离注入样本")]],
             tools=[{"name": "campus_search", "description": "查询虚拟校园知识与数据", "side_effect": "none"},
                    {"name": "protected_write", "description": "写入进程内虚拟校园数据", "side_effect": "virtual_write"}],
-            permissions=default_permissions(strict=fixed),
+            permissions={**default_permissions(strict=fixed), "__agent_type__": "tool"},
         ))
         changed = True
-    if not db.get(TestSuite, SEED_SUITE_ID):
+    existing_suite = db.get(TestSuite, SEED_SUITE_ID)
+    if existing_suite and existing_suite.name != "智能体安全基线测试集":
+        existing_suite.name = "智能体安全基线测试集"
+        changed = True
+    if not existing_suite:
         samples = build_samples()
-        suite = TestSuite(id=SEED_SUITE_ID, name="校园智能体安全回归 · B 规则集", type="security", version="1.0", status="ready")
+        suite = TestSuite(id=SEED_SUITE_ID, name="智能体安全基线测试集", type="security", version="1.0", status="ready")
         db.add(suite)
         db.flush()
         ids = []
@@ -90,9 +104,16 @@ def agent_view(agent: Agent) -> dict:
         tools.append({"name": name, "description": str(item.get("description", name)),
                       "side_effect": effect if effect in {"none", "virtual_write", "external_write"} else "none"})
     local = agent.adapter in {"campus", "local", "mock"}
+    agent_type = str((agent.permissions or {}).get("__agent_type__", "conversation"))
+    if agent_type not in AGENT_TYPE_LABELS:
+        agent_type = "conversation"
     return {
         "id": agent.id, "version": agent.version, "name": agent.name,
-        "purpose": "团队自建校园智能体：工具权限、知识注入、记忆与行为回归验证" if local else "已配置内部智能体",
+        "agent_type": agent_type,
+        "purpose": (
+            f"{AGENT_TYPE_LABELS[agent_type]}智能体：验证规则判定、工具权限、知识安全与行为回归"
+            if local else "已配置内部智能体"
+        ),
         "endpoint": agent.endpoint, "model": agent.model, "knowledge": knowledge, "tools": tools,
         "permissions": {
             str(k).removeprefix("tool:"): v
@@ -105,18 +126,13 @@ def agent_view(agent: Agent) -> dict:
         },
         "validate_status": agent.status if agent.status in {"validated", "invalid", "pending"} else "pending",
         "authorized_scope": {"target_type": "internal_mock" if local else "internal_authorized", "external_target_allowed": False,
-                             "note": "纯本地虚拟工具；不访问外部网站" if local else "仅限已配置白名单且留有授权记录的内部目标"},
+                             "note": "平台托管的安全沙盒；不访问外部网站" if local else "仅限已配置白名单且留有授权记录的内部目标"},
     }
 
 
 def suite_view(suite: TestSuite, cases: list[TestCase]) -> dict:
-    reviewers = {c.judge.get("reviewed_by") for c in cases if c.judge.get("reviewed_by")}
-    reviewed = [c.judge.get("reviewed_at") for c in cases if c.judge.get("reviewed_at")]
     return {"id": suite.id, "name": suite.name, "type": suite.type, "version": suite.version,
-            "case_ids": suite.case_ids or [c.id for c in cases],
-            "created_by": "B / 固定规则样本" if suite.id == SEED_SUITE_ID else "本地人工模板",
-            "reviewer": ", ".join(sorted(reviewers)) if reviewers else None,
-            "reviewed_at": max(reviewed) if reviewed else None}
+            "case_ids": suite.case_ids or [c.id for c in cases]}
 
 
 def case_view(case: TestCase, suite: TestSuite) -> dict:

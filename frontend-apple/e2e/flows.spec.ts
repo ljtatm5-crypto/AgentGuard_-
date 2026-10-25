@@ -80,3 +80,18 @@ test('窄屏任务表格在容器内滚动，页面不横向溢出', async ({ pa
   expect(widths.page).toBeLessThanOrEqual(widths.viewport + 2)
   await expect(page.getByTestId('runs-table').locator('..')).toHaveClass(/table-scroll/)
 })
+
+test('客户可以从 Agent 资产页接入并测试其他智能体', async ({ page }) => {
+  await page.goto('/agents')
+  await page.getByTestId('connect-agent-btn').click()
+  await page.getByTestId('connect-agent-name').fill('财务知识问答智能体')
+  await page.getByTestId('connect-agent-type').selectOption('rag')
+  await page.getByTestId('connect-agent-submit').click()
+  await expect(page.getByTestId('connect-agent-success')).toContainText('财务知识问答智能体')
+  await expect(page.getByRole('heading', { name: '财务知识问答智能体' })).toBeVisible()
+  const card = page.getByTestId('agent-card').filter({ hasText: '财务知识问答智能体' })
+  await expect(card).toContainText('知识库 RAG')
+  await expect(card).toContainText('本地安全沙盒')
+  await page.getByTestId('nav-执行任务').click()
+  await expect(page.getByTestId('select-agent')).toContainText('财务知识问答智能体')
+})

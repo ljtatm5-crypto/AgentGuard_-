@@ -20,6 +20,7 @@ import { API_PREFIX } from '@/api/contract'
 import { mockJudgeTable, verdictForMockRun } from './fixtures/judgments'
 
 /** 可变状态：新任务返回独立的本地合成示例，不发出任何 Agent 请求。 */
+const agentState = new Map<string, Agent>(agents.map((agent) => [agent.id, { ...agent }]))
 const runState = new Map<string, TestRun>(runs.map((r) => [r.id, { ...r }]))
 const generatedTraces = new Map<string, TraceEvent[]>()
 const eventsForRun = (id: string) => generatedTraces.get(id) ?? traceByRun(id)
@@ -57,21 +58,52 @@ export const handlers = [
   // ---------- Agent 资产（B 提供） ----------
   http.get(`${API_PREFIX}/agents`, async () => {
     await delay(180)
-    return HttpResponse.json(agents satisfies Agent[])
+    return HttpResponse.json([...agentState.values()] satisfies Agent[])
   }),
 
   http.post(`${API_PREFIX}/agents/validate`, async ({ request }) => {
     await delay(320)
-    const body = (await request.json()) as { endpoint?: string }
-    if (body.endpoint && !body.endpoint.startsWith('local://')) {
-      return err('scope_public_target_denied', '当前版本只接入团队自建 local:// 靶场', 403)
+    const body = (await request.json()) as {
+      name?: string
+      version?: string
+      agent_type?: Agent['agent_type']
+      endpoint?: string
+      model?: string
     }
-    return HttpResponse.json(agents[0])
+    if (body.endpoint && !body.endpoint.startsWith('local://')) {
+      return err('scope_public_target_denied', '当前版本只接入平台提供的本地测试沙盒', 403)
+    }
+    const name = body.name?.trim()
+    if (!name) return err('VALIDATION_ERROR', '请输入智能体名称', 422)
+    const type = body.agent_type && ['conversation', 'rag', 'tool', 'workflow'].includes(body.agent_type)
+      ? body.agent_type
+      : 'conversation'
+    const endpoint = body.endpoint || `local://agent-${Date.now().toString(36)}`
+    const created: Agent = {
+      id: `agt-local-${Date.now().toString(36)}`,
+      version: body.version || 'v2.0',
+      name,
+      agent_type: type,
+      purpose: '本地测试沙盒：验证规则判定、工具权限与行为回归',
+      endpoint,
+      model: body.model || 'deterministic-local-sandbox',
+      knowledge: [],
+      tools: [...agents[0].tools],
+      permissions: { ...agents[0].permissions },
+      validate_status: 'validated',
+      authorized_scope: {
+        target_type: 'internal_mock',
+        external_target_allowed: false,
+        note: '平台托管的安全沙盒，不访问外部网站',
+      },
+    }
+    agentState.set(created.id, created)
+    return HttpResponse.json(created)
   }),
 
   http.get(`${API_PREFIX}/agents/:id`, async ({ params }) => {
     await delay(150)
-    const found = agents.find((a) => a.id === params.id)
+    const found = agentState.get(String(params.id))
     if (!found) return notFound('Agent', String(params.id))
     return HttpResponse.json(found)
   }),
@@ -93,7 +125,7 @@ export const handlers = [
     await delay(600)
     const body = (await request.json()) as { agent_id?: string; test_type?: string }
     if (!body.agent_id) return err('VALIDATION_ERROR', 'agent_id 为必填字段', 422)
-    if (!agents.some((agent) => agent.id === body.agent_id)) return notFound('Agent', body.agent_id)
+    if (!agentState.has(body.agent_id)) return notFound('Agent', body.agent_id)
     const requested = (body.test_type ?? 'security').trim().toLowerCase()
     const aliases: Record<string, string[]> = {
       injection: ['direct_injection', 'indirect_injection'],
@@ -134,11 +166,11 @@ export const handlers = [
     const body = (await request.json()) as { agent_id?: string; suite_id?: string }
     if (!body.agent_id) return err('VALIDATION_ERROR', 'agent_id 为必填字段', 422)
     if (!body.suite_id) return err('VALIDATION_ERROR', 'suite_id 为必填字段', 422)
-    if (!agents.some((a) => a.id === body.agent_id)) return notFound('Agent', body.agent_id)
+    if (!agentState.has(body.agent_id)) return notFound('Agent', body.agent_id)
     if (!suites.some((s) => s.id === body.suite_id)) return notFound('测试集', body.suite_id)
 
     const seq = runState.size + 1
-    const selectedAgent = agents.find((a) => a.id === body.agent_id)!
+    const selectedAgent = agentState.get(body.agent_id)!
     const selectedSuite = suites.find((s) => s.id === body.suite_id)!
     const selectedCases = cases.filter((c) => c.suite_id === body.suite_id)
     const summary = selectedCases.map((c) => mockJudgeTable[c.id]!)

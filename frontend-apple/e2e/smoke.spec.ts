@@ -114,3 +114,14 @@ test('移动端七项导航保持单行且页面不横向溢出', async ({ page 
   expect(layout.rows).toBe(1)
   expect(layout.pageWidth).toBeLessThanOrEqual(layout.viewportWidth + 2)
 })
+
+test('客户测试集不暴露内部成员和研发字段', async ({ page }) => {
+  await page.goto('/test-suites')
+  await expect(page.getByTestId('suites-table')).toBeVisible()
+  const text = await page.getByTestId('suites-table').innerText()
+  expect(text).not.toContain('队员')
+  expect(text).not.toContain('审核人')
+  expect(text).not.toContain('security_p0')
+  await expect(page.getByTestId('suites-table')).toContainText('覆盖范围')
+  await expect(page.getByTestId('suites-table')).toContainText('已就绪')
+})

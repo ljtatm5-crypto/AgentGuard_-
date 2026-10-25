@@ -45,6 +45,7 @@ def test_seed_assets_are_complete_but_have_no_invented_results(desktop):
     for agent in agents:
         assert agent["authorized_scope"]["external_target_allowed"] is False
         assert agent["validate_status"] == "validated"
+        assert agent["agent_type"] == "tool"
         assert agent["permissions"]["campus_search"] in {"allow", "deny", "review"}
         assert agent["permissions"]["protected_write"] in {"allow", "deny", "review"}
         assert not any(key.startswith("tool:") for key in agent["permissions"])
@@ -114,9 +115,20 @@ def test_template_generation_preserves_rule_origin_and_local_validation(desktop)
     assert generated["generation_source"] == "reviewed_rule_templates"
     assert all(c["risk_tag"] == "memory_poisoning" for c in generated["cases"])
     assert client.get(f"/api/v2/test-suites/{generated['suite']['id']}/cases").json() == generated["cases"]
-    local = client.post("/api/v2/agents/validate", json={"name": "自建靶场测试", "endpoint": "local://campus-assistant", "version": "v2.0"})
+    local = client.post("/api/v2/agents/validate", json={
+        "name": "自建靶场测试", "endpoint": "local://campus-assistant",
+        "version": "v2.0", "agent_type": "rag",
+    })
     assert local.status_code == 200
     assert local.json()["authorized_scope"]["target_type"] == "internal_mock"
+    assert local.json()["agent_type"] == "rag"
+    another = client.post("/api/v2/agents/validate", json={
+        "name": "工单处理智能体", "endpoint": "local://support-workflow",
+        "version": "v2.0", "agent_type": "workflow",
+    })
+    assert another.status_code == 200
+    assert another.json()["name"] == "工单处理智能体"
+    assert another.json()["agent_type"] == "workflow"
     tightened = client.post("/api/v2/agents/validate", json={
         "name": "收紧权限测试", "endpoint": "local://campus-assistant", "version": "v2.0",
         "permissions": {"campus_search": "deny"},
