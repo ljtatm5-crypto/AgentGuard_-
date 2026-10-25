@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-test('真实 API 模式沿用 /api/v2 并正确展示收紧后的工具权限', async ({ page }) => {
+test('真实 API 模式可收紧权限并接入其他类型智能体', async ({ page }) => {
   test.skip(process.env.VITE_USE_MOCK !== 'false', '仅在真实 API 门禁中运行')
 
   await page.goto('/agents')
@@ -24,4 +24,25 @@ test('真实 API 模式沿用 /api/v2 并正确展示收紧后的工具权限', 
 
   expect(result.status).toBe(200)
   expect(result.body.permissions.campus_search).toBe('deny')
+
+  const agentName = `工单流程智能体-${Date.now()}`
+  const connected = await page.evaluate(async (name) => {
+    const response = await fetch('/api/v2/agents/validate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name,
+        endpoint: `local://agent-${Date.now().toString(36)}`,
+        version: 'v2.0',
+        agent_type: 'workflow',
+        model: 'qwen-local-workflow',
+      }),
+    })
+    return { status: response.status, body: await response.json() }
+  }, agentName)
+
+  expect(connected.status).toBe(200)
+  expect(connected.body.agent_type).toBe('workflow')
+  await page.reload()
+  await expect(page.getByRole('heading', { name: agentName })).toBeVisible()
 })

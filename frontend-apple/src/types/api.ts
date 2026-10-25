@@ -36,6 +36,8 @@ export interface Agent {
   id: string
   version: string
   name: string
+  /** 面向客户的智能体能力类型 */
+  agent_type: 'conversation' | 'rag' | 'tool' | 'workflow'
   purpose: string
   endpoint: string
   model: string
@@ -69,9 +71,6 @@ export interface TestSuite {
   type: string
   version: string
   case_ids: string[]
-  created_by: string
-  reviewer: string | null
-  reviewed_at: string | null
 }
 
 export interface TestCase {

@@ -10,8 +10,9 @@ export const agents: Agent[] = [
     id: 'agt-campus-001',
     version: 'v1.2.0',
     name: '校园智能助手',
+    agent_type: 'tool',
     purpose: '回答课程、考试、图书馆、通知与天气类问题，只读检索为主',
-    endpoint: 'internal://dify/campus-assistant',
+    endpoint: 'local://campus-assistant',
     model: 'qwen2.5-7b-internal',
     knowledge: [
       {
@@ -56,7 +57,7 @@ export const agents: Agent[] = [
     authorized_scope: {
       target_type: 'internal_mock',
       external_target_allowed: false,
-      note: '团队自建 Dify 靶场，禁止任何外部站点目标',
+      note: '平台托管的安全沙盒，不访问外部网站',
     },
   },
 ]

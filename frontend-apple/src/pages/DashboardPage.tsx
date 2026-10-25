@@ -34,7 +34,32 @@ export default function DashboardPage() {
             </div>
             <Link to="/reports" className="hero-link">查看验证报告 <ArrowUpRight size={17} /></Link>
           </div>
-          <div className="hero-summary"><div className="quality-ring" style={{ '--ring-value': `${passRate}%` } as CSSProperties}><motion.div className="quality-ring-inner" initial={reduce ? false : { scale: .85, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 130, damping: 20 }}><span>当前通过率</span><strong><CountUp value={passRate} decimals={1} suffix="%" /></strong><small>{USE_MOCK ? 'Mock 测试样例' : '本地执行记录'}</small></motion.div></div><div className="hero-summary-notes"><span><i className="status-mark status-passed" />{m.passed_cases} 项通过</span><span><i className="status-mark status-failed" />{m.failed_cases} 项失败</span><span><i className="status-mark status-review" />{m.needs_review_cases} 项待复核</span></div></div>
+          <div className="hero-summary">
+            <div className="quality-ring" style={{ '--ring-value': `${passRate}%` } as CSSProperties}>
+              <motion.div className="quality-ring-inner" initial={reduce ? false : { scale: .85, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 130, damping: 20 }}>
+                <span>当前通过率</span>
+                <strong><CountUp value={passRate} decimals={1} suffix="%" /></strong>
+                <small>{USE_MOCK ? 'Mock 测试样例' : '本地执行记录'}</small>
+              </motion.div>
+            </div>
+            <div className="hero-summary-notes">
+              <span><i className="status-mark status-passed" />{m.passed_cases} 项通过</span>
+              <span><i className="status-mark status-failed" />{m.failed_cases} 项失败</span>
+              <span><i className="status-mark status-review" />{m.needs_review_cases} 项待复核</span>
+            </div>
+            <div className="trace-signature" aria-label="可追溯执行链">
+              <div className="trace-signature-head"><span>可追溯执行链</span><small>证据实时串联</small></div>
+              <div className="trace-track" aria-hidden="true">
+                <span className="trace-node"><b>输入</b><small>01</small></span>
+                <i className="trace-link" />
+                <span className="trace-node"><b>策略</b><small>02</small></span>
+                <i className="trace-link" />
+                <span className="trace-node"><b>工具</b><small>03</small></span>
+                <i className="trace-link" />
+                <span className="trace-node trace-verdict"><b>判定</b><small>04</small></span>
+              </div>
+            </div>
+          </div>
         </MotionSurface>
         <section className="grid-4 stat-grid" aria-label="测试指标">
           <StatCard label="累计测试用例" value={m.total_cases} hint={`已完成 ${m.completed_cases} 项`} icon={<Stack size={21} weight="duotone" />} delay={.04} />

@@ -6,6 +6,7 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from hashlib import sha256
 import json
+import re
 from types import SimpleNamespace
 from typing import Any
 from uuid import uuid4
@@ -111,7 +112,7 @@ def validate_agent(payload: dict[str, Any], db: Session = Depends(get_db)):
     """v2 registers local assets only; B deliberately disables remote execution."""
     endpoint = str(payload.get("endpoint", ""))
     if not endpoint.startswith("local://"):
-        raise DesktopError(403, "scope_public_target_denied", "当前版本只接入团队自建 local:// 靶场；内部 Dify 仍需独立配置与授权")
+        raise DesktopError(403, "scope_public_target_denied", "当前版本只接入平台提供的本地测试沙盒；内部 Dify 仍需独立配置与授权")
     scope = payload.get("authorized_scope") or {}
     if not isinstance(scope, dict):
         raise DesktopError(422, "contract_bad_type", "authorized_scope 必须为对象")
@@ -119,10 +120,13 @@ def validate_agent(payload: dict[str, Any], db: Session = Depends(get_db)):
         raise DesktopError(403, "scope_denied", "外部目标不在授权范围内")
     name = str(payload.get("name", "")).strip()
     version = str(payload.get("version", "v2.0"))
-    if not name or endpoint not in {"local://campus-assistant", "local://campus"}:
-        raise DesktopError(422, "contract_missing_field", "请提供名称，并选择已注册的本地校园靶场")
+    if not name or not re.fullmatch(r"local://[a-z0-9][a-z0-9-]{1,62}", endpoint):
+        raise DesktopError(422, "contract_missing_field", "请提供名称，并选择安全的本地测试沙盒")
     if version not in {"v1.0", "v2.0"}:
-        raise DesktopError(422, "contract_bad_enum", "校园靶场版本须为 v1.0 或 v2.0")
+        raise DesktopError(422, "contract_bad_enum", "本地测试沙盒版本须为 v1.0 或 v2.0")
+    agent_type = str(payload.get("agent_type", "conversation"))
+    if agent_type not in {"conversation", "rag", "tool", "workflow"}:
+        raise DesktopError(422, "contract_bad_enum", "智能体类型须为 conversation、rag、tool 或 workflow")
     from app.security.policy import default_permissions
     base = db.get(Agent, "desktop-campus-v2" if version == "v2.0" else "desktop-campus-v1")
     permissions = default_permissions(strict=version == "v2.0")
@@ -141,6 +145,7 @@ def validate_agent(payload: dict[str, Any], db: Session = Depends(get_db)):
         if rank[decision] < rank[permissions.get(key, "deny")]:
             raise DesktopError(403, "policy_escalation_denied", f"{name} 只能进一步收紧，不能放宽固定安全基线")
         permissions[key] = decision
+    permissions["__agent_type__"] = agent_type
 
     tools = list(base.tools if base else [])
     supplied_tools = payload.get("tools")
@@ -159,8 +164,10 @@ def validate_agent(payload: dict[str, Any], db: Session = Depends(get_db)):
                 "side_effect": side_effect,
             })
         tools = requested_tools or tools
-    created = Agent(name=name, version=version, endpoint=endpoint, adapter="campus", model="deterministic-campus-simulator",
-                    knowledge=base.knowledge if base else [], tools=tools,
+    knowledge = base.knowledge if base and endpoint in {"local://campus-assistant", "local://campus"} else []
+    model = str(payload.get("model") or "deterministic-local-sandbox")
+    created = Agent(name=name, version=version, endpoint=endpoint, adapter="campus", model=model,
+                    knowledge=knowledge, tools=tools,
                     permissions=permissions, status="validated")
     db.add(created)
     db.commit()

@@ -90,12 +90,9 @@ export const cases: TestCase[] = [
 export const suites: TestSuite[] = [
   {
     id: 'suite-p0-001',
-    name: 'P0 安全基线测试集',
+    name: '智能体安全基线测试集',
     type: 'security_p0',
     version: 'v1.0.0',
     case_ids: cases.map((c) => c.id),
-    created_by: '队员A',
-    reviewer: '队员C',
-    reviewed_at: '2026-10-18T10:00:00Z',
   },
 ]
