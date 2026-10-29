@@ -155,6 +155,8 @@ def validate_agent(payload: dict[str, Any], db: Session = Depends(get_db)):
             raise DesktopError(422, "credential_missing", f"服务端环境变量 {credential_env} 未配置")
         requested_agent_id = str(payload.get("agent_id") or "").strip()
         created_id = requested_agent_id or str(uuid4())
+        if requested_agent_id and db.get(Agent, created_id) is not None:
+            raise DesktopError(409, "agent_id_conflict", f"Agent ID {created_id} 已存在，请使用新的固定 ID 或省略该字段")
         try:
             validate_target_scope(
                 endpoint=endpoint,

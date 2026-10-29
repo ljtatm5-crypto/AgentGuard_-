@@ -335,6 +335,37 @@ def test_existing_suite_is_upgraded_with_combination_samples(desktop):
     assert all(case.id in refreshed.case_ids for case in restored)
 
 
+def test_requested_agent_id_conflict_is_a_controlled_error(desktop, monkeypatch):
+    client, _ = desktop
+    monkeypatch.setenv("AGENTGUARD_TEST_DIFY_KEY", "local-test-secret")
+    client.post("/api/authorizations", json={
+        "reference": "AUTH-BOUND-001",
+        "owner": "队员B",
+        "purpose": "固定 Agent 绑定测试",
+        "target_scope": "self_hosted_dify",
+        "host": "127.0.0.1",
+        "port": 9998,
+        "agent_id": "fixed-agent-id",
+        "valid_days": 1,
+    })
+    payload = {
+        "agent_id": "fixed-agent-id",
+        "name": "固定 ID 智能体",
+        "version": "v2.0",
+        "agent_type": "rag",
+        "connection_mode": "dify_authorized",
+        "endpoint": "http://127.0.0.1:9998/v1/chat-messages",
+        "credential_env": "AGENTGUARD_TEST_DIFY_KEY",
+        "authorization_reference": "AUTH-BOUND-001",
+        "authorization_confirmed": True,
+    }
+    first = client.post("/api/v2/agents/validate", json=payload)
+    assert first.status_code == 200
+    second = client.post("/api/v2/agents/validate", json=payload)
+    assert second.status_code == 409
+    assert second.json()["error_code"] == "agent_id_conflict"
+
+
 def test_dify_adapter_calls_authorized_loopback_without_redirects(monkeypatch):
     from app.services.agent_adapter import invoke_agent
 
