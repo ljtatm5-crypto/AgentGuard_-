@@ -153,6 +153,7 @@ def validate_agent(payload: dict[str, Any], db: Session = Depends(get_db)):
             raise DesktopError(422, "contract_bad_enum", "凭据环境变量名格式无效")
         if not os.getenv(credential_env):
             raise DesktopError(422, "credential_missing", f"服务端环境变量 {credential_env} 未配置")
+        created_id = str(uuid4())
         try:
             validate_target_scope(
                 endpoint=endpoint,
@@ -161,6 +162,8 @@ def validate_agent(payload: dict[str, Any], db: Session = Depends(get_db)):
                 authorization_confirmed=True,
                 authorization_reference=authorization_reference,
                 allowed_hosts=get_settings().allowed_target_host_list,
+                db=db,
+                agent_id=created_id,
             )
         except TargetScopeError as exc:
             raise DesktopError(403, "scope_denied", str(exc)) from exc
@@ -173,6 +176,7 @@ def validate_agent(payload: dict[str, Any], db: Session = Depends(get_db)):
             "__credential_env__": credential_env,
         }
         created = Agent(
+            id=created_id,
             name=name,
             version=version,
             endpoint=endpoint,
@@ -509,7 +513,10 @@ def create_run(payload: RunCreate, db: Session = Depends(get_db)):
                 turns = [step["input"] for step in (case.steps or []) if isinstance(step, dict) and isinstance(step.get("input"), str)]
                 if not turns:
                     turns = [case.input]
-                invocations = [invoke_agent(asset, text, case.risk_tag, session_id=session_id) for text in turns]
+                invocations = [
+                    invoke_agent(asset, text, case.risk_tag, session_id=session_id, db=db)
+                    for text in turns
+                ]
                 invocation = merge_security_invocations(invocations) if len(invocations) > 1 else invocations[0]
                 raw_events = {e["id"]: e for e in (getattr(invocation, "raw", {}) or {}).get("trace_events", [])}
                 for sequence, item in enumerate(invocation.events):

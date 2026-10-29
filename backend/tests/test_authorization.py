@@ -1,6 +1,6 @@
 """授权记录与门禁绑定的验收测试（P0）。
 
-运行： `backend\.venv\Scripts\python.exe -m pytest -q tests/test_authorization.py`
+运行： ``backend\\.venv\\Scripts\\python.exe -m pytest -q tests/test_authorization.py``
 
 覆盖《完善报告》P0 验收标准：
     「授权人、目标、用途、证据、时间和授权编号可查询」
@@ -125,6 +125,13 @@ def test_agent_binding_mismatch_is_rejected(db):
     assert ok.ok is True
     assert bad.ok is False
     assert "Agent" in bad.reason
+
+
+def test_bound_record_rejects_missing_agent_context(db):
+    make_record(db, agent_id="agent-aaa")
+    result = check_authorization(db, reference=REF, host=HOST, port=PORT, agent_id=None)
+    assert result.ok is False
+    assert "Agent" in result.reason
 
 
 def test_expired_record_is_rejected(db):

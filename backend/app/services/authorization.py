@@ -166,7 +166,7 @@ def check_authorization(
     if target_scope and record.target_scope != target_scope:
         return AuthorizationCheck(False, reference,
                                   f"授权 {reference} 的作用域是 {record.target_scope}，与声明的 {target_scope} 不一致")
-    if record.agent_id and agent_id and record.agent_id != agent_id:
+    if record.agent_id and record.agent_id != agent_id:
         return AuthorizationCheck(False, reference,
                                   f"授权 {reference} 绑定的是 Agent {record.agent_id}，与当前 Agent 不一致")
     return AuthorizationCheck(True, reference, "授权记录有效且目标匹配", record.id)

@@ -10,8 +10,6 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Any
 
-import httpx
-
 from app.security.agent_core import CampusAssistantV1, CampusAssistantV2
 from app.security.memory import MemoryStore
 from app.security.models import new_id
@@ -221,34 +219,32 @@ def _invoke_remote(agent: Any, input_text: str, adapter: str, session_id: str | 
 
     started = time.perf_counter()
     if adapter == "dify":
-        with httpx.Client(timeout=30, follow_redirects=False, trust_env=False) as client:
-            response = client.post(
-                endpoint,
-                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                json={
-                    "inputs": {},
-                    "query": input_text,
-                    "response_mode": "blocking",
-                    "conversation_id": "",
-                    "user": session_id or "agentguard",
-                },
-            )
-            response.raise_for_status()
-            payload = response.json()
+        request_body = {
+            "inputs": {},
+            "query": input_text,
+            "response_mode": "blocking",
+            "conversation_id": "",
+            "user": session_id or "agentguard",
+        }
     else:
-        # OpenAI 兼容接口：直连已固定的 IP，Host 与 SNI 仍是原域名。
-        status, body = pinned_request(
-            pin, method="POST",
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            body=json.dumps({
-                "model": str(getattr(agent, "model", "") or "gpt-4o-mini"),
-                "messages": [{"role": "user", "content": input_text}],
-                "temperature": 0,
-            }).encode("utf-8"),
-        )
-        if status >= 400:
-            raise RuntimeError(f"被测 Agent 返回 HTTP {status}")
-        payload = json.loads(body.decode("utf-8", errors="replace"))
+        request_body = {
+            "model": str(getattr(agent, "model", "") or "gpt-4o-mini"),
+            "messages": [{"role": "user", "content": input_text}],
+            "temperature": 0,
+        }
+
+    # Both remote adapters use the same pinned-IP connection path. Sending the
+    # original endpoint through httpx would perform a second DNS lookup and
+    # reopen the rebinding race that netguard is meant to close.
+    status, body = pinned_request(
+        pin,
+        method="POST",
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        body=json.dumps(request_body, ensure_ascii=False).encode("utf-8"),
+    )
+    if status >= 400:
+        raise RuntimeError(f"被测 Agent 返回 HTTP {status}")
+    payload = json.loads(body.decode("utf-8", errors="replace"))
 
     # 连接后复验：解析结果必须与固定值一致，否则判定为 DNS 重绑定。
     verify_unchanged(pin)
