@@ -1,0 +1,268 @@
+/* ==========================================================================
+   轨迹筛选控件 + 404 页面
+   新增于 C 的 P2 完善项：大轨迹可筛选、非法路由有明确落点。
+   仅使用 tokens.css 已定义的变量，深浅色自动跟随。
+   ========================================================================== */
+
+.trace-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  padding: 9px 10px;
+  margin-bottom: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--glass-soft, rgba(255, 255, 255, 0.5));
+}
+
+/* 三栏工作区中间列很窄，类型按钮横向滚动而不是换行堆高 */
+.trace-type-chips {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 5px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+}
+
+.trace-type-chips button {
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  background: var(--solid, transparent);
+  color: var(--ink-soft);
+  font-size: var(--font-button, 15px);
+  line-height: 1.4;
+  padding: 5px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+
+.trace-type-chips button:hover {
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+.trace-type-chips button.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-strong, var(--accent));
+}
+
+.trace-type-chips button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.trace-tools {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  margin-left: 0;
+}
+
+.trace-search {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 5px 9px;
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  background: var(--solid-clear, #fff);
+  color: var(--ink-soft);
+}
+
+.trace-search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.trace-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--ink);
+  font-size: var(--font-body, 16px);
+  width: auto;
+}
+
+.trace-search input::placeholder {
+  color: var(--ink-faint);
+}
+
+.trace-issue-toggle {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-label, 14px);
+  color: var(--ink-soft);
+  cursor: pointer;
+  white-space: nowrap;
+  justify-self: start;
+}
+
+.trace-issue-toggle input {
+  accent-color: var(--accent);
+  width: 14px;
+  height: 14px;
+}
+
+.trace-count {
+  margin: 0;
+  font-size: var(--font-xs, 12px);
+  color: var(--ink-faint);
+  line-height: 1.5;
+}
+
+.trace-empty {
+  padding: 22px 16px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 12px;
+  text-align: center;
+  color: var(--ink-soft);
+}
+
+.trace-empty p {
+  margin: 0 0 10px;
+  font-size: var(--font-sm, 14px);
+}
+
+.trace-more {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+}
+
+/* ---------------------------- 404 ---------------------------- */
+
+.notfound-page {
+  display: flex;
+  justify-content: center;
+  padding-top: 8px;
+}
+
+.notfound-card {
+  width: 100%;
+  max-width: 720px;
+  padding: 32px 32px 26px;
+}
+
+.notfound-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-strong, var(--accent));
+  font-family: var(--font-mono);
+  font-size: var(--font-xs, 12px);
+  letter-spacing: 0.08em;
+}
+
+.notfound-card h1 {
+  margin: 12px 0 6px;
+  font-size: var(--font-title, 28px);
+  line-height: var(--line-title, 1.25);
+}
+
+.notfound-card code {
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: var(--track, rgba(0, 0, 0, 0.04));
+  color: var(--ink);
+  word-break: break-all;
+}
+
+.notfound-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 18px 0 22px;
+}
+
+.notfound-card h2 {
+  font-size: var(--font-title-sm, 16px);
+  margin: 0 0 10px;
+}
+
+.notfound-links {
+  list-style: none;
+  margin: 0 0 18px;
+  padding: 0;
+  display: grid;
+  /* 240px 阈值保证在 720px 卡片内排成 2×2，而不是 3+1 */
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 8px;
+}
+
+.notfound-links a {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  text-decoration: none;
+  color: var(--ink);
+  transition: border-color 160ms ease, transform 160ms ease;
+}
+
+.notfound-links a:hover {
+  border-color: var(--line-strong);
+  transform: translateY(-1px);
+}
+
+.notfound-links strong {
+  font-size: var(--font-button, 15px);
+  font-weight: 500;
+}
+
+.notfound-links small {
+  font-size: var(--font-xs, 12px);
+  color: var(--ink-faint);
+}
+
+.notfound-card kbd {
+  padding: 1px 5px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: var(--font-xs, 12px);
+}
+
+.export-hint {
+  margin: 10px 0 0;
+  max-width: 640px;
+}
+
+@media (max-width: 720px) {
+  .trace-tools {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .trace-search {
+    flex: 1;
+  }
+
+  .trace-search input {
+    width: 100%;
+  }
+
+  .notfound-card {
+    padding: 22px 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notfound-links a:hover {
+    transform: none;
+  }
+}

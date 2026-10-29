@@ -8,11 +8,13 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit --pretty",
-    "test:smoke": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-smoke.ps1",
-    "test:api": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-api.ps1",
-    "test:screenshots": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-screenshots.ps1",
+    "test:smoke": "node scripts/run-tests.mjs smoke",
+    "test:api": "node scripts/run-tests.mjs api",
+    "test:screenshots": "node scripts/run-tests.mjs screenshots",
     "test:smoke:install": "playwright install chromium",
     "check:mock": "vite-node scripts/check-mock.ts",
+    "check:trace": "vite-node scripts/check-trace-view.ts",
+    "report:pdf": "vite-node scripts/render-report-sample.ts",
     "lint": "eslint src --max-warnings 0"
   },
   "dependencies": {
