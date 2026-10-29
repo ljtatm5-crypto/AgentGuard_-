@@ -1,13 +1,21 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { ArrowClockwise, ArrowRight, Crosshair, FunnelSimple, Play, X } from '@phosphor-icons/react'
+import { ArrowClockwise, ArrowRight, Crosshair, FunnelSimple, MagnifyingGlass, Play, X } from '@phosphor-icons/react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api, ApiRequestError } from '@/api/client'
 import { AsyncBoundary } from '@/components/AsyncBoundary'
 import { JudgeSourceTag, PolicyTag, StatusTag } from '@/components/Tags'
 import { useAsync } from '@/hooks/useAsync'
-import { TRACE_TYPE_LABELS } from '@/types/enums'
+import { TRACE_TYPE_LABELS, TRACE_TYPE_ORDER } from '@/types/enums'
+import { buildTraceView } from '@/utils/trace'
 import type { TraceEventType } from '@/types/enums'
+import type { TraceEvent } from '@/types/api'
+
+/**
+ * 单次渲染的轨迹事件条数。
+ * 大批量事件（500+）一次性挂载会阻塞主线程，先渲染首屏，其余按需追加。
+ */
+const TRACE_PAGE_SIZE = 60
 
 export default function RunsPage() {
   const runs = useAsync(() => api.listRuns(), [])
@@ -28,6 +36,10 @@ export default function RunsPage() {
   const [selectedCaseId, setSelectedCaseId] = useState('')
   const [selectedEventId, setSelectedEventId] = useState('')
   const [resultFilter, setResultFilter] = useState<'all' | 'failed' | 'review'>('all')
+  const [traceTypes, setTraceTypes] = useState<TraceEventType[]>([])
+  const [traceQuery, setTraceQuery] = useState('')
+  const [traceOnlyIssues, setTraceOnlyIssues] = useState(false)
+  const [traceLimit, setTraceLimit] = useState(TRACE_PAGE_SIZE)
   const detail = useAsync(
     () => (opened ? api.getRunDetail(opened) : Promise.resolve(null)),
     [opened],
@@ -188,6 +200,7 @@ export default function RunsPage() {
               const selectCase = (caseId: string) => {
                 setSelectedCaseId(caseId)
                 setSelectedEventId('')
+                setTraceLimit(TRACE_PAGE_SIZE)
               }
               return (
                 <>
@@ -242,47 +255,22 @@ export default function RunsPage() {
                               {(focusedCase || eventIds.length > 0) && !caseEvents.some((event) => !eventIds.length || eventIds.includes(event.id)) && (
                                 <p className="form-error" role="status">当前轨迹中未找到所引用的事件，请核对任务与用例版本。</p>
                               )}
-                              <ol className="event-flow" data-testid="trace-timeline">
-                                {caseEvents.map((event, index) => {
-                                  const focused = focusedCase === event.case_id && (eventIds.length === 0 || eventIds.includes(event.id))
-                                  return (
-                                    <li
-                                      key={event.id}
-                                      className={`event-node ${focused ? 'trace-focused' : ''} ${selectedEventId === event.id ? 'event-selected' : ''} ${event.error ? 'has-error' : ''}`}
-                                      tabIndex={0}
-                                      data-evidence-focus={focused ? 'true' : undefined}
-                                      data-event-id={event.id}
-                                      aria-current={selectedEventId === event.id ? 'true' : undefined}
-                                      onClick={() => setSelectedEventId(event.id)}
-                                      onKeyDown={(keyEvent) => {
-                                        if (keyEvent.target !== keyEvent.currentTarget) return
-                                        if (keyEvent.key === 'Enter' || keyEvent.key === ' ') {
-                                          keyEvent.preventDefault()
-                                          setSelectedEventId(event.id)
-                                        }
-                                      }}
-                                    >
-                                      <span className="event-node-index">{String(index + 1).padStart(2, '0')}</span>
-                                      <div className="event-node-card">
-                                        <div className="event-node-head">
-                                          <TraceTag type={event.type} />
-                                          <span className="mono">{event.timestamp.replace('T', ' ').slice(11, 19)}</span>
-                                        </div>
-                                        <strong>{event.tool || TRACE_TYPE_LABELS[event.type]}</strong>
-                                        {event.policy_decision && <div>权限决策：<PolicyTag v={event.policy_decision} /></div>}
-                                        {event.output && <p>{event.output}</p>}
-                                        {event.error && <p className="err">{event.error}</p>}
-                                        <details>
-                                          <summary>查看原始事件</summary>
-                                          <span className="mono">{event.id}</span>
-                                          <pre>{JSON.stringify(event.params, null, 2)}</pre>
-                                        </details>
-                                      </div>
-                                      {index < caseEvents.length - 1 && <ArrowRight className="event-arrow" size={16} aria-hidden="true" />}
-                                    </li>
-                                  )
-                                })}
-                              </ol>
+                              <TraceBrowser
+                                events={caseEvents}
+                                types={traceTypes}
+                                query={traceQuery}
+                                onlyIssues={traceOnlyIssues}
+                                limit={traceLimit}
+                                onTypes={(next) => { setTraceTypes(next); setTraceLimit(TRACE_PAGE_SIZE) }}
+                                onQuery={(next) => { setTraceQuery(next); setTraceLimit(TRACE_PAGE_SIZE) }}
+                                onOnlyIssues={(next) => { setTraceOnlyIssues(next); setTraceLimit(TRACE_PAGE_SIZE) }}
+                                onShowMore={() => setTraceLimit((value) => value + TRACE_PAGE_SIZE)}
+                                onReset={() => { setTraceTypes([]); setTraceQuery(''); setTraceOnlyIssues(false); setTraceLimit(TRACE_PAGE_SIZE) }}
+                                selectedEventId={selectedEventId}
+                                onSelect={setSelectedEventId}
+                                focusedCase={focusedCase}
+                                eventIds={eventIds}
+                              />
                             </>
                           )
                         }}
@@ -339,4 +327,157 @@ function TraceTag({ type }: { type: TraceEventType }) {
 
 function FilterButton({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
   return <button type="button" className={active ? 'active' : ''} onClick={onClick}>{label}</button>
+}
+
+function TraceBrowser({
+  events,
+  types,
+  query,
+  onlyIssues,
+  limit,
+  onTypes,
+  onQuery,
+  onOnlyIssues,
+  onShowMore,
+  onReset,
+  selectedEventId,
+  onSelect,
+  focusedCase,
+  eventIds,
+}: {
+  events: TraceEvent[]
+  types: TraceEventType[]
+  query: string
+  onlyIssues: boolean
+  limit: number
+  onTypes: (next: TraceEventType[]) => void
+  onQuery: (next: string) => void
+  onOnlyIssues: (next: boolean) => void
+  onShowMore: () => void
+  onReset: () => void
+  selectedEventId: string
+  onSelect: (id: string) => void
+  focusedCase: string
+  eventIds: string[]
+}) {
+  const { visible, rendered, filtered, counts } = useMemo(
+    () => buildTraceView({ events, types, query, onlyIssues, limit, focusedCase, eventIds }),
+    [events, types, query, onlyIssues, limit, focusedCase, eventIds],
+  )
+
+  const toggleType = (type: TraceEventType) => {
+    onTypes(types.includes(type) ? types.filter((item) => item !== type) : [...types, type])
+  }
+
+  return (
+    <>
+      <div className="trace-controls" data-testid="trace-controls">
+        <div className="trace-type-chips" role="group" aria-label="按事件类型筛选">
+          <button
+            type="button"
+            className={types.length === 0 ? 'active' : ''}
+            aria-pressed={types.length === 0}
+            onClick={() => onTypes([])}
+          >
+            全部 {events.length}
+          </button>
+          {TRACE_TYPE_ORDER.filter((type) => counts.has(type)).map((type) => (
+            <button
+              type="button"
+              key={type}
+              className={types.includes(type) ? 'active' : ''}
+              aria-pressed={types.includes(type)}
+              onClick={() => toggleType(type)}
+              data-testid={`trace-type-${type}`}
+            >
+              {TRACE_TYPE_LABELS[type]} {counts.get(type)}
+            </button>
+          ))}
+        </div>
+        <div className="trace-tools">
+          <label className="trace-search">
+            <MagnifyingGlass size={15} aria-hidden="true" />
+            <span className="sr-only">搜索轨迹事件</span>
+            <input
+              type="search"
+              value={query}
+              placeholder="搜索工具、输出或参数"
+              onChange={(event) => onQuery(event.target.value)}
+              data-testid="trace-search"
+            />
+          </label>
+          <label className="trace-issue-toggle">
+            <input
+              type="checkbox"
+              checked={onlyIssues}
+              onChange={(event) => onOnlyIssues(event.target.checked)}
+              data-testid="trace-only-issues"
+            />
+            仅看异常与拒绝
+          </label>
+        </div>
+        <p className="trace-count" role="status" aria-live="polite" data-testid="trace-count">
+          {filtered
+            ? `筛选后 ${visible.length} 条 / 本用例共 ${events.length} 条`
+            : `本用例共 ${events.length} 条事件`}
+          {visible.length > rendered.length ? ` · 已显示前 ${rendered.length} 条` : ''}
+        </p>
+      </div>
+
+      {visible.length === 0 ? (
+        <div className="trace-empty" data-testid="trace-empty">
+          <p>没有匹配的轨迹事件。</p>
+          <button type="button" className="btn" onClick={onReset}>清除筛选条件</button>
+        </div>
+      ) : (
+        <ol className="event-flow" data-testid="trace-timeline">
+          {rendered.map((event, index) => {
+            const focused = focusedCase === event.case_id && (eventIds.length === 0 || eventIds.includes(event.id))
+            return (
+              <li
+                key={event.id}
+                className={`event-node ${focused ? 'trace-focused' : ''} ${selectedEventId === event.id ? 'event-selected' : ''} ${event.error ? 'has-error' : ''}`}
+                tabIndex={0}
+                data-evidence-focus={focused ? 'true' : undefined}
+                data-event-id={event.id}
+                aria-current={selectedEventId === event.id ? 'true' : undefined}
+                onClick={() => onSelect(event.id)}
+                onKeyDown={(keyEvent) => {
+                  if (keyEvent.target !== keyEvent.currentTarget) return
+                  if (keyEvent.key === 'Enter' || keyEvent.key === ' ') {
+                    keyEvent.preventDefault()
+                    onSelect(event.id)
+                  }
+                }}
+              >
+                <span className="event-node-index">{String(index + 1).padStart(2, '0')}</span>
+                <div className="event-node-card">
+                  <div className="event-node-head">
+                    <TraceTag type={event.type} />
+                    <span className="mono">{event.timestamp.replace('T', ' ').slice(11, 19)}</span>
+                  </div>
+                  <strong>{event.tool || TRACE_TYPE_LABELS[event.type]}</strong>
+                  {event.policy_decision && <div>权限决策：<PolicyTag v={event.policy_decision} /></div>}
+                  {event.output && <p>{event.output}</p>}
+                  {event.error && <p className="err">{event.error}</p>}
+                  <details>
+                    <summary>查看原始事件</summary>
+                    <span className="mono">{event.id}</span>
+                    <pre>{JSON.stringify(event.params, null, 2)}</pre>
+                  </details>
+                </div>
+                {index < rendered.length - 1 && <ArrowRight className="event-arrow" size={16} aria-hidden="true" />}
+              </li>
+            )
+          })}
+        </ol>
+      )}
+
+      {visible.length > rendered.length && (
+        <button type="button" className="btn trace-more" onClick={onShowMore} data-testid="trace-show-more">
+          再显示 {Math.min(TRACE_PAGE_SIZE, visible.length - rendered.length)} 条（剩余 {visible.length - rendered.length} 条）
+        </button>
+      )}
+    </>
+  )
 }

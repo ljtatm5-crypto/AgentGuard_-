@@ -24,7 +24,8 @@ from app.db.session import get_db
 from app.models.entities import Agent, Finding, TestCase, TestRun, TestSuite, TraceEvent
 from app.services.desktop_contract import (
     FINAL_STATUSES, SEED_SUITE_ID, agent_view, case_view,
-    event_view, finding_view, iso, judge_view, metrics_view, risk_tag, run_view, suite_view,
+    event_view, finding_view, iso, judge_view, metrics_view, risk_tag, run_view,
+    save_chain_review, suite_view,
 )
 
 
@@ -152,6 +153,7 @@ def validate_agent(payload: dict[str, Any], db: Session = Depends(get_db)):
             raise DesktopError(422, "contract_bad_enum", "凭据环境变量名格式无效")
         if not os.getenv(credential_env):
             raise DesktopError(422, "credential_missing", f"服务端环境变量 {credential_env} 未配置")
+        created_id = str(uuid4())
         try:
             validate_target_scope(
                 endpoint=endpoint,
@@ -160,6 +162,8 @@ def validate_agent(payload: dict[str, Any], db: Session = Depends(get_db)):
                 authorization_confirmed=True,
                 authorization_reference=authorization_reference,
                 allowed_hosts=get_settings().allowed_target_host_list,
+                db=db,
+                agent_id=created_id,
             )
         except TargetScopeError as exc:
             raise DesktopError(403, "scope_denied", str(exc)) from exc
@@ -172,6 +176,7 @@ def validate_agent(payload: dict[str, Any], db: Session = Depends(get_db)):
             "__credential_env__": credential_env,
         }
         created = Agent(
+            id=created_id,
             name=name,
             version=version,
             endpoint=endpoint,
@@ -458,12 +463,14 @@ def sync_finding(db: Session, run: TestRun, case: TestCase) -> None:
     data = {"severity": (case.judge or {}).get("severity", "high"), "title": f"{case.name} · 规则未通过",
             "evidence": judge.get("evidence", []), "impact": impact.get("note", "智能体实际行为未满足固定回归规则"),
             "recommendation": "；".join(RECOMMENDATIONS.get(original_tag, ["检查事件证据，修复后在相同规则集上重跑"])),
-            "status": "open", "chain": []}
+            "status": "open"}
     if existing:
         for key, value in data.items():
             setattr(existing, key, value)
     else:
-        db.add(Finding(run_id=run.id, **data))
+        # Finding.chain stores human review entries, not the derived Evidence Flow.
+        # Rejudging regenerates the derived nodes, so never overwrite these reviews.
+        db.add(Finding(run_id=run.id, chain=[], **data))
 
 
 @router.get("/runs")
@@ -508,7 +515,10 @@ def create_run(payload: RunCreate, db: Session = Depends(get_db)):
                 turns = [step["input"] for step in (case.steps or []) if isinstance(step, dict) and isinstance(step.get("input"), str)]
                 if not turns:
                     turns = [case.input]
-                invocations = [invoke_agent(asset, text, case.risk_tag, session_id=session_id) for text in turns]
+                invocations = [
+                    invoke_agent(asset, text, case.risk_tag, session_id=session_id, db=db)
+                    for text in turns
+                ]
                 invocation = merge_security_invocations(invocations) if len(invocations) > 1 else invocations[0]
                 raw_events = {e["id"]: e for e in (getattr(invocation, "raw", {}) or {}).get("trace_events", [])}
                 for sequence, item in enumerate(invocation.events):
@@ -602,6 +612,28 @@ def findings(db: Session = Depends(get_db)):
 @router.get("/findings/{finding_id}/chain")
 def chain(finding_id: str, db: Session = Depends(get_db)):
     return finding_response(db, require(db, Finding, finding_id, "finding_not_found", "缺陷"))
+
+
+class ChainReviewIn(BaseModel):
+    status: str = Field("confirmed", description="confirmed / rejected / pending")
+    reviewer: str = Field(..., min_length=1, description="复核人")
+    note: str = ""
+    confidence: float | None = None
+
+
+@router.post("/findings/{finding_id}/chain/{node_id}/review")
+def review_chain_node(finding_id: str, node_id: str, payload: ChainReviewIn,
+                      db: Session = Depends(get_db)):
+    """人工确认或驳回攻击链上的某个节点（P1：推断节点需可确认/驳回）。"""
+    finding = require(db, Finding, finding_id, "finding_not_found", "缺陷")
+    try:
+        entry = save_chain_review(
+            db, finding, node_id=node_id, status=payload.status,
+            reviewer=payload.reviewer, note=payload.note, confidence=payload.confidence,
+        )
+    except ValueError as exc:
+        raise DesktopError(422, "contract_bad_enum", str(exc)) from exc
+    return {"ok": True, "review": entry, "chain": finding_response(db, finding)}
 
 
 @router.get("/metrics")

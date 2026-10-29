@@ -124,6 +124,16 @@ export const TRACE_TYPE_LABELS: Record<TraceEventType, string> = {
   [TraceEventType.ERROR]: '错误',
 }
 
+/** 轨迹筛选项的固定顺序，与事件发生顺序一致 */
+export const TRACE_TYPE_ORDER: TraceEventType[] = [
+  TraceEventType.INPUT,
+  TraceEventType.RETRIEVAL,
+  TraceEventType.TOOL,
+  TraceEventType.POLICY,
+  TraceEventType.RESPONSE,
+  TraceEventType.ERROR,
+]
+
 export const POLICY_DECISION_LABELS: Record<PolicyDecision, string> = {
   [PolicyDecision.ALLOW]: '允许',
   [PolicyDecision.DENY]: '拒绝',

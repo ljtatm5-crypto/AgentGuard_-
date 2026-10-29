@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import agents, desktop, findings, metrics, runs, suites
+from app.api import agents, authorizations, desktop, findings, metrics, runs, suites
 from app.core.config import get_settings
 from app.db.session import SessionLocal, init_db
 from app.services.seed import ensure_demo_data
@@ -45,6 +45,7 @@ def healthz():
 
 
 app.include_router(agents.router, prefix="/api")
+app.include_router(authorizations.router, prefix="/api")
 app.include_router(suites.router, prefix="/api")
 app.include_router(runs.router, prefix="/api")
 app.include_router(findings.router, prefix="/api")

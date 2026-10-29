@@ -10,11 +10,10 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Any
 
-import httpx
-
 from app.security.agent_core import CampusAssistantV1, CampusAssistantV2
 from app.security.memory import MemoryStore
 from app.security.models import new_id
+from app.security.netguard import pinned_request, resolve_pinned, verify_unchanged
 from app.security.policy import PolicyEngine, default_permissions
 from app.security.rag import KNOWLEDGE_DIR, KnowledgeBase
 from app.security.scope import ScopeGuard, ScopeViolation
@@ -154,8 +153,11 @@ def _assess_risk(events: list[dict], answer: str, flags: dict | None = None) -> 
 
 
 def invoke_agent(agent: Any, input_text: str, risk_tag: str = "normal",
-                 session_id: str | None = None) -> Invocation:
-    """接受 SQLAlchemy Agent 或提供同名属性的对象；不读取隐藏思维过程。"""
+                 session_id: str | None = None, db: Any = None) -> Invocation:
+    """接受 SQLAlchemy Agent 或提供同名属性的对象；不读取隐藏思维过程。
+
+    `db` 传入时，远程适配器会用服务端授权记录校验目标（见 target_scope）。
+    """
     adapter = str(getattr(agent, "adapter", "mock") or "mock").lower()
     version = str(getattr(agent, "version", "") or "")
     if adapter == "mock":
@@ -178,12 +180,20 @@ def invoke_agent(agent: Any, input_text: str, risk_tag: str = "normal",
         return Invocation(reply.text, events, int((time.perf_counter() - started) * 1000),
                           _assess_risk(events, reply.text, reply.flags), "campus", version, raw)
     if adapter in {"dify", "openai", "openai_compat"}:
-        return _invoke_remote(agent, input_text, adapter, session_id=session_id)
+        return _invoke_remote(agent, input_text, adapter, session_id=session_id, db=db)
     raise ValueError(f"未知 adapter: {adapter}")
 
 
-def _invoke_remote(agent: Any, input_text: str, adapter: str, session_id: str | None = None) -> Invocation:
-    """调用受控自建 Dify；不跟随重定向、不走系统代理、仅允许授权私网目标。"""
+def _invoke_remote(agent: Any, input_text: str, adapter: str, session_id: str | None = None,
+                   db: Any = None) -> Invocation:
+    """调用受控自建 Dify / OpenAI 兼容接口。
+
+    三层防护，缺一不可：
+      1. 目标门禁 `validate_target_scope`：白名单 + 服务端授权记录（传 db 时强制）；
+      2. DNS 固定 `resolve_pinned`：解析一次、只允许私网、把结果钉住；
+      3. 请求结束后 `verify_unchanged`：解析结果变化即判定 DNS 重绑定并拒绝。
+    另外全程不跟随重定向、不走系统代理。
+    """
     from app.core.config import get_settings
     from app.core.target_scope import validate_target_scope
     from app.security.models import now_iso
@@ -196,30 +206,66 @@ def _invoke_remote(agent: Any, input_text: str, adapter: str, session_id: str | 
         authorization_confirmed=str(permissions.get("__authorization_confirmed__", "")).lower() == "true",
         authorization_reference=permissions.get("__authorization_reference__"),
         allowed_hosts=get_settings().allowed_target_host_list,
+        db=db, agent_id=str(getattr(agent, "id", "") or "") or None,
     )
-    get_runtime().guard.assert_allowed(endpoint)
-    if adapter != "dify":
-        raise NotImplementedError("当前仅实现 Dify 适配器；其它远程适配器尚未接入。")
+    guard = get_runtime().guard
+    guard.assert_allowed(endpoint)
+    # 连接前固定解析结果；非私网解析直接抛 ScopeViolation。
+    pin = resolve_pinned(endpoint, guard)
     credential_env = str(permissions.get("__credential_env__", ""))
     api_key = os.getenv(credential_env, "") if credential_env else ""
     if not api_key:
         raise ValueError(f"服务端环境变量 {credential_env or '(未配置)'} 中没有可用凭据")
 
     started = time.perf_counter()
-    with httpx.Client(timeout=30, follow_redirects=False, trust_env=False) as client:
-        response = client.post(
-            endpoint,
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            json={
-                "inputs": {},
-                "query": input_text,
-                "response_mode": "blocking",
-                "conversation_id": "",
-                "user": session_id or "agentguard",
-            },
+    if adapter == "dify":
+        request_body = {
+            "inputs": {},
+            "query": input_text,
+            "response_mode": "blocking",
+            "conversation_id": "",
+            "user": session_id or "agentguard",
+        }
+    else:
+        request_body = {
+            "model": str(getattr(agent, "model", "") or "gpt-4o-mini"),
+            "messages": [{"role": "user", "content": input_text}],
+            "temperature": 0,
+        }
+
+    # Both remote adapters use the same pinned-IP connection path. Sending the
+    # original endpoint through httpx would perform a second DNS lookup and
+    # reopen the rebinding race that netguard is meant to close.
+    status, body = pinned_request(
+        pin,
+        method="POST",
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        body=json.dumps(request_body, ensure_ascii=False).encode("utf-8"),
+    )
+    if status >= 400:
+        raise RuntimeError(f"被测 Agent 返回 HTTP {status}")
+    payload = json.loads(body.decode("utf-8", errors="replace"))
+
+    # 连接后复验：解析结果必须与固定值一致，否则判定为 DNS 重绑定。
+    verify_unchanged(pin)
+
+    if adapter != "dify":
+        choices = payload.get("choices") or []
+        answer = str((choices[0].get("message") or {}).get("content", "")) if choices else ""
+        now = now_iso()
+        events = [
+            {"id": new_id("evt"), "type": "input", "tool": None,
+             "params": {"content": input_text}, "output": None, "error": None, "duration_ms": 0},
+            {"id": new_id("evt"), "type": "response", "tool": None, "params": {"pinned_ip": pin.ip},
+             "output": answer, "error": None, "duration_ms": int((time.perf_counter() - started) * 1000)},
+        ]
+        return Invocation(
+            answer=answer, events=events,
+            latency=int((time.perf_counter() - started) * 1000),
+            risk_triggered="AG-SYS-BOUNDARY" in answer, adapter=adapter,
+            agent_version=str(getattr(agent, "version", "") or ""),
+            raw={"answer": answer, "pinned_ip": pin.ip, "trace_events": events},
         )
-        response.raise_for_status()
-        payload = response.json()
 
     nested = payload.get("data")
     answer = str(payload.get("answer") or (nested.get("answer") if isinstance(nested, dict) else "") or "")

@@ -1,43 +1,78 @@
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { ArrowRight, CheckCircle, DownloadSimple, FileCsv, FileText } from '@phosphor-icons/react'
+import { ArrowRight, CheckCircle, DownloadSimple, FileCsv, FilePdf, FileText } from '@phosphor-icons/react'
 import { api, ApiRequestError, USE_MOCK } from '@/api/client'
 import { AsyncBoundary } from '@/components/AsyncBoundary'
 import { StatusTag } from '@/components/Tags'
 import { useAsync } from '@/hooks/useAsync'
 import { buildReportFiles, downloadReportFile } from '@/utils/export'
+import type { ReportSnapshot } from '@/utils/export'
+import { buildReportHtml, printReportHtml } from '@/utils/pdf'
 import type { JudgeResult, TestRun } from '@/types/api'
 
 export default function ReportsPage() {
   const metrics = useAsync(() => api.getMetrics(), [])
   const runs = useAsync(() => api.listRuns(), [])
   const [exporting, setExporting] = useState(false)
+  const [pdfLoading, setPdfLoading] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
   const [exportStatus, setExportStatus] = useState<string | null>(null)
   const [files, setFiles] = useState<ReturnType<typeof buildReportFiles> | null>(null)
+
+  /**
+   * Markdown / CSV / PDF 共用同一次取数，保证三种格式的字段与口径完全一致。
+   */
+  async function collectSnapshot(): Promise<ReportSnapshot> {
+    const [currentMetrics, currentRuns, findings] = await Promise.all([
+      api.getMetrics(),
+      api.listRuns(),
+      api.listFindings(),
+    ])
+    const runDetails = await Promise.allSettled(currentRuns.map((run) => api.getRunDetail(run.id)))
+    const details: Awaited<ReturnType<typeof api.getRunDetail>>[] = []
+    const unavailableRunIds: string[] = []
+    runDetails.forEach((result, index) => {
+      if (result.status === 'fulfilled') details.push(result.value)
+      else unavailableRunIds.push(currentRuns[index].id)
+    })
+    return { metrics: currentMetrics, runs: currentRuns, details, findings, unavailableRunIds, isMock: USE_MOCK }
+  }
 
   async function exportReport() {
     setExporting(true)
     setExportError(null)
     setExportStatus(null)
     try {
-      const [currentMetrics, currentRuns, findings] = await Promise.all([api.getMetrics(), api.listRuns(), api.listFindings()])
-      const runDetails = await Promise.allSettled(currentRuns.map((run) => api.getRunDetail(run.id)))
-      const details: Awaited<ReturnType<typeof api.getRunDetail>>[] = []
-      const unavailableRunIds: string[] = []
-      runDetails.forEach((result, index) => {
-        if (result.status === 'fulfilled') details.push(result.value)
-        else unavailableRunIds.push(currentRuns[index].id)
-      })
-      const generated = buildReportFiles({ metrics: currentMetrics, runs: currentRuns, details, findings, unavailableRunIds, isMock: USE_MOCK })
+      const snapshot = await collectSnapshot()
+      const generated = buildReportFiles(snapshot)
       setFiles(generated)
       downloadReportFile(generated.markdown)
       downloadReportFile(generated.csv)
-      setExportStatus('已生成 Markdown 与 CSV，共 ' + currentRuns.length + ' 条运行记录。' + (unavailableRunIds.length ? unavailableRunIds.length + ' 条详情暂不可用，已在报告中注明。' : ''))
+      setExportStatus(
+        '已生成 Markdown 与 CSV，共 ' + snapshot.runs.length + ' 条运行记录。' +
+          (snapshot.unavailableRunIds.length ? snapshot.unavailableRunIds.length + ' 条详情暂不可用，已在报告中注明。' : ''),
+      )
     } catch (error) {
       setExportError(error instanceof ApiRequestError ? error.message : '报告生成失败，请检查服务后重新导出')
     } finally {
       setExporting(false)
+    }
+  }
+
+  async function exportPdf() {
+    setPdfLoading(true)
+    setExportError(null)
+    setExportStatus(null)
+    try {
+      const snapshot = await collectSnapshot()
+      // 先取数再构建，构建失败不会打开空的打印视图。
+      const html = buildReportHtml({ ...snapshot, generatedAt: new Date() })
+      printReportHtml(html)
+      setExportStatus('已打开 PDF 打印视图：在打印对话框中选择「另存为 PDF」即可保存。')
+    } catch (error) {
+      setExportError(error instanceof ApiRequestError ? error.message : 'PDF 视图生成失败，请稍后重试')
+    } finally {
+      setPdfLoading(false)
     }
   }
 
@@ -127,11 +162,17 @@ export default function ReportsPage() {
           <button className="btn btn-primary" data-testid="export-btn" onClick={() => void exportReport()} disabled={exporting}>
             <DownloadSimple size={18} aria-hidden="true" />{exporting ? '正在整理报告…' : '导出报告（Markdown + CSV）'}
           </button>
+          <button className="btn" data-testid="export-pdf-btn" onClick={() => void exportPdf()} disabled={pdfLoading}>
+            <FilePdf size={18} aria-hidden="true" />{pdfLoading ? '正在排版…' : '导出 PDF（A4 打印）'}
+          </button>
           {files && <>
             <button className="btn" onClick={() => downloadReportFile(files.markdown)} data-testid="export-markdown-btn"><FileText size={17} aria-hidden="true" />单独下载 Markdown</button>
             <button className="btn" onClick={() => downloadReportFile(files.csv)} data-testid="export-csv-btn"><FileCsv size={17} aria-hidden="true" />单独下载 CSV</button>
           </>}
         </div>
+        <p className="muted small export-hint">
+          PDF 由浏览器打印引擎按 A4 排版输出，在打印对话框中选择「另存为 PDF」保存；中文不依赖额外字体包，与 Markdown / CSV 使用同一份数据快照。
+        </p>
         {exportStatus && <p className="export-status" role="status" aria-live="polite" data-testid="export-status"><CheckCircle size={18} aria-hidden="true" />{exportStatus}</p>}
         {exportError && <p className="form-error" role="alert" data-testid="export-error">{exportError}</p>}
       </section>

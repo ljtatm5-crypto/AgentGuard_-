@@ -48,3 +48,52 @@
 - 本地 API 可能使用模拟适配器。页面及导出不将其称为外部 Dify 实测结果。
 - 两个下载由一次点击触发；如浏览器限制多文件下载，可用成功后的单独下载按钮取得同一快照文件。
 - 文本令牌过滤属于常见格式防护，不代表能够识别所有个人信息或自定义凭据；后端仍负责采集端脱敏。
+
+---
+
+## 补充轮次：PDF 报告、404、轨迹筛选与响应式回归
+
+本轮在既有交互上做增量，未改动 A/B 契约、未调整视觉基调。
+
+### PDF 报告
+
+- 新增 `src/utils/pdf.ts`：`buildReportHtml(snapshot)` 生成自包含 A4 文档，
+  `printReportHtml(html)` 通过隐藏 iframe 触发打印。
+- 选择打印而非嵌入 PDF 库：中文不依赖字体子集，包体零增长；iframe 方案可避开
+  异步取数之后的弹窗拦截。
+- `ReportsPage` 抽出 `collectSnapshot()`，Markdown / CSV / PDF 共用同一份快照，
+  三种格式字段与口径一致。
+- 生成器复用 `export.ts` 的 `redactReportText()`，报告内容按不可信文本转义，
+  避免 Agent 输出中的标签破坏排版。
+- `scripts/render-report-sample.ts` 可用同一函数产出 `docs/samples/AgentGuard_测试报告样例.pdf`。
+
+### 404
+
+- 新增 `src/pages/NotFoundPage.tsx`，`App.tsx` 的 `*` 路由由重定向改为渲染 404。
+- GitHub Pages 把 `index.html` 复制为 `404.html`，深层链接仍由 SPA 解析，
+  只有真正不匹配的路径才落到 404，不影响既有直达链接。
+
+### 轨迹筛选
+
+- `RunsPage` 抽出 `TraceBrowser`，提供类型筛选、关键词搜索、仅看异常与分页渲染。
+- 首屏 60 条，其余按需追加；500+ 事件场景不会一次性挂载 DOM。
+- 搜索只覆盖输入、检索、工具、策略、响应、错误等可观察字段，不涉及模型内部状态。
+- 证据定位（`?case=&events=`）逻辑保持不变，筛选默认全开时不干扰跳转高亮。
+
+### 新增 CSS 接口
+
+| 选择器 | 用途 |
+| --- | --- |
+| `.trace-controls` / `.trace-type-chips` / `.trace-tools` | 轨迹筛选容器与控件 |
+| `.trace-search` / `.trace-issue-toggle` / `.trace-count` | 搜索框、异常开关、结果计数 |
+| `.trace-empty` / `.trace-more` | 无匹配出口、分批加载按钮 |
+| `.notfound-page` / `.notfound-card` / `.notfound-links` | 404 页面 |
+
+注意：项目全局存在 `label { flex-direction: column }`，横向排列的 label 必须显式声明
+`flex-direction: row`，否则图标与文字会竖排。
+
+### 验证
+
+- `e2e/c-completion.spec.ts`：8 项（404 三条、轨迹筛选四条、PDF 入口一条）。
+- `e2e/responsive.spec.ts`：17 项（8 路由 × 浅色/深色 + 深色外观生效）。
+- 原 `smoke` / `flows` / `pages` / `visual-system` 共 30 项保持通过。

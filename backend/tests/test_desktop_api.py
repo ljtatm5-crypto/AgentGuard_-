@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from app.api.desktop import router
+from app.api.authorizations import router as authorizations_router
 from app.db.session import Base, get_db
 from app.models.entities import Finding, TraceEvent, TestCase as CaseRecord, TestRun as RunRecord, TestSuite as SuiteRecord
 from app.services.agent_adapter import reset_runtime
@@ -26,6 +27,7 @@ def desktop():
         ensure_desktop_data(db)
         application = FastAPI()
         application.include_router(router, prefix="/api/v2")
+        application.include_router(authorizations_router, prefix="/api")
         application.dependency_overrides[get_db] = lambda: db
         with TestClient(application) as client:
             yield client, db
@@ -260,6 +262,21 @@ def test_authorized_dify_asset_requires_server_side_credential(desktop, monkeypa
     assert missing.json()["error_code"] == "credential_missing"
 
     monkeypatch.setenv("AGENTGUARD_TEST_DIFY_KEY", "local-test-secret")
+    missing_authorization = client.post("/api/v2/agents/validate", json=payload)
+    assert missing_authorization.status_code == 403
+    assert missing_authorization.json()["error_code"] == "scope_denied"
+
+    authorization = client.post("/api/authorizations", json={
+        "reference": "AUTH-LOCAL-001",
+        "owner": "队员B",
+        "purpose": "桌面契约测试",
+        "target_scope": "self_hosted_dify",
+        "host": "127.0.0.1",
+        "port": 9999,
+        "valid_days": 1,
+    })
+    assert authorization.status_code == 200
+
     created = client.post("/api/v2/agents/validate", json=payload)
     assert created.status_code == 200
     body = created.json()
@@ -267,6 +284,28 @@ def test_authorized_dify_asset_requires_server_side_credential(desktop, monkeypa
     assert body["endpoint"] == payload["endpoint"]
     assert body["authorized_scope"]["target_type"] == "internal_authorized"
     assert "local-test-secret" not in json.dumps(body)
+
+
+def test_rejudge_preserves_chain_review(desktop):
+    client, _ = desktop
+    run = execute(client, "v1.0")
+    finding = client.get("/api/v2/findings").json()[0]
+    node_id = finding["chain"][0]["id"]
+    review = client.post(
+        f"/api/v2/findings/{finding['id']}/chain/{node_id}/review",
+        json={"status": "confirmed", "reviewer": "队员A", "note": "证据已人工核对", "confidence": 0.88},
+    )
+    assert review.status_code == 200
+
+    rejudge = client.post(f"/api/v2/runs/{run['id']}/judge")
+    assert rejudge.status_code == 200
+
+    refreshed = client.get(f"/api/v2/findings/{finding['id']}/chain").json()
+    reviewed_node = next(node for node in refreshed["chain"] if node["id"] == node_id)
+    assert reviewed_node["confirmation"]["status"] == "confirmed"
+    assert reviewed_node["confirmation"]["reviewed_by"] == "队员A"
+    assert reviewed_node["confirmation"]["note"] == "证据已人工核对"
+    assert reviewed_node["confidence"] == 0.88
 
 
 def test_dify_adapter_calls_authorized_loopback_without_redirects(monkeypatch):

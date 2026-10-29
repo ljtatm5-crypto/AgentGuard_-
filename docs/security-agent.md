@@ -17,12 +17,13 @@
 | 机制 | 行为 |
 |---|---|
 | 回环 / 私网 | 放行（本机自建靶场） |
-| 显式授权清单 | 校验主机、授权编号和服务端凭据环境变量；`AuthorizationRecord` 的持久化仍待完善 |
+| 显式授权清单 | 校验主机、授权编号和服务端凭据环境变量；`AuthorizationRecord` 已落到 `authorization_records` 表，可登记/查询/撤销，门禁按 主机+端口+作用域+Agent 逐条比对 |
 | 公网 IP / 公网域名 | **拒绝，且在建立连接之前** |
 | 公网黑名单 | `google.com`、`openai.com`、`dify.ai` 等即使加白也拒绝 |
 | 非 http(s) 协议 | 拒绝（`file://` 等） |
 
 `ScopeGuard.check()` 是唯一入口，`agent_adapter` 在发起任何远程请求前必须先过它。
+DNS 解析结果由 `app/security/netguard.py` 固定，连接前后各校验一次，变化即判重绑定。
 
 ---
 

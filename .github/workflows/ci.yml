@@ -61,13 +61,14 @@ jobs:
           npm run lint
           npm run typecheck
           npm run check:mock
+          npm run check:trace
           npm run build
       - name: Install browser
         working-directory: frontend-apple
         run: npx playwright install --with-deps chromium
-      - name: Mock route smoke
+      - name: Mock browser suite
         working-directory: frontend-apple
-        run: npx playwright test e2e/smoke.spec.ts e2e/flows.spec.ts
+        run: npm run test:smoke
       - name: Real API contract
         working-directory: frontend-apple
         env:
