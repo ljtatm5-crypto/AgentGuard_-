@@ -60,29 +60,42 @@ def ensure_desktop_data(db: Session) -> None:
         ))
         changed = True
     existing_suite = db.get(TestSuite, SEED_SUITE_ID)
-    if existing_suite and existing_suite.name != "智能体安全基线测试集":
-        existing_suite.name = "智能体安全基线测试集"
-        changed = True
+    samples = build_samples()
     if not existing_suite:
-        samples = build_samples()
         suite = TestSuite(id=SEED_SUITE_ID, name="智能体安全基线测试集", type="security", version="1.0", status="ready")
         db.add(suite)
         db.flush()
-        ids = []
-        for sample in samples:
-            case = sample.to_case()
-            case_id = f"desktop-{sample.sample_id}"
-            db.add(TestCase(
-                id=case_id, suite_id=suite.id, name=sample.name, type=case.type,
-                input=sample.input, steps=sample.steps, expected=sample.expected_risk,
-                forbidden=sample.forbidden, risk_tag=sample.risk_type, source="B-reviewed",
-                judge={**case.judge, "sample_id": sample.sample_id, "severity": str(sample.severity),
-                       "rule_first": True, "ruleset_version": "b-security-1.0", "llm_role": "supplement_only",
-                       "reviewed_by": "B", "reviewed_at": datetime.now(timezone.utc).isoformat()},
-            ))
-            ids.append(case_id)
-        suite.case_ids = ids
         changed = True
+    else:
+        suite = existing_suite
+        if suite.name != "智能体安全基线测试集":
+            suite.name = "智能体安全基线测试集"
+            changed = True
+
+    # Upgrade installations that already have the suite instead of seeding only
+    # on first install. Existing cases and historical runs remain untouched.
+    current_ids = list(suite.case_ids or [])
+    existing_ids = set(current_ids)
+    for sample in samples:
+        case_id = f"desktop-{sample.sample_id}"
+        if db.get(TestCase, case_id) is not None:
+            continue
+        case = sample.to_case()
+        db.add(TestCase(
+            id=case_id, suite_id=suite.id, name=sample.name, type=case.type,
+            input=sample.input, steps=sample.steps, expected=sample.expected_risk,
+            forbidden=sample.forbidden, risk_tag=sample.risk_type, source="B-reviewed",
+            judge={**case.judge, "sample_id": sample.sample_id, "severity": str(sample.severity),
+                   "rule_first": True, "ruleset_version": "b-security-1.0", "llm_role": "supplement_only",
+                   "reviewed_by": "B", "reviewed_at": datetime.now(timezone.utc).isoformat()},
+        ))
+        current_ids.append(case_id)
+        existing_ids.add(case_id)
+        changed = True
+    if suite.case_ids != current_ids:
+        suite.case_ids = current_ids
+    if changed and suite.version == "1.0" and any(sample.sample_id.startswith("AG-C-") for sample in samples):
+        suite.version = "1.1"
     if changed:
         db.commit()
 

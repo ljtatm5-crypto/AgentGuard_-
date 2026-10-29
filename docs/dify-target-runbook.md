@@ -72,10 +72,13 @@ curl.exe -X POST http://127.0.0.1:8000/api/authorizations ^
 
 ### 3.3 配置并校验 Agent
 
+Dify 资产 ID 由服务端生成。若授权记录尚未绑定 Agent，首次校验成功后会将它绑定到新资产。
+如需把授权预先绑定到固定资产 ID，可在请求中额外提供 `"agent_id":"<固定UUID>"`。
+
 ```powershell
-curl.exe -X POST http://127.0.0.1:8000/api/agents/validate ^
+curl.exe -X POST http://127.0.0.1:8000/api/v2/agents/validate ^
   -H "Content-Type: application/json" ^
-  -d "{\"name\":\"校园助手 · Dify靶场\",\"adapter\":\"dify\",\"endpoint\":\"http://192.168.1.20:8080/v1/chat-messages\",\"target_scope\":\"self_hosted_dify\",\"authorization_confirmed\":true,\"authorization_reference\":\"AUTH-2026-B-001\",\"permissions\":{\"__credential_env__\":\"AGENTGUARD_DIFY_KEY\"}}"
+  -d "{\"name\":\"校园助手 · Dify靶场\",\"version\":\"v2.0\",\"agent_type\":\"rag\",\"connection_mode\":\"dify_authorized\",\"endpoint\":\"http://192.168.1.20:8080/v1/chat-messages\",\"credential_env\":\"AGENTGUARD_DIFY_KEY\",\"authorization_confirmed\":true,\"authorization_reference\":\"AUTH-2026-B-001\"}"
 ```
 
 - 成功 → `{"valid": true, ...}`
