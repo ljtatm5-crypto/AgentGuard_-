@@ -150,7 +150,8 @@ class ScopeGuard:
         if host in _LOOPBACK_NAMES:
             return ScopeDecision(True, host, "loopback", str(ErrorCode.OK), "本机回环，视为自建靶场", port)
 
-        # 3) 字面量 IP：只放行回环/私网/链路本地
+        # 3) 字面量 IP：只放行回环与 RFC 1918 / IPv6 ULA 私网
+        #    （169.254/16 与 fe80::/10 链路本地默认拒绝，避免把本地设备当成靶场）
         ip = self._as_ip(host)
         if ip is not None:
             return self._judge_ip(host, ip, port, resolved=False)

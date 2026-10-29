@@ -10,6 +10,7 @@ const RunsPage = lazy(() => import('@/pages/RunsPage'))
 const FindingsPage = lazy(() => import('@/pages/FindingsPage'))
 const ReportsPage = lazy(() => import('@/pages/ReportsPage'))
 const SettingsPage = lazy(() => import('@/pages/SettingsPage'))
+const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'))
 
 function page(node: ReactNode) {
   return (
@@ -33,7 +34,7 @@ export default function App() {
         <Route path="/findings" element={page(<FindingsPage />)} />
         <Route path="/reports" element={page(<ReportsPage />)} />
         <Route path="/settings" element={page(<SettingsPage />)} />
-        <Route path="*" element={<Navigate to="/overview" replace />} />
+        <Route path="*" element={page(<NotFoundPage />)} />
       </Route>
     </Routes>
   )

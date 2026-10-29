@@ -102,3 +102,29 @@ class Finding(Base):
     status: Mapped[str] = mapped_column(String(30), default="open")
     chain: Mapped[list] = mapped_column(JSON, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+
+
+class AuthorizationRecord(Base):
+    """服务端授权记录：授权人、目标、用途、证据、时间与授权编号逐条落库。
+
+    这条记录是「能不能连这个远程靶场」的唯一凭据。
+    调用方在 Agent 配置里自报的 authorization_reference 只有在这里能查到，
+    才被认可；查不到、已过期、已撤销或目标不匹配，一律拒绝建连。
+    """
+
+    __tablename__ = "authorization_records"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    reference: Mapped[str] = mapped_column(String(80), unique=True, index=True)
+    owner: Mapped[str] = mapped_column(String(120))
+    purpose: Mapped[str] = mapped_column(Text)
+    target_scope: Mapped[str] = mapped_column(String(40))
+    host: Mapped[str] = mapped_column(String(255), index=True)
+    port: Mapped[int] = mapped_column(Integer)
+    agent_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    evidence: Mapped[str] = mapped_column(Text, default="")
+    effective_from: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoke_reason: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)

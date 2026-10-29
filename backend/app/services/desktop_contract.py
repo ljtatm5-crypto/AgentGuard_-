@@ -60,29 +60,42 @@ def ensure_desktop_data(db: Session) -> None:
         ))
         changed = True
     existing_suite = db.get(TestSuite, SEED_SUITE_ID)
-    if existing_suite and existing_suite.name != "智能体安全基线测试集":
-        existing_suite.name = "智能体安全基线测试集"
-        changed = True
+    samples = build_samples()
     if not existing_suite:
-        samples = build_samples()
         suite = TestSuite(id=SEED_SUITE_ID, name="智能体安全基线测试集", type="security", version="1.0", status="ready")
         db.add(suite)
         db.flush()
-        ids = []
-        for sample in samples:
-            case = sample.to_case()
-            case_id = f"desktop-{sample.sample_id}"
-            db.add(TestCase(
-                id=case_id, suite_id=suite.id, name=sample.name, type=case.type,
-                input=sample.input, steps=sample.steps, expected=sample.expected_risk,
-                forbidden=sample.forbidden, risk_tag=sample.risk_type, source="B-reviewed",
-                judge={**case.judge, "sample_id": sample.sample_id, "severity": str(sample.severity),
-                       "rule_first": True, "ruleset_version": "b-security-1.0", "llm_role": "supplement_only",
-                       "reviewed_by": "B", "reviewed_at": datetime.now(timezone.utc).isoformat()},
-            ))
-            ids.append(case_id)
-        suite.case_ids = ids
         changed = True
+    else:
+        suite = existing_suite
+        if suite.name != "智能体安全基线测试集":
+            suite.name = "智能体安全基线测试集"
+            changed = True
+
+    # Upgrade installations that already have the suite instead of seeding only
+    # on first install. Existing cases and historical runs remain untouched.
+    current_ids = list(suite.case_ids or [])
+    existing_ids = set(current_ids)
+    for sample in samples:
+        case_id = f"desktop-{sample.sample_id}"
+        if db.get(TestCase, case_id) is not None:
+            continue
+        case = sample.to_case()
+        db.add(TestCase(
+            id=case_id, suite_id=suite.id, name=sample.name, type=case.type,
+            input=sample.input, steps=sample.steps, expected=sample.expected_risk,
+            forbidden=sample.forbidden, risk_tag=sample.risk_type, source="B-reviewed",
+            judge={**case.judge, "sample_id": sample.sample_id, "severity": str(sample.severity),
+                   "rule_first": True, "ruleset_version": "b-security-1.0", "llm_role": "supplement_only",
+                   "reviewed_by": "B", "reviewed_at": datetime.now(timezone.utc).isoformat()},
+        ))
+        current_ids.append(case_id)
+        existing_ids.add(case_id)
+        changed = True
+    if suite.case_ids != current_ids:
+        suite.case_ids = current_ids
+    if changed and suite.version == "1.0" and any(sample.sample_id.startswith("AG-C-") for sample in samples):
+        suite.version = "1.1"
     if changed:
         db.commit()
 
@@ -230,42 +243,116 @@ def finding_view(finding: Finding, run: TestRun, case: TestCase, suite: TestSuit
     if decisions:
         behavior_summary.append(f"策略 {', '.join(decisions)}")
     behavior_detail = "；".join(behavior_summary) or "缺少可观察的检索、工具或策略事件"
+    reviews = {
+        str(item.get("node_id")): item
+        for item in (finding.chain or [])
+        if isinstance(item, dict) and item.get("kind") == "review"
+    }
+
+    def node_confidence(node_id: str, nodes: list[TraceEvent], base: float | None = None) -> tuple[dict, str]:
+        evidence = chain_evidence(nodes)
+        observed = bool(evidence["event_ids"])
+        confidence = base if base is not None else (0.95 if observed else 0.35)
+        review = reviews.get(node_id, {})
+        if review.get("confidence") is not None:
+            confidence = float(review["confidence"])
+        confirmation = {
+            "status": review.get("status", "pending"),
+            "reviewed_by": review.get("reviewed_by"),
+            "reviewed_at": review.get("reviewed_at"),
+            "note": review.get("note", ""),
+        }
+        return {
+            "evidence": evidence,
+            "basis": "observed" if observed else "inferred",
+            "confidence": round(float(confidence), 2),
+            "confirmation": confirmation,
+        }, ("observed" if observed else "inferred")
+
+    entry_conf, _ = node_confidence(f"{finding.id}-entry", input_events)
+    behavior_conf, _ = node_confidence(f"{finding.id}-behavior", behavior_events)
+    impact_conf, _ = node_confidence(f"{finding.id}-impact", impact_events)
+    fix_conf, _ = node_confidence(f"{finding.id}-fix", [], base=0.5)
+
     chain = [
         {
             "id": f"{finding.id}-entry",
             "kind": "entry",
             "label": "输入与载体",
             "detail": case.input,
-            "evidence": chain_evidence(input_events),
+            **entry_conf,
+            "unknowns": [] if (case.input or "").strip() else ["用例输入为空，无法确认攻击载体"],
         },
         {
             "id": f"{finding.id}-behavior",
             "kind": "behavior",
             "label": "可观察行为",
             "detail": behavior_detail,
-            "evidence": chain_evidence(behavior_events),
+            **behavior_conf,
+            "unknowns": [] if behavior_events else ["未捕获检索、工具或策略事件，行为结论缺少事件依据"],
         },
         {
             "id": f"{finding.id}-impact",
             "kind": "impact",
             "label": "影响范围",
             "detail": finding.impact,
-            "evidence": chain_evidence(impact_events),
+            **impact_conf,
+            "unknowns": [] if impact_events else ["缺少响应或错误事件，影响范围属于推断"],
         },
         {
             "id": f"{finding.id}-fix",
             "kind": "fix",
             "label": "修复建议",
             "detail": finding.recommendation,
-            "evidence": chain_evidence([]),
+            **fix_conf,
+            "unknowns": ["修复措施尚未经同一测试集重放验证"],
         },
     ]
+    observed_nodes = sum(1 for item in chain if item["basis"] == "observed")
+    confirmed_nodes = sum(1 for item in chain if item["confirmation"]["status"] == "confirmed")
+    rejected_nodes = sum(1 for item in chain if item["confirmation"]["status"] == "rejected")
+    chain_summary = {
+        "nodes": len(chain),
+        "observed": observed_nodes,
+        "inferred": len(chain) - observed_nodes,
+        "confirmed": confirmed_nodes,
+        "rejected": rejected_nodes,
+        "confidence": round(min(item["confidence"] for item in chain), 2) if chain else 0.0,
+        "note": "链路置信度取各节点最低值；inferred 节点只表示推论，不能当作攻击成功证据",
+    }
     return {"id": finding.id, "title": finding.title, "risk_tag": risk_tag(case.risk_tag),
             "severity": finding.severity if finding.severity in {"critical", "high", "medium", "low", "info"} else "medium",
             "status": "mitigated" if finding.status == "mitigated" else "open", "evidence": evidence,
             "impact": finding.impact, "recommendation": finding.recommendation, "agent_version": run.agent_version,
             "suite_version": (run.result or {}).get("suite_version", suite.version), "created_at": iso(finding.created_at),
-            "chain": chain}
+            "chain": chain, "chain_summary": chain_summary}
+
+
+def save_chain_review(db: Session, finding: Finding, *, node_id: str, status: str,
+                      reviewer: str, note: str = "", confidence: float | None = None) -> dict:
+    """记录人工对某个攻击链节点的确认或驳回；旧记录保留，只覆盖同一节点的最新结论。"""
+    if status not in {"confirmed", "rejected", "pending"}:
+        raise ValueError("status 只能是 confirmed / rejected / pending")
+    if not (reviewer or "").strip():
+        raise ValueError("必须填写复核人")
+    entries = [item for item in (finding.chain or [])
+               if not (isinstance(item, dict) and item.get("kind") == "review"
+                       and item.get("node_id") == node_id)]
+    entry = {
+        "kind": "review",
+        "node_id": node_id,
+        "status": status,
+        "reviewed_by": reviewer.strip(),
+        "reviewed_at": datetime.now(timezone.utc).isoformat(),
+        "note": (note or "").strip(),
+    }
+    if confidence is not None:
+        entry["confidence"] = max(0.0, min(1.0, float(confidence)))
+    entries.append(entry)
+    finding.chain = entries
+    db.commit()
+    db.refresh(finding)
+    return entry
 
 
 def metrics_view(db: Session) -> dict:

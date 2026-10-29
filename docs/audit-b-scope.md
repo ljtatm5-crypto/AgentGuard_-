@@ -10,6 +10,19 @@
 
 因此，没有发现当前版本可绕过范围门禁并向公网发请求的高风险路径。这个结论只适用于本地确定性靶场，不代表真实 Dify 适配器的网络隔离已经完成。
 
+## 2026-10-25 完善进展（队员B）
+
+针对下面「残余风险」1 与 2 的代码改动已完成，详细验收见 `docs/security-completion.md`：
+
+| 残余风险 | 当前状态 | 落点 |
+|---|---|---|
+| 1 授权证据调用方自报 | **已修复**：授权记录落 `authorization_records` 表，门禁按 主机+端口+作用域+Agent 逐条比对，过期/撤销/不匹配全部拒绝；提供登记/查询/撤销 API | `app/services/authorization.py`、`app/api/authorizations.py`、`app/core/target_scope.py` |
+| 2 DNS 检查与连接竞态 | **已修复**：解析结果固定后再建连，连接后复验；解析变化或出现公网地址即判重绑定并拒绝 | `app/security/netguard.py`、`app/services/agent_adapter.py` |
+| 3 链路本地地址注释不一致 | **已修复**：注释改为与实际一致（169.254/16、fe80::/10 默认拒绝） | `app/security/scope.py` |
+| 4 公开文档夸大留痕 | **已修复**：`docs/security-agent.md` 按实际行为描述 | `docs/security-agent.md` |
+
+仍未闭环：真实自建 Dify 靶场的一次实地调用（需要 Docker 环境与内网域名），属环境依赖项，不在代码层。
+
 ## 残余风险
 
 1. **授权证据仍是调用方自报。** `authorization_confirmed=true` 加上任意非空授权编号即可通过 `validate_target_scope`；`AuthorizationRecord` 和 `record_authorization()` 没有接入校验流程，成功检查也不会自动写入记录。真实远程适配器启用前，应把授权目标、负责人、用途、证据编号和有效期保存为服务端记录，并校验目标、端口、Agent 与记录的绑定关系。

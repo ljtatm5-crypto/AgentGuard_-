@@ -55,18 +55,23 @@ feature/b-*  ┘   （联调）  （演示）
 ```
 src/
 ├─ types/
-│  ├─ enums.ts          枚举单一来源（状态/严重等级/判定来源/风险类型）
+│  ├─ enums.ts          枚举单一来源（状态/严重等级/判定来源/风险类型/轨迹类型顺序）
 │  └─ api.ts            团队公共契约类型
 ├─ api/
 │  ├─ client.ts         ★ 唯一数据出入口，Mock/真实切换点
 │  └─ schemas.ts        Zod 运行时校验，响应不符契约立即失败
 ├─ mock/
-│  ├─ handlers.ts       11 个接口的 Mock 实现
+│  ├─ handlers.ts       /api/v2 全部接口的 Mock 实现
 │  └─ fixtures/         六类 P0 用例、轨迹事件、Finding 与攻击链
-├─ components/          四态容器 AsyncBoundary、标签组件
-├─ pages/               6 大页面
+├─ components/          四态容器 AsyncBoundary、标签组件、动效壳
+├─ pages/               8 条路由（含 404）
 ├─ hooks/useAsync.ts    统一取数与重试
-└─ styles.css
+├─ utils/
+│  ├─ export.ts         Markdown / CSV 构建与脱敏
+│  └─ pdf.ts            A4 打印式 PDF 报告
+├─ styles.css
+├─ tokens.css / aurora.css / workspaces.css   视觉系统
+└─ trace-controls.css   轨迹筛选与 404 页面样式
 ```
 
 ---
@@ -91,8 +96,11 @@ Agent 资产页支持从客户界面接入对话型、RAG、工具调用和工�
 必须经人工确认后保存；Mock 模式会明确标注候选未调用真实模型。
 
 核心工作区包括紧凑 Agent 资产目录、逐条可编辑的测试工作室、三栏执行轨迹、事件级
-攻击链节点图和逐用例修复差异。实时任务队列与 PDF 报告属于后续生产化范围，详见
+攻击链节点图和逐用例修复差异。实时任务队列属于后续生产化范围，详见
 `docs/workspace-redesign.md`。
+
+本轮补齐的 P1/P2 项：PDF 报告（A4 打印）、真实 404 页面、轨迹按类型/关键词/异常
+筛选与分批渲染、移动端与深色外观的全路由回归。
 
 ---
 
@@ -119,6 +127,47 @@ npm run test:api             # 启动本地 FastAPI，验证 /api/v2 真实契�
 覆盖：8 条契约路由可访问、导航切换、四态不卡在 loading/error、授权范围标注、攻击链证据跳转与真实 API 权限展示。
 
 另有 `npm run test:screenshots` 可重新生成 `docs/screenshots/` 下的桌面与移动端演示截图。
+
+### 本轮新增的回归
+
+| 用例 | 文件 | 覆盖内容 |
+|---|---|---|
+| 404 与路由兜底 | `e2e/c-completion.spec.ts` | 非法路径展示 404、深层链接不被劫持、`/suites` 兼容重定向 |
+| 轨迹筛选 | 同上 | 类型筛选、关键词搜索、仅看异常、空结果出口 |
+| 报告导出 | 同上 | PDF 入口可用，且点击后生成含指标/限制/数据来源的 A4 文档 |
+| 移动端与深色外观 | `e2e/responsive.spec.ts` | 390×844 下 8 条路由 × 浅色/深色均无横向溢出 |
+
+另有两个不依赖浏览器的逻辑校验：
+
+```bash
+npm run check:mock    # Mock 数据证据链完整性
+npm run check:trace   # 轨迹视图：520 条事件下的截断、深链聚焦与筛选组合
+```
+
+建议把这两条也加进 CI 的静态门禁（`.github/workflows/ci.yml` 的
+`Static and mock gates` 步骤，加一行 `npm run check:trace`）。
+
+---
+
+## 报告导出
+
+三种格式读取同一份 `ReportSnapshot`，字段与口径一致：
+
+| 格式 | 入口 | 实现 |
+|---|---|---|
+| Markdown | 「导出报告」 | `utils/export.ts` |
+| CSV | 「导出报告」 | 同上（含公式注入防护与 BOM） |
+| PDF | 「导出 PDF（A4 打印）」 | `utils/pdf.ts` |
+
+PDF 不引入 PDF 库、不嵌入字体子集：生成自包含 A4 文档后由浏览器打印引擎输出，
+因此中文不会乱码，也不增加包体。在打印对话框中选择「另存为 PDF」即可。
+
+生成样例（提交材料用）：
+
+```bash
+npx vite-node scripts/render-report-sample.ts
+# → docs/samples/AgentGuard_测试报告样例.pdf
+```
 
 ---
 

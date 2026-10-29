@@ -24,7 +24,11 @@ export default function AppLayout() {
   const searchTrigger = useRef<HTMLButtonElement>(null)
   const dialog = useRef<HTMLDivElement>(null)
   const [theme, setTheme] = useState(() => localStorage.getItem('agentguard-appearance') || 'light')
-  const active = NAV.find(n => location.pathname === n.to || location.pathname.startsWith(`${n.to}/`)) ?? NAV[0]
+  // 未匹配任何导航项时（如 404），不能沿用 NAV[0] 的标签，否则标题与面包屑会误报「总览」
+  const active = location.pathname === '/'
+    ? NAV[0]
+    : NAV.find(n => location.pathname === n.to || location.pathname.startsWith(`${n.to}/`))
+      ?? { ...NAV[0], label: '页面未找到', shortLabel: '未找到', hint: '该地址不在导航范围内' }
   useEffect(() => { document.documentElement.dataset.theme = theme; localStorage.setItem('agentguard-appearance', theme) }, [theme])
   useEffect(() => { document.title = `${active.label} · AgentGuard 智测盾` }, [active.label])
   useEffect(() => {

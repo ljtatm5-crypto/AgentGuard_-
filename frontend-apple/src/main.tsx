@@ -6,6 +6,7 @@ import { USE_MOCK } from './api/client'
 import './tokens.css'
 import './aurora.css'
 import './workspaces.css'
+import './trace-controls.css'
 
 const routerBase = import.meta.env.BASE_URL.replace(/\/$/, '') || '/'
 

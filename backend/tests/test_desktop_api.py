@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from app.api.desktop import router
+from app.api.authorizations import router as authorizations_router
 from app.db.session import Base, get_db
 from app.models.entities import Finding, TraceEvent, TestCase as CaseRecord, TestRun as RunRecord, TestSuite as SuiteRecord
 from app.services.agent_adapter import reset_runtime
@@ -26,6 +27,7 @@ def desktop():
         ensure_desktop_data(db)
         application = FastAPI()
         application.include_router(router, prefix="/api/v2")
+        application.include_router(authorizations_router, prefix="/api")
         application.dependency_overrides[get_db] = lambda: db
         with TestClient(application) as client:
             yield client, db
@@ -260,6 +262,21 @@ def test_authorized_dify_asset_requires_server_side_credential(desktop, monkeypa
     assert missing.json()["error_code"] == "credential_missing"
 
     monkeypatch.setenv("AGENTGUARD_TEST_DIFY_KEY", "local-test-secret")
+    missing_authorization = client.post("/api/v2/agents/validate", json=payload)
+    assert missing_authorization.status_code == 403
+    assert missing_authorization.json()["error_code"] == "scope_denied"
+
+    authorization = client.post("/api/authorizations", json={
+        "reference": "AUTH-LOCAL-001",
+        "owner": "队员B",
+        "purpose": "桌面契约测试",
+        "target_scope": "self_hosted_dify",
+        "host": "127.0.0.1",
+        "port": 9999,
+        "valid_days": 1,
+    })
+    assert authorization.status_code == 200
+
     created = client.post("/api/v2/agents/validate", json=payload)
     assert created.status_code == 200
     body = created.json()
@@ -267,6 +284,86 @@ def test_authorized_dify_asset_requires_server_side_credential(desktop, monkeypa
     assert body["endpoint"] == payload["endpoint"]
     assert body["authorized_scope"]["target_type"] == "internal_authorized"
     assert "local-test-secret" not in json.dumps(body)
+    stored_authorization = client.get("/api/authorizations/AUTH-LOCAL-001").json()
+    assert stored_authorization["agent_id"] == body["id"]
+
+
+def test_rejudge_preserves_chain_review(desktop):
+    client, _ = desktop
+    run = execute(client, "v1.0")
+    finding = client.get("/api/v2/findings").json()[0]
+    node_id = finding["chain"][0]["id"]
+    review = client.post(
+        f"/api/v2/findings/{finding['id']}/chain/{node_id}/review",
+        json={"status": "confirmed", "reviewer": "队员A", "note": "证据已人工核对", "confidence": 0.88},
+    )
+    assert review.status_code == 200
+
+    rejudge = client.post(f"/api/v2/runs/{run['id']}/judge")
+    assert rejudge.status_code == 200
+
+    refreshed = client.get(f"/api/v2/findings/{finding['id']}/chain").json()
+    reviewed_node = next(node for node in refreshed["chain"] if node["id"] == node_id)
+    assert reviewed_node["confirmation"]["status"] == "confirmed"
+    assert reviewed_node["confirmation"]["reviewed_by"] == "队员A"
+    assert reviewed_node["confirmation"]["note"] == "证据已人工核对"
+    assert reviewed_node["confidence"] == 0.88
+
+
+def test_existing_suite_is_upgraded_with_combination_samples(desktop):
+    client, db = desktop
+    suite = db.get(SuiteRecord, SEED_SUITE_ID)
+    combo_ids = [
+        case.id for case in db.scalars(select(CaseRecord).where(CaseRecord.suite_id == suite.id)).all()
+        if str((case.judge or {}).get("sample_id", "")).startswith("AG-C-")
+    ]
+    assert len(combo_ids) == 3
+    for case_id in combo_ids:
+        db.delete(db.get(CaseRecord, case_id))
+    suite.case_ids = [case_id for case_id in suite.case_ids if case_id not in combo_ids]
+    suite.version = "1.0"
+    db.commit()
+
+    ensure_desktop_data(db)
+    refreshed = db.get(SuiteRecord, SEED_SUITE_ID)
+    restored = [
+        case for case in db.scalars(select(CaseRecord).where(CaseRecord.suite_id == refreshed.id)).all()
+        if str((case.judge or {}).get("sample_id", "")).startswith("AG-C-")
+    ]
+    assert len(restored) == 3
+    assert refreshed.version == "1.1"
+    assert all(case.id in refreshed.case_ids for case in restored)
+
+
+def test_requested_agent_id_conflict_is_a_controlled_error(desktop, monkeypatch):
+    client, _ = desktop
+    monkeypatch.setenv("AGENTGUARD_TEST_DIFY_KEY", "local-test-secret")
+    client.post("/api/authorizations", json={
+        "reference": "AUTH-BOUND-001",
+        "owner": "队员B",
+        "purpose": "固定 Agent 绑定测试",
+        "target_scope": "self_hosted_dify",
+        "host": "127.0.0.1",
+        "port": 9998,
+        "agent_id": "fixed-agent-id",
+        "valid_days": 1,
+    })
+    payload = {
+        "agent_id": "fixed-agent-id",
+        "name": "固定 ID 智能体",
+        "version": "v2.0",
+        "agent_type": "rag",
+        "connection_mode": "dify_authorized",
+        "endpoint": "http://127.0.0.1:9998/v1/chat-messages",
+        "credential_env": "AGENTGUARD_TEST_DIFY_KEY",
+        "authorization_reference": "AUTH-BOUND-001",
+        "authorization_confirmed": True,
+    }
+    first = client.post("/api/v2/agents/validate", json=payload)
+    assert first.status_code == 200
+    second = client.post("/api/v2/agents/validate", json=payload)
+    assert second.status_code == 409
+    assert second.json()["error_code"] == "agent_id_conflict"
 
 
 def test_dify_adapter_calls_authorized_loopback_without_redirects(monkeypatch):

@@ -34,6 +34,7 @@ jobs:
           npm run lint
           npm run typecheck
           npm run check:mock
+          npm run check:trace
       - name: Build static site
         working-directory: frontend-apple
         env:
