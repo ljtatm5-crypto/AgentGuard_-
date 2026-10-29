@@ -284,6 +284,8 @@ def test_authorized_dify_asset_requires_server_side_credential(desktop, monkeypa
     assert body["endpoint"] == payload["endpoint"]
     assert body["authorized_scope"]["target_type"] == "internal_authorized"
     assert "local-test-secret" not in json.dumps(body)
+    stored_authorization = client.get("/api/authorizations/AUTH-LOCAL-001").json()
+    assert stored_authorization["agent_id"] == body["id"]
 
 
 def test_rejudge_preserves_chain_review(desktop):
@@ -306,6 +308,31 @@ def test_rejudge_preserves_chain_review(desktop):
     assert reviewed_node["confirmation"]["reviewed_by"] == "队员A"
     assert reviewed_node["confirmation"]["note"] == "证据已人工核对"
     assert reviewed_node["confidence"] == 0.88
+
+
+def test_existing_suite_is_upgraded_with_combination_samples(desktop):
+    client, db = desktop
+    suite = db.get(SuiteRecord, SEED_SUITE_ID)
+    combo_ids = [
+        case.id for case in db.scalars(select(CaseRecord).where(CaseRecord.suite_id == suite.id)).all()
+        if str((case.judge or {}).get("sample_id", "")).startswith("AG-C-")
+    ]
+    assert len(combo_ids) == 3
+    for case_id in combo_ids:
+        db.delete(db.get(CaseRecord, case_id))
+    suite.case_ids = [case_id for case_id in suite.case_ids if case_id not in combo_ids]
+    suite.version = "1.0"
+    db.commit()
+
+    ensure_desktop_data(db)
+    refreshed = db.get(SuiteRecord, SEED_SUITE_ID)
+    restored = [
+        case for case in db.scalars(select(CaseRecord).where(CaseRecord.suite_id == refreshed.id)).all()
+        if str((case.judge or {}).get("sample_id", "")).startswith("AG-C-")
+    ]
+    assert len(restored) == 3
+    assert refreshed.version == "1.1"
+    assert all(case.id in refreshed.case_ids for case in restored)
 
 
 def test_dify_adapter_calls_authorized_loopback_without_redirects(monkeypatch):

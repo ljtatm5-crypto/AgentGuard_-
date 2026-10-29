@@ -153,7 +153,8 @@ def validate_agent(payload: dict[str, Any], db: Session = Depends(get_db)):
             raise DesktopError(422, "contract_bad_enum", "凭据环境变量名格式无效")
         if not os.getenv(credential_env):
             raise DesktopError(422, "credential_missing", f"服务端环境变量 {credential_env} 未配置")
-        created_id = str(uuid4())
+        requested_agent_id = str(payload.get("agent_id") or "").strip()
+        created_id = requested_agent_id or str(uuid4())
         try:
             validate_target_scope(
                 endpoint=endpoint,
@@ -163,7 +164,7 @@ def validate_agent(payload: dict[str, Any], db: Session = Depends(get_db)):
                 authorization_reference=authorization_reference,
                 allowed_hosts=get_settings().allowed_target_host_list,
                 db=db,
-                agent_id=created_id,
+                agent_id=created_id if requested_agent_id else None,
             )
         except TargetScopeError as exc:
             raise DesktopError(403, "scope_denied", str(exc)) from exc
@@ -175,6 +176,11 @@ def validate_agent(payload: dict[str, Any], db: Session = Depends(get_db)):
             "__authorization_reference__": authorization_reference,
             "__credential_env__": credential_env,
         }
+        from app.services.authorization import get_by_reference
+
+        authorization = get_by_reference(db, authorization_reference)
+        if authorization is not None and authorization.agent_id is None:
+            authorization.agent_id = created_id
         created = Agent(
             id=created_id,
             name=name,
