@@ -143,6 +143,21 @@ def test_private_host_is_resolved_and_pinned():
     assert pin.all_ips == ("192.168.1.10",)
 
 
+def test_ipv6_host_header_is_bracketed():
+    from app.security.netguard import PinnedTarget
+
+    default_port = PinnedTarget(
+        host="::1", port=8080, scheme="http", ip="::1", family=socket.AF_INET6,
+        all_ips=("::1",),
+    )
+    explicit_port = PinnedTarget(
+        host="::1", port=8081, scheme="http", ip="::1", family=socket.AF_INET6,
+        all_ips=("::1",),
+    )
+    assert default_port.host_header == "[::1]:8080"
+    assert explicit_port.host_header == "[::1]:8081"
+
+
 def test_dify_adapter_uses_pinned_request(monkeypatch):
     """Dify and OpenAI-compatible calls must share the fixed-IP transport."""
     from app.services import agent_adapter

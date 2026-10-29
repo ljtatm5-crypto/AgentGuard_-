@@ -63,7 +63,8 @@ class PinnedTarget:
     @property
     def host_header(self) -> str:
         default = 443 if self.scheme == "https" else 80
-        return self.host if self.port == default else f"{self.host}:{self.port}"
+        host = f"[{self.host}]" if ":" in self.host and not self.host.startswith("[") else self.host
+        return host if self.port == default else f"{host}:{self.port}"
 
     def to_dict(self) -> dict:
         return {

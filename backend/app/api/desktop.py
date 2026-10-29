@@ -463,12 +463,14 @@ def sync_finding(db: Session, run: TestRun, case: TestCase) -> None:
     data = {"severity": (case.judge or {}).get("severity", "high"), "title": f"{case.name} · 规则未通过",
             "evidence": judge.get("evidence", []), "impact": impact.get("note", "智能体实际行为未满足固定回归规则"),
             "recommendation": "；".join(RECOMMENDATIONS.get(original_tag, ["检查事件证据，修复后在相同规则集上重跑"])),
-            "status": "open", "chain": []}
+            "status": "open"}
     if existing:
         for key, value in data.items():
             setattr(existing, key, value)
     else:
-        db.add(Finding(run_id=run.id, **data))
+        # Finding.chain stores human review entries, not the derived Evidence Flow.
+        # Rejudging regenerates the derived nodes, so never overwrite these reviews.
+        db.add(Finding(run_id=run.id, chain=[], **data))
 
 
 @router.get("/runs")

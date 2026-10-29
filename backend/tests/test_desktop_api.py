@@ -286,6 +286,28 @@ def test_authorized_dify_asset_requires_server_side_credential(desktop, monkeypa
     assert "local-test-secret" not in json.dumps(body)
 
 
+def test_rejudge_preserves_chain_review(desktop):
+    client, _ = desktop
+    run = execute(client, "v1.0")
+    finding = client.get("/api/v2/findings").json()[0]
+    node_id = finding["chain"][0]["id"]
+    review = client.post(
+        f"/api/v2/findings/{finding['id']}/chain/{node_id}/review",
+        json={"status": "confirmed", "reviewer": "队员A", "note": "证据已人工核对", "confidence": 0.88},
+    )
+    assert review.status_code == 200
+
+    rejudge = client.post(f"/api/v2/runs/{run['id']}/judge")
+    assert rejudge.status_code == 200
+
+    refreshed = client.get(f"/api/v2/findings/{finding['id']}/chain").json()
+    reviewed_node = next(node for node in refreshed["chain"] if node["id"] == node_id)
+    assert reviewed_node["confirmation"]["status"] == "confirmed"
+    assert reviewed_node["confirmation"]["reviewed_by"] == "队员A"
+    assert reviewed_node["confirmation"]["note"] == "证据已人工核对"
+    assert reviewed_node["confidence"] == 0.88
+
+
 def test_dify_adapter_calls_authorized_loopback_without_redirects(monkeypatch):
     from app.services.agent_adapter import invoke_agent
 
