@@ -1,6 +1,11 @@
 import { defineConfig, devices } from '@playwright/test'
 
 const apiMode = process.env.VITE_USE_MOCK === 'false'
+if (apiMode) {
+  // The browser gate exercises a local backend without provisioning a token.
+  process.env.AGENTGUARD_ENVIRONMENT ??= 'test'
+  process.env.AGENTGUARD_ALLOW_ANONYMOUS_WRITES ??= 'true'
+}
 const python = process.platform === 'win32' ? '.\\.venv\\Scripts\\python.exe' : 'python'
 const port = process.env.PLAYWRIGHT_PORT ?? '5173'
 const reuseExistingServer = process.env.PLAYWRIGHT_ISOLATED !== '1' && !process.env.CI
