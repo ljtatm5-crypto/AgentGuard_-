@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
-from app.db.session import Base, normalize_database_url
+from app.db.session import Base, acquire_bootstrap_lock, normalize_database_url, should_use_managed_pool
 from app.models.entities import Agent
 
 
@@ -27,3 +27,16 @@ def test_sqlite_records_survive_engine_recreation(tmp_path):
         assert row is not None
         assert row.name == "persisted"
     reopened.dispose()
+
+def test_bootstrap_lock_is_a_sqlite_noop(tmp_path):
+    engine = create_engine(f"sqlite:///{(tmp_path / 'lock.db').as_posix()}")
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        acquire_bootstrap_lock(session)
+        assert session.scalar(select(1)) == 1
+    engine.dispose()
+
+def test_managed_neon_pool_uses_null_pool_mode():
+    assert should_use_managed_pool("production", "postgresql+psycopg://u:p@direct.example/db")
+    assert should_use_managed_pool("test", "postgresql+psycopg://u:p@db.example-pooler.example/db")
+    assert not should_use_managed_pool("test", "postgresql+psycopg://u:p@direct.example/db")

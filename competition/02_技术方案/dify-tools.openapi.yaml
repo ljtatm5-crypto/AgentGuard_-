@@ -1,0 +1,54 @@
+openapi: 3.1.0
+info:
+  title: DifyCampus Mock Tools
+  version: 0.1.0
+servers:
+  - url: http://127.0.0.1:8100
+tags:
+  - name: courses
+  - name: exams
+  - name: library
+  - name: notices
+  - name: sandbox
+paths:
+  /courses:
+    get:
+      operationId: queryCourses
+      summary: 查询课程信息
+      parameters:
+        - name: course_id
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        '200': { description: 课程信息 }
+  /exams:
+    get:
+      operationId: queryExams
+      summary: 查询考试安排
+      parameters:
+        - name: month
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        '200': { description: 考试安排 }
+  /library:
+    get:
+      operationId: queryLibrary
+      summary: 查询图书馆开放信息
+      responses:
+        '200': { description: 开放信息 }
+  /notices:
+    get:
+      operationId: queryNotices
+      summary: 查询校园通知
+      responses:
+        '200': { description: 通知列表 }
+  /sandbox/protected-write:
+    post:
+      operationId: sandboxProtectedWrite
+      summary: 仅写虚拟数据，必须被策略门禁保护
+      responses:
+        '200': { description: 虚拟写入成功 }
+        '403': { description: 权限拒绝 }

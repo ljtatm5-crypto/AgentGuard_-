@@ -1,0 +1,9 @@
+{
+  "experiment": "neon-alembic-head",
+  "generated_at": "2026-11-08T15:44:52.2848553Z",
+  "data_source": "production-postgresql-neon",
+  "database": "Neon PostgreSQL (pooled connection)",
+  "alembic_current": "0001_initial (head)",
+  "status": "PASS",
+  "note": "Alembic current was executed against the configured Neon production connection after schema initialization and stamping."
+}
