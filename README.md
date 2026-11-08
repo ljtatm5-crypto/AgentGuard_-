@@ -14,11 +14,12 @@
 
 ```text
 agentguard/
-├─ backend/                 FastAPI + SQLAlchemy + SQLite
+├─ backend/                 FastAPI + SQLAlchemy + SQLite/PostgreSQL + Alembic
 │  ├─ app/api/              Agent、测试集、运行、指标接口
 │  ├─ app/models/           六类统一数据对象
 │  ├─ app/services/         模拟 Agent、执行器、判定器、种子数据
-│  └─ tests/                API 冒烟测试
+│  ├─ migrations/           Alembic 数据库迁移
+│  └─ tests/                API、安全与持久化测试
 ├─ frontend-apple/          React + TypeScript + MSW + 苹果毛玻璃桌面端
 ├─ docker-compose.yml       一键启动开发环境
 └─ .env.example
@@ -51,6 +52,10 @@ npm run dev
 访问 <http://127.0.0.1:5173>。默认 `VITE_USE_MOCK=true`，不要求后端启动；API 模式设置
 `VITE_USE_MOCK=false`，Vite 会把 `/api` 代理到 `http://127.0.0.1:8000`。Mock 与真实后端统一使用
 `/api/v2` 契约。
+
+真实 API 模式下，公开读接口可直接访问；创建任务、生成用例、授权登记等写操作默认需要
+`AGENTGUARD_WRITE_TOKEN`。在设置页输入操作员令牌后，令牌只保存在当前浏览器会话。
+本地测试可显式设置 `AGENTGUARD_ALLOW_ANONYMOUS_WRITES=true`，生产环境禁止开启。
 
 当前路由：`/overview`、`/agents`、`/test-suites`、`/runs`、`/runs/:id`、`/findings`、`/reports`、`/settings`。
 

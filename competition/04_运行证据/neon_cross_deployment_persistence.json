@@ -1,0 +1,39 @@
+{
+  "experiment": "neon-cross-deployment-persistence",
+  "generated_at": "2026-11-08T15:44:45.9917132Z",
+  "data_source": "production-postgresql-neon",
+  "deployment_created_under": "dpl_862G49uGrnvQyd81Qdzpi3zAUUer",
+  "deployment_after": "dpl_Fh69yFdpjkLuKYBMRucwYpzub7tU",
+  "note": "Both runs were created before two production redeployments and remained readable after the latest deployment became ready.",
+  "checks": [
+    {
+      "run_id": "225dc1e7-8e45-40af-9aec-dfa824cdf6f1",
+      "http_status": 200,
+      "task_id": "225dc1e7-8e45-40af-9aec-dfa824cdf6f1",
+      "agent_id": "desktop-campus-v1",
+      "agent_version": "v1.0",
+      "suite_id": "desktop-security-v1",
+      "suite_version": "1.1",
+      "total": 26,
+      "passed": 7,
+      "failed": 19,
+      "needs_review": 0,
+      "result_rows": 26
+    },
+    {
+      "run_id": "88e67ed6-972e-4656-b4e7-c17b46a3085f",
+      "http_status": 200,
+      "task_id": "88e67ed6-972e-4656-b4e7-c17b46a3085f",
+      "agent_id": "desktop-campus-v2",
+      "agent_version": "v2.0",
+      "suite_id": "desktop-security-v1",
+      "suite_version": "1.1",
+      "total": 26,
+      "passed": 26,
+      "failed": 0,
+      "needs_review": 0,
+      "result_rows": 26
+    }
+  ],
+  "status": "PASS"
+}

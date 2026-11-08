@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>AgentGuard 实验分析报告</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+<style>
+body { font-family: "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; color:#17364a; line-height:1.72; max-width:900px; margin:36px auto; padding:0 28px; }
+h1 { color:#102a3d; border-bottom:3px solid #27657a; padding-bottom:12px; line-height:1.25; }
+h2 { color:#27657a; margin-top:30px; break-after:avoid; }
+h3 { color:#355f70; break-after:avoid; }
+p, li { orphans:3; widows:3; }
+table { border-collapse:collapse; width:100%; margin:18px 0; break-inside:avoid; }
+th,td { border:1px solid #cfdde5; padding:8px 10px; text-align:left; vertical-align:top; }
+th { background:#eaf4f2; }
+code { background:#f1f5f7; padding:2px 5px; border-radius:4px; overflow-wrap:anywhere; }
+pre { background:#f1f5f7; padding:14px; border-radius:8px; overflow:auto; white-space:pre-wrap; }
+blockquote { border-left:4px solid #8ab6c4; margin-left:0; padding-left:16px; color:#55758f; }
+@page { size:A4; margin:15mm 16mm; }
+@media print { body { max-width:none; margin:0; padding:0; } a { color:#27657a; } }
+</style>
+</head>
+<body>
+<h1 id="agentguard-智盾实验分析报告">AgentGuard 智盾实验分析报告</h1>
+<h2
+id="实验一确定性校园靶场前后版本对照生产复验">实验一：确定性校园靶场前后版本对照（生产复验）</h2>
+<ul>
+<li>数据类型：确定性校园 Agent 的真实执行结果。</li>
+<li>运行环境：Vercel FastAPI 生产部署 + Neon PostgreSQL。</li>
+<li>测试集：<code>desktop-security-v1</code>，26 条，套件版本 1.1。</li>
+<li>运行方式：通过生产 <code>/api/v2/runs</code>
+创建任务，再读取持久化逐用例结果。</li>
+<li>数据来源：<code>deterministic-production-campus-agent</code>。</li>
+</ul>
+<table>
+<colgroup>
+<col style="width: 13%" />
+<col style="width: 18%" />
+<col style="width: 18%" />
+<col style="width: 18%" />
+<col style="width: 18%" />
+<col style="width: 13%" />
+</colgroup>
+<thead>
+<tr>
+<th>版本</th>
+<th style="text-align: right;">通过</th>
+<th style="text-align: right;">失败</th>
+<th style="text-align: right;">待复核</th>
+<th style="text-align: right;">通过率</th>
+<th>生产 Run ID</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>V1.0 缺陷版</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">19</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">26.9%</td>
+<td><code>225dc1e7-8e45-40af-9aec-dfa824cdf6f1</code></td>
+</tr>
+<tr>
+<td>V2.0 修复版</td>
+<td style="text-align: right;">26</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">100.0%</td>
+<td><code>88e67ed6-972e-4656-b4e7-c17b46a3085f</code></td>
+</tr>
+</tbody>
+</table>
+<p>结论：修复后同一测试集通过数从 7/26 提升到 26/26，共保存 52
+条逐用例结果。所有判定来源均为固定规则，未使用真实大模型。</p>
+<h2 id="实验二ai-生成用例与混合判定">实验二：AI 生成用例与混合判定</h2>
+<ul>
+<li>代码路径已实现：<code>llm_provider.py</code>、<code>/api/v2/test-suites/generate</code>。</li>
+<li>真实模型调用状态：<code>BLOCKED</code>。</li>
+<li>原因：缺少模型地址、模型名和服务端 API Key。</li>
+<li>当前只能证明规则模板与人工审核契约可运行，不能证明真实模型生成效果。</li>
+</ul>
+<h2 id="实验三攻击链证据定位">实验三：攻击链证据定位</h2>
+<ul>
+<li>生产复验生成 19 条 Finding，节点包含 input、behavior、impact 和
+fix。</li>
+<li>每个节点保存
+<code>run_id</code>、<code>case_id</code>、<code>trace_event_ids</code>、basis、confidence
+和人工复核状态。</li>
+<li>前端已实际展示缺陷列表和 Evidence Flow。</li>
+<li>真实 Dify
+风险实验：<code>NOT_RUN</code>；不得把本地确定性靶场结果当作 Dify
+结果。</li>
+</ul>
+<h2 id="实验四真实-dify-修复回归">实验四：真实 Dify 修复回归</h2>
+<ul>
+<li>环境依赖：授权 Dify 地址、API Key、知识库和工作流导出。</li>
+<li>当前状态：<code>BLOCKED</code>。</li>
+<li>不得用确定性靶场结果代替真实 Dify 结果。</li>
+</ul>
+<h2 id="实验五postgresql-跨部署持久化">实验五：PostgreSQL
+跨部署持久化</h2>
+<ul>
+<li>生产数据库：Neon PostgreSQL，Alembic 当前版本
+<code>0001_initial (head)</code>。</li>
+<li>两个 Run ID 在创建后经历两次生产重新部署，仍通过
+<code>/api/v2/runs/{id}</code> 返回 200。</li>
+<li>证据文件：<code>04_运行证据/neon_cross_deployment_persistence.json</code>、<code>neon_alembic.json</code>。</li>
+<li>结论：<code>PASS</code>。这证明线上记录不是 Vercel <code>/tmp</code>
+SQLite 的临时数据。</li>
+</ul>
+</body>
+</html>

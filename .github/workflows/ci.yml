@@ -37,6 +37,45 @@ jobs:
         working-directory: backend
         run: pytest -q
 
+  postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: agentguard
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d agentguard"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      AGENTGUARD_DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/agentguard
+      AGENTGUARD_DB_AUTO_CREATE: "false"
+      AGENTGUARD_ENVIRONMENT: test
+      AGENTGUARD_ALLOW_ANONYMOUS_WRITES: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install backend
+        working-directory: backend
+        run: pip install -e . pytest
+      - name: Run migrations
+        working-directory: backend
+        run: alembic upgrade head
+      - name: Verify persistence across sessions
+        working-directory: backend
+        run: python scripts/verify_persistence.py
+      - name: Backend tests on PostgreSQL
+        working-directory: backend
+        run: pytest -q
+
   frontend:
     runs-on: ubuntu-latest
     steps:

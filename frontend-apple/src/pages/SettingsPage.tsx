@@ -1,12 +1,14 @@
+import { useState } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
 import {
   CheckCircle,
   CloudSlash,
+  Key,
   ShieldCheck,
   SlidersHorizontal,
   SquaresFour,
 } from '@phosphor-icons/react'
-import { API_PREFIX, USE_MOCK } from '@/api/client'
+import { API_PREFIX, USE_MOCK, getControlKey, setControlKey } from '@/api/client'
 import { MotionSurface } from '@/components/MotionSurface'
 
 const preferences = [
@@ -34,6 +36,20 @@ const preferences = [
 
 export default function SettingsPage() {
   const reduce = useReducedMotion()
+  const [controlKey, setControlKeyValue] = useState(getControlKey)
+  const [keySaved, setKeySaved] = useState(false)
+
+  function saveControlKey() {
+    setControlKey(controlKey)
+    setKeySaved(true)
+  }
+
+  function clearControlKey() {
+    setControlKey('')
+    setControlKeyValue('')
+    setKeySaved(false)
+  }
+
   return (
     <div className="settings-page" data-testid="settings-page">
       <header className="page-head">
@@ -55,6 +71,38 @@ export default function SettingsPage() {
           <span><small>外部目标</small><strong>不可访问</strong></span>
         </div>
       </MotionSurface>
+
+      {!USE_MOCK && (
+        <section className="panel write-access-panel" data-testid="write-access-panel">
+          <div className="panel-head">
+            <div>
+              <span className="eyebrow">受控操作</span>
+              <h2>写操作令牌</h2>
+            </div>
+            <span className="setting-status">{keySaved ? '当前会话已授权' : '只读优先'}</span>
+          </div>
+          <p className="write-access-copy">
+            阅读和报告始终公开。创建任务、生成用例和修改授权等写操作需要服务端配置的令牌，令牌只保存在当前浏览器会话中。
+          </p>
+          <div className="write-access-form">
+            <label htmlFor="control-key">操作员令牌</label>
+            <div className="write-access-input">
+              <Key size={18} weight="duotone" />
+              <input
+                id="control-key"
+                type="password"
+                autoComplete="off"
+                value={controlKey}
+                onChange={(event) => { setControlKeyValue(event.target.value); setKeySaved(false) }}
+                placeholder="输入 Vercel 环境变量中的受控令牌"
+              />
+            </div>
+            <button className="btn btn-primary" type="button" onClick={saveControlKey} disabled={!controlKey.trim()}>保存令牌</button>
+            <button className="btn" type="button" onClick={clearControlKey}>清除</button>
+          </div>
+          {keySaved && <p className="write-access-note" role="status">令牌已保存到当前浏览器会话，可用于受控测试。</p>}
+        </section>
+      )}
 
       <div className="settings-layout">
         <section className="panel settings-options">

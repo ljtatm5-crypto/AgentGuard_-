@@ -8,6 +8,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.db.session import acquire_bootstrap_lock
 from app.models.entities import Agent, Finding, TestCase, TestRun, TestSuite, TraceEvent
 
 FINAL_STATUSES = {"passed", "failed", "needs_review"}
@@ -36,6 +37,7 @@ def risk_tag(value: str) -> str:
 
 def ensure_desktop_data(db: Session) -> None:
     """Seed assets and reviewed rules only. Never manufacture executions or metrics."""
+    acquire_bootstrap_lock(db)
     from app.security.policy import default_permissions
     from app.security.samples import build_samples
 

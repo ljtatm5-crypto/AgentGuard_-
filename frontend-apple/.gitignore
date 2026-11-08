@@ -12,3 +12,4 @@ playwright/.cache
 *.log
 
 .vercel
+.env*
