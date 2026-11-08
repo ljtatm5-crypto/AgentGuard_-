@@ -1,11 +1,11 @@
 {
-  "generated_at": "2026-11-08T15:48:18.806Z",
+  "generated_at": "2026-11-08T16:15:03.082Z",
   "root": "competition/04_运行证据",
   "files": [
     {
       "path": "页面截图\\生产环境报告.png",
-      "bytes": 669223,
-      "sha256": "6e07d6d50888eaa78f6b214fd083e9dddd149835e40c15fc62d91f674979fbce"
+      "bytes": 669196,
+      "sha256": "a402b34f65bb451a200933bbd00cd6f75b835d9420bd6679b7b6e3b5c13031d9"
     },
     {
       "path": "页面截图\\生产环境测试集.png",
@@ -39,43 +39,43 @@
     },
     {
       "path": "campus_baseline.csv",
-      "bytes": 7364,
-      "sha256": "5243c7b582c14dc7864544204874670cf875e4bf6794bb06fe24781f679961eb"
+      "bytes": 7311,
+      "sha256": "3ac24d107604dc0fd3683eb0a515375606c6849988f5ed8ea5557a78febb9c81"
     },
     {
       "path": "campus_baseline.json",
-      "bytes": 16696,
-      "sha256": "cd6d5e9d540719d5c881d17a775bfeab1a95c5c572b03b03b039a9da587fed86"
+      "bytes": 16196,
+      "sha256": "66cfcc6c4ea3e5ad006bc03652becd8d10e4f97d28be7454bc23986359b8099e"
     },
     {
       "path": "campus_production_baseline.csv",
-      "bytes": 7364,
-      "sha256": "3fb9e17bd60c106d011e3086c73a5d580896336b02cd7bb99d2278bfda3d7440"
+      "bytes": 7311,
+      "sha256": "0a5d4ffdf48da15a46940c5260c698c6cafdf54409028856446cf5441b07385a"
     },
     {
       "path": "campus_production_baseline.json",
-      "bytes": 16764,
-      "sha256": "7cfe4715d210b6927f3951378df407fa384169c8da8ea88ae3419d528e37069c"
+      "bytes": 16263,
+      "sha256": "de5419888a0dbf1c8dbc774fa042daba409c070af0e8ad7d3084ef1e87a13475"
     },
     {
       "path": "live_frontend_verification.json",
       "bytes": 1483,
-      "sha256": "8bde4b6e252f9eba725e061de810a52eca89e63aff384e5d714c63754455c98a"
+      "sha256": "7045bc4c43f6ddc26eb74251f06dc5244dbf61e0b401e2cc779c5f4360ff5220"
     },
     {
       "path": "neon_alembic.json",
-      "bytes": 397,
-      "sha256": "c9db1e12d51d911847aa643e753492a661590b181dfabb401ee851d6f7bc649c"
+      "bytes": 388,
+      "sha256": "05c5149915ece9ed4a4855b7373c3eecdb245507b7ea41ca615371bd1f278848"
     },
     {
       "path": "neon_cross_deployment_persistence.json",
-      "bytes": 1290,
-      "sha256": "938318f24e6f9d97ba8a0d6f5b3e2a8a4b4bfe552ca711c277ae0a0061134236"
+      "bytes": 1306,
+      "sha256": "a03da86fca423eff9e5697489a4a96f793b1cddba8fdb370e8cd9b4045998c56"
     },
     {
       "path": "README.md",
       "bytes": 1484,
-      "sha256": "bb67dc1d0b9b1159ac49606a4285ce45887f770c1c185aa1c8d59d8024f43aea"
+      "sha256": "e5831282f85162e1195a38cccea94c7990699ba7822f5aaacd05b1291629e487"
     }
   ]
 }
