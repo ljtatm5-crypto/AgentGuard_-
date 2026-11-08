@@ -20,7 +20,7 @@
 | 公开写接口控制 | PASS | `backend/app/security/access.py` | 配置生产令牌并复查 |
 | 请求限流与审计 | PASS | 写中间件、结构化日志 | 后续迁移到持久化审计表 |
 | 同步任务规模上限 | PASS | `AGENTGUARD_MAX_CASES_PER_RUN` | 真实模型需异步 Worker |
-| PostgreSQL 持久化 | BLOCKED | 当前 Vercel 使用 `/tmp` SQLite | 接 Neon，补 Alembic 迁移 |
+| PostgreSQL 持久化 | IN_PROGRESS | 已支持 psycopg、连接池、Alembic 与 CI PostgreSQL | 需要 Neon 连接串完成线上切换与跨部署验证 |
 | 异步任务队列 | NOT_RUN | 当前同步执行 | 需持久化 Worker 或托管队列 |
 | 80 条正式测试集 | NOT_RUN | 当前固定 26 条基线 | 建数据集、人工真值与审核状态 |
 | 竞赛材料包 | NOT_RUN | 尚无 `competition/` | 生成文档、CSV、证据清单与脚本 |
@@ -38,8 +38,10 @@
 
 ### 阶段二：PostgreSQL 持久化
 
-- BLOCKED：需要 Neon/PostgreSQL 连接串与数据库迁移环境。
-- 当前 Vercel 后端仍使用 `/tmp` SQLite，冷启动可能丢失运行记录。
+- 已增加 psycopg 3、连接池参数、Alembic 初始迁移与持久化检查脚本。
+- 本地 SQLite 迁移升级/降级和跨 Engine 持久化验证通过。
+- CI 新增 PostgreSQL 16 服务任务，验证迁移和跨会话读取。
+- 真实 Neon 线上切换为 BLOCKED：缺少数据库连接串；当前 Vercel 后端仍使用 `/tmp` SQLite。
 
 ### 阶段三：双实例验证
 
@@ -72,7 +74,7 @@
 
 ## 关键阻塞
 
-1. 缺少 Neon/PostgreSQL 凭据。
+1. 代码已支持 Neon/PostgreSQL，但缺少实际数据库连接串，线上仍使用临时 SQLite。
 2. 缺少真实 Dify 靶场地址、模型和 API Key。
 3. 人工真值与 80 条用例审核不能由 Agent 代为声称。
 4. 异步 Worker 需要额外运行时或队列服务。
