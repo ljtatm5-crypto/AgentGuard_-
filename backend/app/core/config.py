@@ -5,6 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_name: str = "AgentGuard 智测盾"
+    environment: str = "development"
     database_url: str = "sqlite:///./agentguard.db"
     cors_origins: str = "http://localhost:5173"
     demo_mode: bool = True
@@ -14,6 +15,15 @@ class Settings(BaseSettings):
     llm_model: str = ""
     llm_api_key_env: str = ""
     llm_prompt_version: str = "judge-v1"
+    # Public reads stay available, while every mutating request is denied by
+    # default unless an operator token is supplied. Local test/demo runs can
+    # opt into anonymous writes explicitly.
+    allow_anonymous_writes: bool = False
+    write_token: str = ""
+    write_rate_limit_per_minute: int = 30
+    max_request_bytes: int = 1_048_576
+    max_cases_per_run: int = 40
+    audit_log_enabled: bool = True
 
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -52,6 +52,10 @@ npm run dev
 `VITE_USE_MOCK=false`，Vite 会把 `/api` 代理到 `http://127.0.0.1:8000`。Mock 与真实后端统一使用
 `/api/v2` 契约。
 
+真实 API 模式下，公开读接口可直接访问；创建任务、生成用例、授权登记等写操作默认需要
+`AGENTGUARD_WRITE_TOKEN`。在设置页输入操作员令牌后，令牌只保存在当前浏览器会话。
+本地测试可显式设置 `AGENTGUARD_ALLOW_ANONYMOUS_WRITES=true`，生产环境禁止开启。
+
 当前路由：`/overview`、`/agents`、`/test-suites`、`/runs`、`/runs/:id`、`/findings`、`/reports`、`/settings`。
 
 GitHub Pages 演示：<https://ljtatm5-crypto.github.io/AgentGuard_-/>
