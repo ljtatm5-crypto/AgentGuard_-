@@ -33,8 +33,8 @@
 - 后端健康检查：https://agentguard-api-three.vercel.app/healthz
 - API 文档：https://agentguard-api-three.vercel.app/docs
 - Neon 资源：`agentguard-postgres`，免费计划，生产/预览/开发已连接。
-- 前端生产部署：`dpl_Fi3yseLr4hkcxd4WLewfxZjdjgwP`
-- 后端最新生产部署：`dpl_Fh69yFdpjkLuKYBMRucwYpzub7tU`
+- 前端生产部署：`dpl_7mdTp7cjKszp65jyzvUvSTH4p9H6`
+- 后端最新生产部署：`dpl_GtZxasSUkYXvP1iYyhq318zVzQJT`
 - V1.0 生产 Run：`225dc1e7-8e45-40af-9aec-dfa824cdf6f1`（7 通过 / 19 失败）
 - V2.0 生产 Run：`88e67ed6-972e-4656-b4e7-c17b46a3085f`（26 通过 / 0 失败）
 - 跨部署持久化：`competition/04_运行证据/neon_cross_deployment_persistence.json`，`PASS`

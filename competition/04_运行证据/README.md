@@ -5,8 +5,8 @@
 - 前端：https://agent-guard-kohl.vercel.app
 - 后端：https://agentguard-api-three.vercel.app
 - 数据库：Neon PostgreSQL
-- 前端生产部署：`dpl_Fi3yseLr4hkcxd4WLewfxZjdjgwP`
-- 后端生产部署：`dpl_Fh69yFdpjkLuKYBMRucwYpzub7tU`
+- 前端生产部署：`dpl_7mdTp7cjKszp65jyzvUvSTH4p9H6`
+- 后端生产部署：`dpl_GtZxasSUkYXvP1iYyhq318zVzQJT`
 
 ## 文件
 

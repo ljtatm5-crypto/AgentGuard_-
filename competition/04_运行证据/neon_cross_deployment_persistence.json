@@ -1,10 +1,10 @@
 {
   "experiment": "neon-cross-deployment-persistence",
-  "generated_at": "2026-11-08T15:44:45.9917132Z",
+  "generated_at": "2026-11-08T16:14:55.0026059Z",
   "data_source": "production-postgresql-neon",
   "deployment_created_under": "dpl_862G49uGrnvQyd81Qdzpi3zAUUer",
-  "deployment_after": "dpl_Fh69yFdpjkLuKYBMRucwYpzub7tU",
-  "note": "Both runs were created before two production redeployments and remained readable after the latest deployment became ready.",
+  "deployment_after": "dpl_GtZxasSUkYXvP1iYyhq318zVzQJT",
+  "note": "Both runs were created before multiple production redeployments and remained readable after the final main-branch deployment became ready.",
   "checks": [
     {
       "run_id": "225dc1e7-8e45-40af-9aec-dfa824cdf6f1",
