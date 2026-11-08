@@ -29,6 +29,20 @@ WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 audit_logger = logging.getLogger("agentguard.audit")
 
 
+def configure_audit_logger() -> logging.Logger:
+    """Emit structured audit records even when the app runs under uvicorn."""
+    if not audit_logger.handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter("%(message)s"))
+        audit_logger.addHandler(handler)
+    audit_logger.setLevel(logging.INFO)
+    audit_logger.propagate = False
+    return audit_logger
+
+
+configure_audit_logger()
+
+
 @dataclass(frozen=True)
 class Principal:
     subject: str
@@ -69,6 +83,20 @@ def _bearer_token(request: Request) -> str:
     if value.lower().startswith("bearer "):
         return value[7:].strip()
     return request.headers.get("x-agentguard-key", "").strip()
+
+
+async def _read_limited_body(request: Request, max_request_bytes: int) -> bool:
+    """Consume the request body with a hard byte limit and replay it downstream."""
+    total = 0
+    chunks: list[bytes] = []
+    async for chunk in request.stream():
+        total += len(chunk)
+        if total > max_request_bytes:
+            return False
+        chunks.append(chunk)
+    # BaseHTTPMiddleware replays this cached body into the endpoint request.
+    setattr(request, "_body", b"".join(chunks))
+    return True
 
 
 def _principal(request: Request, settings: Settings) -> Principal | None:
@@ -145,6 +173,16 @@ class WriteAccessMiddleware(BaseHTTPMiddleware):
                 {"Retry-After": str(retry_after), "X-Request-ID": request_id},
             )
             self._audit(request_id, request, principal, 429, "rate_limited")
+            return response
+
+        if not await _read_limited_body(request, settings.max_request_bytes):
+            response = _error(
+                413,
+                "request_too_large",
+                "请求体超过允许大小",
+                {"X-Request-ID": request_id},
+            )
+            self._audit(request_id, request, principal, 413, "rejected")
             return response
 
         started = time.perf_counter()

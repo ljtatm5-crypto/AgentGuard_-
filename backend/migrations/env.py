@@ -4,14 +4,14 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from app.core.config import get_settings
-from app.db.session import Base, normalize_database_url
+from app.db.session import Base, escape_alembic_url
 from app.models import entities  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-config.set_main_option("sqlalchemy.url", normalize_database_url(get_settings().database_url))
+config.set_main_option("sqlalchemy.url", escape_alembic_url(get_settings().database_url))
 target_metadata = Base.metadata
 
 

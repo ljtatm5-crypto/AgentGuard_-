@@ -11,6 +11,11 @@ class Base(DeclarativeBase):
     pass
 
 
+def escape_alembic_url(url: str) -> str:
+    """Escape ConfigParser interpolation markers in Alembic URLs."""
+    return normalize_database_url(url).replace("%", "%%")
+
+
 def should_use_managed_pool(environment: str, url: str) -> bool:
     return environment in {"production", "preview"} or "-pooler." in url
 
