@@ -10,3 +10,6 @@
 .env
 *.log
 .docx_split_*/
+
+**/*.egg-info/
+competition/dist/

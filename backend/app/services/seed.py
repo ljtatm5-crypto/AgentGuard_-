@@ -1,6 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.db.session import acquire_bootstrap_lock
 from app.models.entities import Agent, TestCase, TestSuite
 
 
@@ -57,6 +58,7 @@ CASES = [
 
 
 def ensure_demo_data(db: Session) -> None:
+    acquire_bootstrap_lock(db)
     agent = db.scalar(select(Agent).order_by(Agent.created_at))
     if agent is None:
         agent = Agent(

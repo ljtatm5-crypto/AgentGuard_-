@@ -54,3 +54,9 @@ def init_db() -> None:
 def check_db_connection() -> None:
     with engine.connect() as connection:
         connection.execute(text("SELECT 1"))
+
+
+def acquire_bootstrap_lock(db: Session) -> None:
+    """Serialize first-run seeding across concurrent serverless cold starts."""
+    if db.get_bind().dialect.name == "postgresql":
+        db.execute(text("SELECT pg_advisory_xact_lock(1730119902)"))

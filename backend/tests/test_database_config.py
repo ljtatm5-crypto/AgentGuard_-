@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
-from app.db.session import Base, normalize_database_url
+from app.db.session import Base, acquire_bootstrap_lock, normalize_database_url
 from app.models.entities import Agent
 
 
@@ -27,3 +27,11 @@ def test_sqlite_records_survive_engine_recreation(tmp_path):
         assert row is not None
         assert row.name == "persisted"
     reopened.dispose()
+
+def test_bootstrap_lock_is_a_sqlite_noop(tmp_path):
+    engine = create_engine(f"sqlite:///{(tmp_path / 'lock.db').as_posix()}")
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        acquire_bootstrap_lock(session)
+        assert session.scalar(select(1)) == 1
+    engine.dispose()
