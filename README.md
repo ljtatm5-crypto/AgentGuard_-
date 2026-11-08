@@ -14,11 +14,12 @@
 
 ```text
 agentguard/
-├─ backend/                 FastAPI + SQLAlchemy + SQLite
+├─ backend/                 FastAPI + SQLAlchemy + SQLite/PostgreSQL + Alembic
 │  ├─ app/api/              Agent、测试集、运行、指标接口
 │  ├─ app/models/           六类统一数据对象
 │  ├─ app/services/         模拟 Agent、执行器、判定器、种子数据
-│  └─ tests/                API 冒烟测试
+│  ├─ migrations/           Alembic 数据库迁移
+│  └─ tests/                API、安全与持久化测试
 ├─ frontend-apple/          React + TypeScript + MSW + 苹果毛玻璃桌面端
 ├─ docker-compose.yml       一键启动开发环境
 └─ .env.example

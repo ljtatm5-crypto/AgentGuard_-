@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     max_request_bytes: int = 1_048_576
     max_cases_per_run: int = 40
     audit_log_enabled: bool = True
+    db_auto_create: bool = True
+    db_pool_size: int = 5
+    db_max_overflow: int = 5
+    db_pool_recycle_seconds: int = 300
 
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import agents, authorizations, desktop, findings, metrics, runs, suites
 from app.core.config import get_settings
-from app.db.session import SessionLocal, init_db
+from app.db.session import SessionLocal, check_db_connection, init_db
 from app.security.access import WriteAccessMiddleware
 from app.services.seed import ensure_demo_data
 from app.services.desktop_contract import ensure_desktop_data
@@ -15,7 +15,9 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    init_db()
+    check_db_connection()
+    if settings.db_auto_create:
+        init_db()
     db = SessionLocal()
     try:
         ensure_demo_data(db)
@@ -64,6 +66,8 @@ def capabilities():
         "max_cases_per_run": settings.max_cases_per_run,
         "async_tasks": False,
         "database": "postgresql" if settings.database_url.startswith(("postgresql", "postgres")) else "sqlite",
+        "migrations": "alembic",
+        "auto_create_schema": settings.db_auto_create,
     }
 
 
