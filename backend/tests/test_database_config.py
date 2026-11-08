@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
-from app.db.session import Base, acquire_bootstrap_lock, normalize_database_url
+from app.db.session import Base, acquire_bootstrap_lock, normalize_database_url, should_use_managed_pool
 from app.models.entities import Agent
 
 
@@ -35,3 +35,8 @@ def test_bootstrap_lock_is_a_sqlite_noop(tmp_path):
         acquire_bootstrap_lock(session)
         assert session.scalar(select(1)) == 1
     engine.dispose()
+
+def test_managed_neon_pool_uses_null_pool_mode():
+    assert should_use_managed_pool("production", "postgresql+psycopg://u:p@direct.example/db")
+    assert should_use_managed_pool("test", "postgresql+psycopg://u:p@db.example-pooler.example/db")
+    assert not should_use_managed_pool("test", "postgresql+psycopg://u:p@direct.example/db")
