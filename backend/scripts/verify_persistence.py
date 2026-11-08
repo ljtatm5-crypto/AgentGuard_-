@@ -10,7 +10,7 @@ from app.models.entities import Agent
 
 def main() -> None:
     check_db_connection()
-    agent_id = f"persistence-check-{uuid4()}"
+    agent_id = uuid4().hex
     with SessionLocal() as db:
         db.add(Agent(id=agent_id, name="persistence-check", adapter="mock"))
         db.commit()
