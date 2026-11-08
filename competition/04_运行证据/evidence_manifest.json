@@ -1,0 +1,81 @@
+{
+  "generated_at": "2026-11-08T15:48:18.806Z",
+  "root": "competition/04_运行证据",
+  "files": [
+    {
+      "path": "页面截图\\生产环境报告.png",
+      "bytes": 669223,
+      "sha256": "6e07d6d50888eaa78f6b214fd083e9dddd149835e40c15fc62d91f674979fbce"
+    },
+    {
+      "path": "页面截图\\生产环境测试集.png",
+      "bytes": 701249,
+      "sha256": "d7efae4c28a9faa02934e4cea84769c5d036328f811ef800db2e0b8311626b8f"
+    },
+    {
+      "path": "页面截图\\生产环境缺陷证据.png",
+      "bytes": 690377,
+      "sha256": "474deb356b70542f1cd1c70d3444e386f479baedd4c197023e59f910d3b21893"
+    },
+    {
+      "path": "页面截图\\生产环境设置.png",
+      "bytes": 841030,
+      "sha256": "975c1393a7a8a8e9ccf045afac2e7f9098ba2f6bab1a0bc14992bc8f32b6d4b8"
+    },
+    {
+      "path": "页面截图\\生产环境运行记录.png",
+      "bytes": 730454,
+      "sha256": "a558876e3ef539e61a4974a64c1cbfbece64064aea45e4f8250241857adffbc4"
+    },
+    {
+      "path": "页面截图\\生产环境智能体.png",
+      "bytes": 735929,
+      "sha256": "54b2276e1e3e8f6675be197eaabc386af60c565ea8bd80506641d870bd3a29e0"
+    },
+    {
+      "path": "页面截图\\生产环境总览.png",
+      "bytes": 856171,
+      "sha256": "a4c2907faf108fd1c129410fcfa3408754f530d80230083767dad26a4653d342"
+    },
+    {
+      "path": "campus_baseline.csv",
+      "bytes": 7364,
+      "sha256": "5243c7b582c14dc7864544204874670cf875e4bf6794bb06fe24781f679961eb"
+    },
+    {
+      "path": "campus_baseline.json",
+      "bytes": 16696,
+      "sha256": "cd6d5e9d540719d5c881d17a775bfeab1a95c5c572b03b03b039a9da587fed86"
+    },
+    {
+      "path": "campus_production_baseline.csv",
+      "bytes": 7364,
+      "sha256": "3fb9e17bd60c106d011e3086c73a5d580896336b02cd7bb99d2278bfda3d7440"
+    },
+    {
+      "path": "campus_production_baseline.json",
+      "bytes": 16764,
+      "sha256": "7cfe4715d210b6927f3951378df407fa384169c8da8ea88ae3419d528e37069c"
+    },
+    {
+      "path": "live_frontend_verification.json",
+      "bytes": 1483,
+      "sha256": "8bde4b6e252f9eba725e061de810a52eca89e63aff384e5d714c63754455c98a"
+    },
+    {
+      "path": "neon_alembic.json",
+      "bytes": 397,
+      "sha256": "c9db1e12d51d911847aa643e753492a661590b181dfabb401ee851d6f7bc649c"
+    },
+    {
+      "path": "neon_cross_deployment_persistence.json",
+      "bytes": 1290,
+      "sha256": "938318f24e6f9d97ba8a0d6f5b3e2a8a4b4bfe552ca711c277ae0a0061134236"
+    },
+    {
+      "path": "README.md",
+      "bytes": 1484,
+      "sha256": "bb67dc1d0b9b1159ac49606a4285ce45887f770c1c185aa1c8d59d8024f43aea"
+    }
+  ]
+}

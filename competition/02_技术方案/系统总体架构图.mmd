@@ -1,0 +1,13 @@
+flowchart LR
+  U[测试人员] --> F[React 工作台]
+  F -->|/api/v2| A[FastAPI]
+  A --> G[目标范围与授权门禁]
+  A --> E[执行器]
+  E --> C[CampusGuard 确定性靶场]
+  E --> D[DifyCampus 真实 Agent]
+  E --> L[OpenAI 兼容模型]
+  A --> J[规则优先 Judge]
+  A --> T[TraceEvent 证据]
+  A --> R[缺陷与攻击链]
+  A --> M[指标与回归]
+  A --> DB[(SQLite/PostgreSQL)]
