@@ -26,6 +26,19 @@ export { ApiRequestError }
 
 export const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false'
 const BASE = (import.meta.env.VITE_API_BASE ?? '').replace(/\/$/, '')
+const CONTROL_KEY_STORAGE = 'agentguard.controlKey'
+
+export function getControlKey(): string {
+  if (typeof window === 'undefined') return ''
+  return window.sessionStorage.getItem(CONTROL_KEY_STORAGE) ?? ''
+}
+
+export function setControlKey(value: string): void {
+  if (typeof window === 'undefined') return
+  const normalized = value.trim()
+  if (normalized) window.sessionStorage.setItem(CONTROL_KEY_STORAGE, normalized)
+  else window.sessionStorage.removeItem(CONTROL_KEY_STORAGE)
+}
 
 /** 重试策略：仅对网络错误与 5xx 重试，4xx 属契约问题不重试 */
 const RETRY_LIMIT = 2
@@ -37,11 +50,21 @@ async function request<T>(path: string, schema: ZodType<T>, init?: RequestInit):
   const url = USE_MOCK ? mockApiPath(path) : `${BASE}${apiPath(path)}`
 
   let lastError: unknown
+  const method = (init?.method ?? 'GET').toUpperCase()
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(init?.headers as Record<string, string> | undefined),
+  }
+  const controlKey = getControlKey()
+  if (!USE_MOCK && !['GET', 'HEAD'].includes(method) && controlKey) {
+    headers.Authorization = `Bearer ${controlKey}`
+  }
+
   for (let attempt = 0; attempt <= RETRY_LIMIT; attempt++) {
     try {
       const res = await fetch(url, {
         ...init,
-        headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
+        headers,
       })
 
       if (!res.ok) {

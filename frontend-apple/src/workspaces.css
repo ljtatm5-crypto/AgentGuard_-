@@ -3108,3 +3108,77 @@
     margin-left: 0;
   }
 }
+
+.write-access-panel {
+  margin-bottom: 18px;
+}
+
+.write-access-copy {
+  max-width: 78ch;
+  margin: 0 0 16px;
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.write-access-form {
+  display: grid;
+  grid-template-columns: auto minmax(220px, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.write-access-form > label {
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.write-access-input {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong, var(--border));
+  border-radius: 11px;
+  background: var(--solid);
+  color: var(--text-2);
+}
+
+.write-access-input:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.write-access-input input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.write-access-note {
+  margin: 12px 0 0;
+  color: var(--success);
+  font-size: 12px;
+}
+
+@media (max-width: 767px) {
+  .write-access-form {
+    grid-template-columns: 1fr;
+  }
+
+  .write-access-form > label {
+    margin-bottom: -2px;
+  }
+
+  .write-access-form .btn {
+    width: 100%;
+  }
+}

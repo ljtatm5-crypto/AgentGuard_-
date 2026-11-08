@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.db.session import get_db
 from app.models.entities import Agent, Finding, TestCase, TestRun, TestSuite, TraceEvent
 from app.services.desktop_contract import (
@@ -503,6 +504,14 @@ def create_run(payload: RunCreate, db: Session = Depends(get_db)):
     selected = suite_cases(db, suite)
     if not selected:
         raise DesktopError(422, "empty_suite", "测试集没有可执行用例")
+    limit = get_settings().max_cases_per_run
+    if len(selected) > limit:
+        raise DesktopError(
+            422,
+            "run_too_large",
+            f"当前同步执行上限为 {limit} 条用例，请拆分测试集或配置异步 Worker",
+            {"requested": len(selected), "limit": limit},
+        )
     task_id = str(uuid4())
     rows = []
     try:
