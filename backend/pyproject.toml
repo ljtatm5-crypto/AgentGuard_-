@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "agentguard-backend"
 version = "0.1.0"
@@ -23,3 +27,8 @@ dev = [
 testpaths = ["tests"]
 addopts = "-q"
 pythonpath = ["."]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]
+exclude = ["tests*", "migrations*", "scripts*"]
