@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-09T07:47:14.095Z",
+  "generated_at": "2026-11-09T07:51:21.036Z",
   "root": "competition/04_运行证据",
   "files": [
     {
@@ -59,8 +59,8 @@
     },
     {
       "path": "ground_truth_metrics_recomputed.json",
-      "bytes": 500,
-      "sha256": "8e7d0d13e89e180b2110c618d0caff57d30b49f0a35a6acb790b472937dad1ad"
+      "bytes": 478,
+      "sha256": "1642e2710c6a0ca52dc3aa3eb78dcedf7c0984da119211bc2120d51109de6814"
     },
     {
       "path": "live_frontend_verification.json",
@@ -69,8 +69,8 @@
     },
     {
       "path": "neon_alembic.json",
-      "bytes": 656,
-      "sha256": "9cea310d352468060ee3ad49c602dcf8c42ff768a4c6fad0b03b6c445928b13d"
+      "bytes": 643,
+      "sha256": "9410bc0a52dec65f04abca06721fc33652caeb9946c274e6f55fb712762b8d6d"
     },
     {
       "path": "neon_cross_deployment_persistence.json",
@@ -79,8 +79,8 @@
     },
     {
       "path": "production_access_control_verification.json",
-      "bytes": 1907,
-      "sha256": "d3c180ef736175c1fc869bf2c55c865250744fdd73ff0adb9550b3bcef4a9f1d"
+      "bytes": 1831,
+      "sha256": "f77d6776306c93339ee17608ffa576b7b2a0445b5262e311594737e70eef0041"
     },
     {
       "path": "README.md",
