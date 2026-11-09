@@ -1,41 +1,41 @@
 {
-  "generated_at": "2026-11-08T16:15:03.082Z",
+  "generated_at": "2026-11-09T07:47:14.095Z",
   "root": "competition/04_运行证据",
   "files": [
     {
       "path": "页面截图\\生产环境报告.png",
-      "bytes": 669196,
-      "sha256": "a402b34f65bb451a200933bbd00cd6f75b835d9420bd6679b7b6e3b5c13031d9"
+      "bytes": 694363,
+      "sha256": "69d9064a64f12f7669bcaadc8b1b527212eadd2746e69a877f5a06260c0fe408"
     },
     {
       "path": "页面截图\\生产环境测试集.png",
-      "bytes": 701249,
-      "sha256": "d7efae4c28a9faa02934e4cea84769c5d036328f811ef800db2e0b8311626b8f"
+      "bytes": 676740,
+      "sha256": "125b445f2e7c9211cc2c1500acf2e664513fce6a11361a8ed1a493451be4f05a"
     },
     {
       "path": "页面截图\\生产环境缺陷证据.png",
-      "bytes": 690377,
-      "sha256": "474deb356b70542f1cd1c70d3444e386f479baedd4c197023e59f910d3b21893"
+      "bytes": 690954,
+      "sha256": "edadfa46fafbc7956cd0fafe2c6f05960b414e5512c91dd2eb7c0e073f69c728"
     },
     {
       "path": "页面截图\\生产环境设置.png",
-      "bytes": 841030,
-      "sha256": "975c1393a7a8a8e9ccf045afac2e7f9098ba2f6bab1a0bc14992bc8f32b6d4b8"
+      "bytes": 851683,
+      "sha256": "1f9a15e6e27a596758235539221b974b2bb7e9ad1278bb3ec0af735066a7d427"
     },
     {
       "path": "页面截图\\生产环境运行记录.png",
-      "bytes": 730454,
-      "sha256": "a558876e3ef539e61a4974a64c1cbfbece64064aea45e4f8250241857adffbc4"
+      "bytes": 730778,
+      "sha256": "3525f4b54ba89d6562f8f46c3edcc127e4e1fb1161ea771e29d1d33d1242f98f"
     },
     {
       "path": "页面截图\\生产环境智能体.png",
-      "bytes": 735929,
-      "sha256": "54b2276e1e3e8f6675be197eaabc386af60c565ea8bd80506641d870bd3a29e0"
+      "bytes": 712486,
+      "sha256": "5790b009b7802e182d08cb51526ca6528867e987f8be30245b53060cfa9dcadd"
     },
     {
       "path": "页面截图\\生产环境总览.png",
-      "bytes": 856171,
-      "sha256": "a4c2907faf108fd1c129410fcfa3408754f530d80230083767dad26a4653d342"
+      "bytes": 856546,
+      "sha256": "b09fd15dbcd64081d3293e8530db1ffd64822c085ce670ee34c15cd0719772d9"
     },
     {
       "path": "campus_baseline.csv",
@@ -58,24 +58,34 @@
       "sha256": "de5419888a0dbf1c8dbc774fa042daba409c070af0e8ad7d3084ef1e87a13475"
     },
     {
+      "path": "ground_truth_metrics_recomputed.json",
+      "bytes": 500,
+      "sha256": "8e7d0d13e89e180b2110c618d0caff57d30b49f0a35a6acb790b472937dad1ad"
+    },
+    {
       "path": "live_frontend_verification.json",
-      "bytes": 1483,
-      "sha256": "7045bc4c43f6ddc26eb74251f06dc5244dbf61e0b401e2cc779c5f4360ff5220"
+      "bytes": 1482,
+      "sha256": "7c92deae509b6f2fda76081ce57dc7e3810879d2b39fe8902e6bbe5af163c7a5"
     },
     {
       "path": "neon_alembic.json",
-      "bytes": 388,
-      "sha256": "05c5149915ece9ed4a4855b7373c3eecdb245507b7ea41ca615371bd1f278848"
+      "bytes": 656,
+      "sha256": "9cea310d352468060ee3ad49c602dcf8c42ff768a4c6fad0b03b6c445928b13d"
     },
     {
       "path": "neon_cross_deployment_persistence.json",
-      "bytes": 1306,
-      "sha256": "a03da86fca423eff9e5697489a4a96f793b1cddba8fdb370e8cd9b4045998c56"
+      "bytes": 1267,
+      "sha256": "04828e36d61dccb870c2678fb5f19051acab5af14986a3fd06a8470431167a76"
+    },
+    {
+      "path": "production_access_control_verification.json",
+      "bytes": 1907,
+      "sha256": "d3c180ef736175c1fc869bf2c55c865250744fdd73ff0adb9550b3bcef4a9f1d"
     },
     {
       "path": "README.md",
-      "bytes": 1484,
-      "sha256": "e5831282f85162e1195a38cccea94c7990699ba7822f5aaacd05b1291629e487"
+      "bytes": 1645,
+      "sha256": "5881ddb39b55229a67ad0d926b22cdd7704bff615ed734c22669986aa75fe8c0"
     }
   ]
 }

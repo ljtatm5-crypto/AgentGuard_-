@@ -5,16 +5,17 @@
 - 前端：https://agent-guard-kohl.vercel.app
 - 后端：https://agentguard-api-three.vercel.app
 - 数据库：Neon PostgreSQL
-- 前端生产部署：`dpl_7mdTp7cjKszp65jyzvUvSTH4p9H6`
-- 后端生产部署：`dpl_GtZxasSUkYXvP1iYyhq318zVzQJT`
+- 前端生产部署：`dpl_9GXWdxMRNAkWRQ2iH7uxQsL2w2bE`
+- 后端生产部署：`dpl_AS2mQGA6wwy1xxZCjQA69GQkRaeK`
 
 ## 文件
 
 - `campus_baseline.json/csv`：本地确定性靶场 V1.0/V2.0 复现结果。
 - `campus_production_baseline.json/csv`：Vercel + Neon PostgreSQL 生产复验结果，52 条逐用例记录。
 - `neon_cross_deployment_persistence.json`：两个生产 Run 在两次重新部署后仍返回 200。
-- `neon_alembic.json`：线上 Alembic 当前版本 `0001_initial (head)`。
-- `live_frontend_verification.json`：7 个生产主路由的 Playwright 验收结果。
+- `neon_alembic.json`：线上 Alembic 当前版本 `0002_case_ground_truth (head)`。
+- `live_frontend_verification.json`：7 个生产主路由的 Playwright 验收结果，控制台错误为 0。
+- `production_access_control_verification.json`：生产匿名/错误令牌/正确令牌、私有轨迹与正式指标验收。
 - `页面截图/`：生产总览、Agent、测试集、运行记录、攻击链、报告、设置页面。
 - `evidence_manifest.json`：以上文件的 SHA-256 清单。
 
