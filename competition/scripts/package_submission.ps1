@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $outputDir = Join-Path $repo 'competition/dist'
 New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
