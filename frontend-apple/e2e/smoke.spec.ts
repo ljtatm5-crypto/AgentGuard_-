@@ -57,6 +57,13 @@ test('攻击链节点可定位到证据', async ({ page }) => {
   await expect(page.locator('[data-testid="evidence-link"]').first()).toContainText('run-')
 })
 
+test('运行环境标签来自能力接口而非固定本地文案', async ({ page }) => {
+  await page.goto('/overview')
+  const mode = page.getByTestId('runtime-mode-label')
+  await expect(mode).toContainText('Mock 数据模式')
+  await expect(mode).not.toContainText('本地靶场模式')
+})
+
 test('Mock 与真实 API 共用 /api/v2 契约', async ({ page }) => {
   const apiPaths = new Set<string>()
   page.on('request', (request) => {
