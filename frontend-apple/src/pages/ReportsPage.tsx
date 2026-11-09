@@ -38,7 +38,7 @@ export default function ReportsPage() {
         : `本地或开发 API / ${caps.database === 'postgresql' ? 'PostgreSQL' : 'SQLite'}`
     const details: Awaited<ReturnType<typeof api.getRunDetail>>[] = []
     const unavailableRunIds: string[] = []
-    if (USE_MOCK || getControlKey()) {
+    if (USE_MOCK || caps.anonymous_writes || getControlKey()) {
       const runDetails = await Promise.allSettled(currentRuns.map((run) => api.getRunDetail(run.id)))
       runDetails.forEach((result, index) => {
         if (result.status === 'fulfilled') details.push(result.value)
@@ -160,7 +160,7 @@ export default function ReportsPage() {
       <section className="panel">
         <h2>逐用例修复差异</h2>
         <AsyncBoundary state={runs.state} isEmpty={(data) => data.length < 2} onRetry={runs.retry}>
-          {(data) => <RunComparison runs={data} />}
+          {(data) => <RunComparison runs={data} canReadPrivate={USE_MOCK || (capabilities.state.phase === 'ready' && (capabilities.state.data.anonymous_writes || Boolean(getControlKey())))} />}
         </AsyncBoundary>
       </section>
 
@@ -192,7 +192,7 @@ export default function ReportsPage() {
   )
 }
 
-function RunComparison({ runs }: { runs: TestRun[] }) {
+function RunComparison({ runs, canReadPrivate }: { runs: TestRun[]; canReadPrivate: boolean }) {
   const chronological = [...runs].sort((left, right) => left.started_at.localeCompare(right.started_at))
   const [beforeId, setBeforeId] = useState(chronological.at(-2)?.id ?? '')
   const [afterId, setAfterId] = useState(chronological.at(-1)?.id ?? '')
@@ -203,12 +203,11 @@ function RunComparison({ runs }: { runs: TestRun[] }) {
 
   const beforeRun = chronological.find((run) => run.id === beforeId)
   const afterRun = chronological.find((run) => run.id === afterId)
-  const hasPrivateReadAccess = USE_MOCK || Boolean(getControlKey())
   const details = useAsync(
-    () => hasPrivateReadAccess && beforeRun && afterRun
+    () => canReadPrivate && beforeRun && afterRun
       ? Promise.all([api.getRunDetail(beforeRun.id), api.getRunDetail(afterRun.id)])
       : Promise.resolve(null),
-    [beforeRun?.id, afterRun?.id, hasPrivateReadAccess],
+    [beforeRun?.id, afterRun?.id, canReadPrivate],
   )
   const sameSuite = beforeRun && afterRun && beforeRun.suite_id === afterRun.suite_id
 
@@ -230,7 +229,7 @@ function RunComparison({ runs }: { runs: TestRun[] }) {
         </label>
       </div>
       {!sameSuite && <p className="form-error" role="alert">两次运行必须使用同一测试集才能做逐用例对比。</p>}
-      {!hasPrivateReadAccess && (
+      {!canReadPrivate && (
         <p className="muted small" role="status">
           逐用例详情属于私有运行证据。请在设置页输入操作员令牌后刷新本页；当前仅展示公开摘要。
         </p>
