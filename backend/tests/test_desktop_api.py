@@ -156,7 +156,7 @@ def test_run_batches_persist_completed_cases_before_later_failure(desktop, monke
     def flaky_commit():
         nonlocal commits
         commits += 1
-        if commits == 2:
+        if commits == 3:
             raise RuntimeError("simulated batch persistence failure")
         return original_commit()
 
@@ -167,8 +167,17 @@ def test_run_batches_persist_completed_cases_before_later_failure(desktop, monke
             "suite_id": SEED_SUITE_ID,
         })
     monkeypatch.setattr(db, "commit", original_commit)
-    persisted = db.scalar(select(func.count()).select_from(RunRecord))
-    assert persisted == 5
+    statuses = db.scalars(select(RunRecord.status)).all()
+    assert len(statuses) == 26
+    assert sum(status in {"passed", "failed", "needs_review"} for status in statuses) == 5
+    assert statuses.count("pending") == 21
+    with TestClient(build_desktop_app(db, allow_anonymous=False, token="operator-secret")) as public:
+        runs = public.get("/api/v2/runs").json()
+    assert len(runs) == 1
+    assert runs[0]["status"] == "pending"
+    assert runs[0]["total"] == 26
+    assert runs[0]["completed"] == 5
+    assert runs[0]["pending"] == 21
 
 
 def test_metrics_use_reviewed_version_specific_ground_truth(desktop):

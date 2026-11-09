@@ -111,6 +111,8 @@ const runSchema = z.object({
   passed: z.number(),
   failed: z.number(),
   needs_review: z.number(),
+  pending: z.number().optional(),
+  running: z.number().optional(),
   latency_ms: z.number(),
   started_at: z.string(),
   finished_at: z.string().nullable(),

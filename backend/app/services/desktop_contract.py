@@ -177,6 +177,7 @@ def run_view(rows: list[TestRun], suite: TestSuite | None) -> dict:
             "suite_id": first.suite_id, "suite_version": (first.result or {}).get("suite_version", suite.version if suite else "unknown"),
             "status": status, "total": len(rows), "completed": sum(counts[s] for s in FINAL_STATUSES),
             "passed": counts["passed"], "failed": counts["failed"], "needs_review": counts["needs_review"],
+            "pending": counts["pending"], "running": counts["running"],
             "latency_ms": sum(row.latency or 0 for row in rows), "started_at": started,
             "finished_at": max(finishes) if status in FINAL_STATUSES else None}
 

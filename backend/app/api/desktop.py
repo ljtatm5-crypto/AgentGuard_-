@@ -522,20 +522,35 @@ def create_run(payload: RunCreate, db: Session = Depends(get_db)):
             {"requested": len(selected), "limit": limit},
         )
     task_id = str(uuid4())
-    rows = []
+    # Persist the expected case set before executing anything. If the process
+    # is interrupted, remaining rows stay pending instead of disappearing and
+    # making a truncated run look complete.
+    prepared: list[tuple[TestCase, TestRun, dict[str, Any], str]] = []
+    for case in selected:
+        # Freeze the reviewed input and rules before executing any tools. Rejudging
+        # must never silently adopt an edited test case or a changed ruleset.
+        snapshot = deepcopy({key: getattr(case, key) for key in
+                             ("id", "name", "type", "input", "steps", "expected", "forbidden", "risk_tag", "judge", "ground_truth")})
+        fingerprint = sha256(json.dumps(snapshot, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+        run = TestRun(
+            task_id=task_id,
+            agent_id=asset.id,
+            suite_id=suite.id,
+            case_id=case.id,
+            agent_version=asset.version,
+            status="pending",
+            result={"suite_version": suite.version, "case_snapshot": snapshot, "rules_fingerprint": fingerprint},
+        )
+        db.add(run)
+        prepared.append((case, run, snapshot, fingerprint))
+    rows = [run for _, run, _, _ in prepared]
     try:
-        for case in selected:
-            run = TestRun(task_id=task_id, agent_id=asset.id, suite_id=suite.id, case_id=case.id,
-                          agent_version=asset.version, status="running")
-            db.add(run)
+        db.commit()
+        for index, (case, run, snapshot, fingerprint) in enumerate(prepared, start=1):
+            run.status = "running"
             db.flush()
             session_id = f"{task_id}:{case.id}"
             started = datetime.now(timezone.utc)
-            # Freeze the reviewed input and rules before executing any tools. Rejudging
-            # must never silently adopt an edited test case or a changed ruleset.
-            snapshot = deepcopy({key: getattr(case, key) for key in
-                                 ("id", "name", "type", "input", "steps", "expected", "forbidden", "risk_tag", "judge", "ground_truth")})
-            fingerprint = sha256(json.dumps(snapshot, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
             try:
                 # Only steps with explicit input are executable turns; prose steps are instructions for readers.
                 turns = [step["input"] for step in (case.steps or []) if isinstance(step, dict) and isinstance(step.get("input"), str)]
@@ -579,8 +594,8 @@ def create_run(payload: RunCreate, db: Session = Depends(get_db)):
             finally:
                 if asset.adapter in {"campus", "local"}:
                     release_session(asset.id, session_id)
-            rows.append(run)
-            if len(rows) % max(1, get_settings().run_batch_size) == 0:
+            batch_size = max(1, get_settings().run_batch_size)
+            if index % batch_size == 0:
                 # Persist completed cases incrementally so a later timeout or
                 # process failure cannot erase already-finished evidence.
                 db.commit()

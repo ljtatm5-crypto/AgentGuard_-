@@ -100,6 +100,8 @@ export interface TestRun {
   passed: number
   failed: number
   needs_review: number
+  pending?: number
+  running?: number
   latency_ms: number
   started_at: string
   finished_at: string | null

@@ -24,7 +24,7 @@
 | PostgreSQL 持久化 | PASS | Neon PostgreSQL，Alembic `0001_initial (head)`，跨两次重新部署读取 Run 记录 | 保持数据库备份与迁移策略 |
 | 并发冷启动初始化 | PASS | PostgreSQL 事务级 advisory lock，避免重复播种 | CI 持续覆盖 |
 | 异步任务队列 | NOT_RUN | 当前同步执行 | 需持久化 Worker 或托管队列 |
-| 分批执行持久化 | PASS | 每 5 条提交一次，后续异常不会回滚已提交批次 | 真实模型场景仍需 Worker |
+| 分批执行持久化 | PASS | 执行前持久化全部待执行行，每 5 条提交一次；中断后保持 `pending`，不会伪装成完整成功 | 真实模型场景仍需 Worker |
 | 全局限流 | NOT_RUN | 当前为单实例内存限流 | 生产费用控制需共享限流或队列 |
 | 80 条正式测试集 | IN_PROGRESS | 80 条候选通过结构校验，全部 `pending_human_review`；复核模板已增加审核状态 | 人工审核、冻结数据集 |
 | 风险真值口径 | PASS | 26 条确定性基线使用按 Agent 身份与版本共同绑定的独立审核真值；`risk_tag` 不参与 F1 | 保持审核版本与复算脚本 |
