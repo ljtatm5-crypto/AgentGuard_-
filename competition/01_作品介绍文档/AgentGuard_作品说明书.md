@@ -41,7 +41,7 @@ AgentGuard 智测盾是面向 AI 智能体的质量、安全与行为风险自�
 
 线上只读演示地址：https://agent-guard-kohl.vercel.app
 后端 API：https://agentguard-api-three.vercel.app
-生产数据库：Neon PostgreSQL（Alembic `0001_initial (head)`）
+生产数据库：Neon PostgreSQL（Alembic `0002_case_ground_truth (head)`）
 源码：https://github.com/ljtatm5-crypto/AgentGuard_-
 
 生产写操作需要服务端操作员令牌；在设置页输入令牌后，令牌只保存在当前浏览器会话。

@@ -1,6 +1,6 @@
 # AgentGuard 传智杯冲刺进度
 
-最后更新：2026-11-08
+最后更新：2026-11-09
 
 状态口径：`PASS` 已实际验证；`IN_PROGRESS` 正在实现；`BLOCKED` 缺外部条件；`NOT_RUN` 尚未执行。
 
@@ -18,10 +18,10 @@
 | 攻击链与证据回指 | PASS | 生产复验生成 19 条 Finding，节点保存 run/case/event ids | 补三组真实 Dify 攻击实验 |
 | 报告导出 | PASS | PDF/Markdown/CSV，含数据来源与适用范围 | 保持字段核对 |
 | 公开写接口控制 | PASS | 匿名 POST 401，错误令牌 403，有效令牌通过鉴权 | 操作员令牌已设置为 Vercel Secret |
-| 公开/私有读边界 | PASS | 公开摘要匿名可读；原始轨迹、运行详情、攻击链、授权记录和非演示资产需操作员令牌 | 生产发布后复核 |
+| 公开/私有读边界 | PASS | 生产复验：匿名摘要 200，运行详情/授权记录匿名 401，错误令牌 403，正确令牌 200 | 保持自动化回归 |
 | 请求限流与审计 | PASS | 写中间件、request id、结构化日志 | 后续迁移到持久化审计表 |
 | 同步任务规模上限 | PASS | `AGENTGUARD_MAX_CASES_PER_RUN=40` | 真实模型需异步 Worker |
-| PostgreSQL 持久化 | PASS | Neon PostgreSQL，Alembic `0001_initial (head)`，跨两次重新部署读取 Run 记录 | 保持数据库备份与迁移策略 |
+| PostgreSQL 持久化 | PASS | Neon PostgreSQL，Alembic `0002_case_ground_truth (head)`，跨多次重新部署读取 Run 记录 | 保持数据库备份与迁移策略 |
 | 并发冷启动初始化 | PASS | PostgreSQL 事务级 advisory lock，避免重复播种 | CI 持续覆盖 |
 | 异步任务队列 | NOT_RUN | 当前同步执行 | 需持久化 Worker 或托管队列 |
 | 分批执行持久化 | PASS | 执行前持久化全部待执行行，每 5 条提交一次；中断后保持 `pending`，不会伪装成完整成功 | 真实模型场景仍需 Worker |
@@ -37,12 +37,13 @@
 - 后端健康检查：https://agentguard-api-three.vercel.app/healthz
 - API 文档：https://agentguard-api-three.vercel.app/docs
 - Neon 资源：`agentguard-postgres`，免费计划，生产/预览/开发已连接。
-- 前端生产部署：`dpl_7mdTp7cjKszp65jyzvUvSTH4p9H6`
-- 后端最新生产部署：`dpl_GtZxasSUkYXvP1iYyhq318zVzQJT`
+- 前端生产部署：`dpl_9GXWdxMRNAkWRQ2iH7uxQsL2w2bE`
+- 后端最新生产部署：`dpl_AS2mQGA6wwy1xxZCjQA69GQkRaeK`
 - V1.0 生产 Run：`225dc1e7-8e45-40af-9aec-dfa824cdf6f1`（7 通过 / 19 失败）
 - V2.0 生产 Run：`88e67ed6-972e-4656-b4e7-c17b46a3085f`（26 通过 / 0 失败）
 - 跨部署持久化：`competition/04_运行证据/neon_cross_deployment_persistence.json`，`PASS`
-- Alembic 当前版本：`0001_initial (head)`，证据见 `competition/04_运行证据/neon_alembic.json`
+- Alembic 当前版本：`0002_case_ground_truth (head)`，证据见 `competition/04_运行证据/neon_alembic.json`
+- 生产鉴权与指标：`competition/04_运行证据/production_access_control_verification.json`，`PASS`
 - 前端 7 路由：`/overview`、`/agents`、`/test-suites`、`/runs`、`/findings`、`/reports`、`/settings` 全部 200，控制台错误 0，截图见 `competition/04_运行证据/页面截图/`。
 
 ## 阶段记录
@@ -58,7 +59,7 @@
 ### 阶段二：PostgreSQL 持久化
 
 - 已支持 psycopg 3、Alembic 初始迁移和跨会话持久化检查。
-- 线上 Neon PostgreSQL 已建表，Alembic 当前为 `0001_initial (head)`。
+- 线上 Neon PostgreSQL 已建表，Alembic 当前为 `0002_case_ground_truth (head)`。
 - 生产环境使用 Neon 外部连接池 + SQLAlchemy `NullPool`，避免 Vercel 冷启动复用已关闭的 TLS 连接。
 - 两个生产 Run 记录在两次重新部署后仍可读取，跨部署持久化为 `PASS`。
 
