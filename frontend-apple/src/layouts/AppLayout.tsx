@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { NavLink, useLocation, useNavigate, useOutlet } from 'react-router-dom'
 import { AnimatePresence, motion, MotionConfig, useReducedMotion } from 'motion/react'
 import { SquaresFour, Stack, PlayCircle, CirclesThreePlus, ChartPieSlice, Graph, GearSix, MagnifyingGlass, CaretRight, Sun, Moon, Command, X, ArrowUpRight, CheckCircle } from '@phosphor-icons/react'
-import { USE_MOCK } from '@/api/client'
+import { api, USE_MOCK } from '@/api/client'
+import { useAsync } from '@/hooks/useAsync'
 
 const NAV = [
   { to: '/overview', label: '总览', shortLabel: '总览', icon: SquaresFour, hint: '查看测试进展' },
@@ -19,6 +20,18 @@ export default function AppLayout() {
   const navigate = useNavigate()
   const outlet = useOutlet()
   const reduce = useReducedMotion()
+  const capabilities = useAsync(() => api.getCapabilities(), [])
+  const caps = capabilities.state.phase === 'ready' ? capabilities.state.data : null
+  const runtimeModeLabel = USE_MOCK
+    ? 'Mock 数据模式'
+    : caps?.environment === 'production'
+      ? 'Vercel 生产环境'
+      : '本地/开发环境'
+  const runtimeModeDetail = USE_MOCK
+    ? '示例数据，仅用于演示'
+    : caps
+      ? `${caps.database === 'postgresql' ? 'PostgreSQL' : 'SQLite'} · ${caps.anonymous_writes ? '匿名本地权限' : '受控写权限'}`
+      : '正在读取运行能力…'
   const [searchOpen, setSearchOpen] = useState(false)
   const [query, setQuery] = useState('')
   const searchTrigger = useRef<HTMLButtonElement>(null)
@@ -89,7 +102,7 @@ export default function AppLayout() {
           ))}
         </nav>
         <div className="sidebar-bottom"><div className="workspace-note"><CheckCircle size={22} weight="duotone" /><strong>专注验证，安心探索。</strong><p>在授权环境中，让问题可见，让改进可验证。</p><NavLink to="/runs">开始一次测试 <ArrowUpRight size={15} /></NavLink></div>
-        <div className="sidebar-foot"><span className={`dot ${USE_MOCK ? 'dot-mock' : 'dot-live'}`} /><div><strong>{USE_MOCK ? 'Mock 数据模式' : '本地靶场模式'}</strong><small>{USE_MOCK ? '示例数据，仅用于演示' : '本地执行与证据记录'}</small></div></div></div>
+        <div className="sidebar-foot" data-testid="runtime-mode-label"><span className={`dot ${USE_MOCK ? 'dot-mock' : 'dot-live'}`} /><div><strong>{runtimeModeLabel}</strong><small>{runtimeModeDetail}</small></div></div></div>
       </aside>
       <main className="main">
         <header className="app-topbar"><div className="breadcrumb">工作空间 <CaretRight size={13} /><span>{active.label}</span></div><div className="topbar-actions"><button className="search-trigger" ref={searchTrigger} onClick={openSearch} aria-label="搜索页面"><MagnifyingGlass size={17} /><span>快速前往</span><kbd><Command size={12} /> K</kbd></button><div className="appearance-switch" aria-label="外观"><button aria-label="浅色外观" aria-pressed={theme === 'light'} onClick={() => setTheme('light')}>{theme === 'light' && <motion.span layoutId="appearance" />}<Sun size={17} /></button><button aria-label="深色外观" aria-pressed={theme === 'dark'} onClick={() => setTheme('dark')}>{theme === 'dark' && <motion.span layoutId="appearance" />}<Moon size={17} /></button></div><span className="team-avatar" title="三人协作团队">AG</span></div></header>
