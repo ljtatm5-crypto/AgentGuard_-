@@ -8,10 +8,11 @@ import {
   SlidersHorizontal,
   SquaresFour,
 } from '@phosphor-icons/react'
-import { API_PREFIX, USE_MOCK, getControlKey, setControlKey } from '@/api/client'
+import { api, API_PREFIX, USE_MOCK, getControlKey, setControlKey } from '@/api/client'
 import { MotionSurface } from '@/components/MotionSurface'
+import { useAsync } from '@/hooks/useAsync'
 
-const preferences = [
+const basePreferences = [
   {
     title: '测试判定偏好',
     detail: '先执行可复现的固定规则，再由人工复核规则无法确认的用例。',
@@ -24,18 +25,29 @@ const preferences = [
     status: '证据完整',
     icon: CheckCircle,
   },
-  {
-    title: '测试数据来源',
-    detail: USE_MOCK
-      ? '当前使用浏览器内置演示数据，不需要连接后端即可完成功能体验。'
-      : '当前读取本地测试环境中的运行记录，所有页面展示均来自已保存数据。',
-    status: USE_MOCK ? '演示数据' : '本地运行',
-    icon: SquaresFour,
-  },
 ]
 
 export default function SettingsPage() {
   const reduce = useReducedMotion()
+  const capabilities = useAsync(() => api.getCapabilities(), [])
+  const caps = capabilities.state.phase === 'ready' ? capabilities.state.data : null
+  const isProduction = caps?.environment === 'production'
+  const modeLabel = USE_MOCK ? 'Mock 演示' : isProduction ? 'Vercel 生产' : '本地运行'
+  const connectionLabel = USE_MOCK ? '内置 Mock' : isProduction ? 'Vercel 生产 API' : '本地/开发 API'
+  const databaseLabel = caps ? (caps.database === 'postgresql' ? 'PostgreSQL' : 'SQLite') : '读取中'
+  const llmLabel = caps ? (caps.llm_enabled ? '已启用' : '未启用') : '读取中'
+  const rateLimitLabel = caps ? (caps.rate_limit_scope === 'per_process' ? '单实例限流' : caps.rate_limit_scope) : '读取中'
+  const evidenceLabel = USE_MOCK ? '浏览器演示数据' : isProduction ? '远程持久化' : '本地运行记录'
+  const preferences = [...basePreferences, {
+    title: '测试数据来源',
+    detail: USE_MOCK
+      ? '当前使用浏览器内置演示数据，不需要连接后端即可完成功能体验。'
+      : isProduction
+        ? '当前读取 Vercel 生产 API；公开页面展示脱敏摘要，原始轨迹与授权记录需要操作员令牌。'
+        : '当前读取本地或开发环境 API，数据来自已保存运行记录。',
+    status: USE_MOCK ? '演示数据' : isProduction ? '生产摘要' : '本地运行',
+    icon: SquaresFour,
+  }]
   const [controlKey, setControlKeyValue] = useState(getControlKey)
   const [keySaved, setKeySaved] = useState(false)
 
@@ -60,13 +72,16 @@ export default function SettingsPage() {
       <MotionSurface className="settings-status">
         <div className="settings-status-copy">
           <span className={`mode-pill ${USE_MOCK ? 'is-mock' : 'is-live'}`}>
-            <span className="dot" />{USE_MOCK ? '演示数据模式' : '本地数据模式'}
+            <span className="dot" />{modeLabel}
           </span>
-          <h2>智能体测试工作区</h2>
-          <p>{USE_MOCK ? '所有内容来自预置示例，适合产品演示和功能验收。' : '当前连接本地测试环境，可查看真实运行记录与证据。'}</p>
+          <h2>{USE_MOCK ? '智能体测试工作区' : isProduction ? '线上生产工作区' : '本地测试工作区'}</h2>
+          <p>{USE_MOCK ? '所有内容来自预置示例，适合产品演示和功能验收。' : isProduction ? '当前连接 Vercel 生产 API 与持久化数据库；公开摘要可匿名查看，私有证据需要操作员令牌。' : '当前连接本地或开发 API，可查看已保存运行记录。'}</p>
         </div>
         <div className="settings-facts">
-          <span><small>数据连接</small><strong>{USE_MOCK ? '内置 Mock' : '本地 API'}</strong></span>
+          <span><small>数据连接</small><strong>{connectionLabel}</strong></span>
+          <span><small>数据库</small><strong>{databaseLabel}</strong></span>
+          <span><small>真实模型</small><strong>{llmLabel}</strong></span>
+          <span><small>限流范围</small><strong>{rateLimitLabel}</strong></span>
           <span><small>接口契约</small><strong>{API_PREFIX}</strong></span>
           <span><small>外部目标</small><strong>不可访问</strong></span>
         </div>
@@ -82,7 +97,7 @@ export default function SettingsPage() {
             <span className="setting-status">{keySaved ? '当前会话已授权' : '只读优先'}</span>
           </div>
           <p className="write-access-copy">
-            阅读和报告始终公开。创建任务、生成用例和修改授权等写操作需要服务端配置的令牌，令牌只保存在当前浏览器会话中。
+            公开摘要可以匿名读取；原始轨迹、Agent 回答、授权记录和客户资产详情需要操作员令牌。创建任务、生成用例和修改授权同样需要令牌，令牌只保存在当前浏览器会话中。
           </p>
           <div className="write-access-form">
             <label htmlFor="control-key">操作员令牌</label>
@@ -151,7 +166,7 @@ export default function SettingsPage() {
           <div><dt>产品版本</dt><dd>v0.1.0</dd></div>
           <div><dt>支持类型</dt><dd>多类智能体</dd></div>
           <div><dt>测试范围</dt><dd>多类型智能体</dd></div>
-          <div><dt>证据保留</dt><dd>本地运行记录</dd></div>
+          <div><dt>证据保留</dt><dd>{evidenceLabel}</dd></div>
         </dl>
       </section>
     </div>

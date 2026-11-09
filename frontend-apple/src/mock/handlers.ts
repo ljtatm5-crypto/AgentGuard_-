@@ -313,6 +313,28 @@ export const handlers = [
     return HttpResponse.json(withEvidenceStatus(found))
   }),
 
+  // ---------- 运行能力 ----------
+  http.get(mockApiPath('/capabilities'), async () => {
+    await delay(80)
+    return HttpResponse.json({
+      public_read: true,
+      controlled_writes: true,
+      anonymous_writes: true,
+      writes_require_auth: false,
+      max_cases_per_run: 40,
+      async_tasks: false,
+      database: 'sqlite',
+      migrations: 'alembic',
+      auto_create_schema: true,
+      environment: 'mock',
+      llm_enabled: false,
+      write_token_configured: false,
+      private_reads_require_auth: false,
+      rate_limit_scope: 'per_process',
+      public_data_scope: 'mock_demo',
+    })
+  }),
+
   // ---------- 指标聚合 ----------
   http.get(mockApiPath('/metrics'), async () => {
     await delay(240)

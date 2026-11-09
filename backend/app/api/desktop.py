@@ -23,10 +23,11 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.db.session import get_db
 from app.models.entities import Agent, Finding, TestCase, TestRun, TestSuite, TraceEvent
+from app.security.access import is_operator_request
 from app.services.desktop_contract import (
-    FINAL_STATUSES, SEED_SUITE_ID, agent_view, case_view,
-    event_view, finding_view, iso, judge_view, metrics_view, risk_tag, run_view,
-    save_chain_review, suite_view,
+    FINAL_STATUSES, SEED_AGENT_IDS, SEED_SUITE_ID, agent_view, case_view,
+    event_view, finding_view, iso, judge_view, metrics_view, public_finding_view,
+    risk_tag, run_view, save_chain_review, suite_view,
 )
 
 
@@ -107,8 +108,10 @@ def suite_cases(db: Session, suite: TestSuite) -> list[TestCase]:
 
 
 @router.get("/agents")
-def agents(db: Session = Depends(get_db)):
+def agents(request: Request, db: Session = Depends(get_db)):
     rows = list(db.scalars(select(Agent).order_by(Agent.created_at.desc())).all())
+    if not is_operator_request(request):
+        rows = [agent for agent in rows if agent.id in SEED_AGENT_IDS.values()]
     rows.sort(key=lambda a: a.id != "desktop-campus-v2")
     return [agent_view(a) for a in rows]
 
@@ -252,12 +255,16 @@ def validate_agent(payload: dict[str, Any], db: Session = Depends(get_db)):
 
 
 @router.get("/test-suites")
-def suites(db: Session = Depends(get_db)):
-    return [suite_view(s, suite_cases(db, s)) for s in db.scalars(select(TestSuite).order_by(TestSuite.created_at.desc())).all()]
+def suites(request: Request, db: Session = Depends(get_db)):
+    rows = list(db.scalars(select(TestSuite).order_by(TestSuite.created_at.desc())).all())
+    operator = is_operator_request(request)
+    if not operator:
+        rows = [suite for suite in rows if suite.id == SEED_SUITE_ID]
+    return [suite_view(s, suite_cases(db, s) if operator else []) for s in rows]
 
 
 @router.get("/test-suites/{suite_id}/cases")
-def cases(suite_id: str, db: Session = Depends(get_db)):
+def cases(suite_id: str, request: Request, db: Session = Depends(get_db)):
     suite = require(db, TestSuite, suite_id, "suite_not_found", "测试集")
     return [case_view(c, suite) for c in suite_cases(db, suite)]
 
@@ -483,9 +490,11 @@ def sync_finding(db: Session, run: TestRun, case: TestCase) -> None:
 
 
 @router.get("/runs")
-def runs(db: Session = Depends(get_db)):
+def runs(request: Request, db: Session = Depends(get_db)):
     grouped = defaultdict(list)
     for row in db.scalars(select(TestRun).order_by(TestRun.created_at.desc(), TestRun.id)).all():
+        if not is_operator_request(request) and row.agent_id not in SEED_AGENT_IDS.values():
+            continue
         grouped[row.task_id].append(row)
     return [run_view(rows, db.get(TestSuite, rows[0].suite_id)) for rows in grouped.values()]
 
@@ -513,20 +522,35 @@ def create_run(payload: RunCreate, db: Session = Depends(get_db)):
             {"requested": len(selected), "limit": limit},
         )
     task_id = str(uuid4())
-    rows = []
+    # Persist the expected case set before executing anything. If the process
+    # is interrupted, remaining rows stay pending instead of disappearing and
+    # making a truncated run look complete.
+    prepared: list[tuple[TestCase, TestRun, dict[str, Any], str]] = []
+    for case in selected:
+        # Freeze the reviewed input and rules before executing any tools. Rejudging
+        # must never silently adopt an edited test case or a changed ruleset.
+        snapshot = deepcopy({key: getattr(case, key) for key in
+                             ("id", "name", "type", "input", "steps", "expected", "forbidden", "risk_tag", "judge", "ground_truth")})
+        fingerprint = sha256(json.dumps(snapshot, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+        run = TestRun(
+            task_id=task_id,
+            agent_id=asset.id,
+            suite_id=suite.id,
+            case_id=case.id,
+            agent_version=asset.version,
+            status="pending",
+            result={"suite_version": suite.version, "case_snapshot": snapshot, "rules_fingerprint": fingerprint},
+        )
+        db.add(run)
+        prepared.append((case, run, snapshot, fingerprint))
+    rows = [run for _, run, _, _ in prepared]
     try:
-        for case in selected:
-            run = TestRun(task_id=task_id, agent_id=asset.id, suite_id=suite.id, case_id=case.id,
-                          agent_version=asset.version, status="running")
-            db.add(run)
+        db.commit()
+        for index, (case, run, snapshot, fingerprint) in enumerate(prepared, start=1):
+            run.status = "running"
             db.flush()
             session_id = f"{task_id}:{case.id}"
             started = datetime.now(timezone.utc)
-            # Freeze the reviewed input and rules before executing any tools. Rejudging
-            # must never silently adopt an edited test case or a changed ruleset.
-            snapshot = deepcopy({key: getattr(case, key) for key in
-                                 ("id", "name", "type", "input", "steps", "expected", "forbidden", "risk_tag", "judge")})
-            fingerprint = sha256(json.dumps(snapshot, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
             try:
                 # Only steps with explicit input are executable turns; prose steps are instructions for readers.
                 turns = [step["input"] for step in (case.steps or []) if isinstance(step, dict) and isinstance(step.get("input"), str)]
@@ -570,7 +594,11 @@ def create_run(payload: RunCreate, db: Session = Depends(get_db)):
             finally:
                 if asset.adapter in {"campus", "local"}:
                     release_session(asset.id, session_id)
-            rows.append(run)
+            batch_size = max(1, get_settings().run_batch_size)
+            if index % batch_size == 0:
+                # Persist completed cases incrementally so a later timeout or
+                # process failure cannot erase already-finished evidence.
+                db.commit()
         db.commit()
     except Exception:
         db.rollback()
@@ -622,8 +650,20 @@ def finding_response(db: Session, finding: Finding) -> dict:
 
 
 @router.get("/findings")
-def findings(db: Session = Depends(get_db)):
-    return [finding_response(db, f) for f in db.scalars(select(Finding).order_by(Finding.created_at.desc())).all()]
+def findings(request: Request, db: Session = Depends(get_db)):
+    operator = is_operator_request(request)
+    items = []
+    for finding in db.scalars(select(Finding).order_by(Finding.created_at.desc())).all():
+        run = db.get(TestRun, finding.run_id)
+        if run is None or (not operator and run.agent_id not in SEED_AGENT_IDS.values()):
+            continue
+        snapshot = (run.result or {}).get("case_snapshot")
+        case = SimpleNamespace(**snapshot) if snapshot else db.get(TestCase, run.case_id)
+        suite = db.get(TestSuite, run.suite_id)
+        if case is None or suite is None:
+            continue
+        items.append(finding_response(db, finding) if operator else public_finding_view(finding, run, case, suite))
+    return items
 
 
 @router.get("/findings/{finding_id}/chain")
@@ -654,5 +694,6 @@ def review_chain_node(finding_id: str, node_id: str, payload: ChainReviewIn,
 
 
 @router.get("/metrics")
-def metrics(db: Session = Depends(get_db)):
-    return metrics_view(db)
+def metrics(request: Request, db: Session = Depends(get_db)):
+    agent_ids = None if is_operator_request(request) else set(SEED_AGENT_IDS.values())
+    return metrics_view(db, agent_ids=agent_ids)

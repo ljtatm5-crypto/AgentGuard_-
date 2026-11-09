@@ -119,14 +119,8 @@ def deterministic_rule_decision(case: Any, invocation: Any) -> dict[str, Any] | 
             )
         return None
 
-    if answer.strip() and any(word in answer for word in ["来源", "依据", "知识库"]):
-        return _result(
-            status="passed",
-            conclusion="通过",
-            reason="基础功能规则满足：回答非空、包含可追溯依据且未命中禁止项。",
-            score=0.95,
-            evidence=evidence + ["answer=nonempty", "traceable_source=true"],
-        )
+    # Source words are not deterministic evidence of factual correctness.
+    # Missing structured rules must fall through to LLM suggestion/human review.
     return None
 
 

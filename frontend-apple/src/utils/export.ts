@@ -8,6 +8,7 @@ export interface ReportSnapshot {
   findings: Finding[]
   unavailableRunIds: string[]
   isMock: boolean
+  dataSource?: string
   generatedAt?: Date
 }
 
@@ -48,7 +49,7 @@ export function buildReportFiles(snapshot: ReportSnapshot): { markdown: ReportFi
   const generated = snapshot.generatedAt ?? new Date()
   const generatedAt = generated.toISOString()
   const stamp = generatedAt.replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')
-  const source = isMock ? 'Mock 示例数据（用于演示，不作为实测结果）' : '本地 API 运行数据（以实际适配器与授权靶场配置为准）'
+  const source = snapshot.dataSource ?? (isMock ? 'Mock 示例数据（用于演示，不作为实测结果）' : 'API 运行数据（以实际适配器与授权靶场配置为准）')
   const lines = [
     '# AgentGuard 智测盾测试报告', '',
     '- 导出时间：' + generatedAt,

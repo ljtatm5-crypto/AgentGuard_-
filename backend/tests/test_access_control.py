@@ -147,3 +147,49 @@ def test_audit_record_is_emitted_for_valid_write(monkeypatch):
     )
     assert response.status_code == 200
     assert any('"event": "http_write"' in record for record in records)
+
+
+def test_private_reads_require_operator_token():
+    settings = Settings(
+        environment="production",
+        allow_anonymous_writes=False,
+        write_token="operator-secret",
+        audit_log_enabled=False,
+    )
+    app = FastAPI()
+    app.add_middleware(WriteAccessMiddleware, settings_provider=lambda: settings)
+
+    @app.get("/api/v2/metrics")
+    def public_summary():
+        return {"ok": True}
+
+    @app.get("/api/v2/runs/{task_id}")
+    def private_trace(task_id: str):
+        return {"task_id": task_id, "raw": "private"}
+
+    with TestClient(app) as client:
+        assert client.get("/api/v2/metrics").status_code == 200
+        assert client.get("/api/v2/runs/abc").status_code == 401
+        assert client.get("/api/v2/runs/abc", headers={"Authorization": "Bearer wrong"}).status_code == 403
+        authorized = client.get("/api/v2/runs/abc", headers={"Authorization": "Bearer operator-secret"})
+        assert authorized.status_code == 200
+
+
+def test_cors_headers_cover_private_read_failures():
+    settings = Settings(
+        environment="production",
+        allow_anonymous_writes=False,
+        write_token="operator-secret",
+        audit_log_enabled=False,
+    )
+    app = FastAPI()
+    app.add_middleware(WriteAccessMiddleware, settings_provider=lambda: settings)
+    app.add_middleware(CORSMiddleware, allow_origins=["https://demo.example"], allow_methods=["*"], allow_headers=["*"])
+
+    @app.get("/api/v2/runs/{task_id}/trace")
+    def private_trace(task_id: str):
+        return []
+
+    response = TestClient(app).get("/api/v2/runs/abc/trace", headers={"Origin": "https://demo.example"})
+    assert response.status_code == 401
+    assert response.headers["access-control-allow-origin"] == "https://demo.example"

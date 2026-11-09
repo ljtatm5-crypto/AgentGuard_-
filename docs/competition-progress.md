@@ -18,12 +18,16 @@
 | 攻击链与证据回指 | PASS | 生产复验生成 19 条 Finding，节点保存 run/case/event ids | 补三组真实 Dify 攻击实验 |
 | 报告导出 | PASS | PDF/Markdown/CSV，含数据来源与适用范围 | 保持字段核对 |
 | 公开写接口控制 | PASS | 匿名 POST 401，错误令牌 403，有效令牌通过鉴权 | 操作员令牌已设置为 Vercel Secret |
+| 公开/私有读边界 | PASS | 公开摘要匿名可读；原始轨迹、运行详情、攻击链、授权记录和非演示资产需操作员令牌 | 生产发布后复核 |
 | 请求限流与审计 | PASS | 写中间件、request id、结构化日志 | 后续迁移到持久化审计表 |
 | 同步任务规模上限 | PASS | `AGENTGUARD_MAX_CASES_PER_RUN=40` | 真实模型需异步 Worker |
 | PostgreSQL 持久化 | PASS | Neon PostgreSQL，Alembic `0001_initial (head)`，跨两次重新部署读取 Run 记录 | 保持数据库备份与迁移策略 |
 | 并发冷启动初始化 | PASS | PostgreSQL 事务级 advisory lock，避免重复播种 | CI 持续覆盖 |
 | 异步任务队列 | NOT_RUN | 当前同步执行 | 需持久化 Worker 或托管队列 |
-| 80 条正式测试集 | IN_PROGRESS | 80 条候选通过结构校验，全部 `pending_human_review` | 人工审核、冻结数据集 |
+| 分批执行持久化 | PASS | 执行前持久化全部待执行行，每 5 条提交一次；中断后保持 `pending`，不会伪装成完整成功 | 真实模型场景仍需 Worker |
+| 全局限流 | NOT_RUN | 当前为单实例内存限流 | 生产费用控制需共享限流或队列 |
+| 80 条正式测试集 | IN_PROGRESS | 80 条候选通过结构校验，全部 `pending_human_review`；复核模板已增加审核状态 | 人工审核、冻结数据集 |
+| 风险真值口径 | PASS | 26 条确定性基线使用按 Agent 身份与版本共同绑定的独立审核真值；`risk_tag` 不参与 F1 | 保持审核版本与复算脚本 |
 | 生产前端与后端 | PASS | `agent-guard-kohl.vercel.app`、`agentguard-api-three.vercel.app` | 持续回归 |
 | 竞赛材料包 | IN_PROGRESS | `competition/` 已包含说明书、技术方案、数据集、实验、证据、截图与打包脚本 | 补演示视频与人工审核记录 |
 

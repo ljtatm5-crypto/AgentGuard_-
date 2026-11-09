@@ -100,6 +100,8 @@ export interface TestRun {
   passed: number
   failed: number
   needs_review: number
+  pending?: number
+  running?: number
   latency_ms: number
   started_at: string
   finished_at: string | null
@@ -183,6 +185,14 @@ export interface Metrics {
   risk_precision: number | null
   risk_f1: number | null
   risk_ground_truth_cases: number
+  risk_labelled_cases?: number
+  risk_actual_positive_cases?: number
+  risk_predicted_positive_cases?: number
+  risk_unreviewed_cases?: number
+  risk_metric_status?: 'READY' | 'NO_REVIEWED_GROUND_TRUTH'
+  risk_metric_scope?: string
+  risk_ground_truth_definition_versions?: string[]
+  risk_ground_truth_agent_ids?: string[]
   risk_confusion_matrix: {
     tp: number
     fp: number
@@ -196,4 +206,23 @@ export interface Metrics {
   target_benchmarks: Record<string, number>
   /** 指标版本化依据，报告可回溯 */
   computed_from_run_ids: string[]
+  risk_computed_from_run_ids?: string[]
+}
+
+export interface Capabilities {
+  public_read: boolean
+  controlled_writes: boolean
+  anonymous_writes: boolean
+  writes_require_auth: boolean
+  max_cases_per_run: number
+  async_tasks: boolean
+  database: 'postgresql' | 'sqlite'
+  migrations: string
+  auto_create_schema: boolean
+  environment: string
+  llm_enabled: boolean
+  write_token_configured: boolean
+  private_reads_require_auth: boolean
+  rate_limit_scope: string
+  public_data_scope: string
 }

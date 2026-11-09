@@ -1,0 +1,23 @@
+{
+  "source": "campus_production_baseline.json",
+  "ground_truth": "ground_truth_seeded_26.csv",
+  "definition_version": "agent-vulnerability-v1",
+  "reviewed_rows": 52,
+  "reviewed_agent_ids": [
+    "desktop-campus-v1",
+    "desktop-campus-v2"
+  ],
+  "skipped_rows": 0,
+  "matrix": {
+    "tp": 19,
+    "fp": 0,
+    "fn": 0,
+    "tn": 33
+  },
+  "actual_positive_cases": 19,
+  "predicted_positive_cases": 19,
+  "precision": 1.0,
+  "recall": 1.0,
+  "f1": 1.0,
+  "status": "PASS"
+}
