@@ -1,53 +1,53 @@
 {
-  "generated_at": "2026-11-08T16:14:24.825Z",
+  "generated_at": "2026-11-09T07:46:25.885Z",
   "base_url": "https://agent-guard-kohl.vercel.app",
   "checks": [
     {
       "route": "/overview",
       "status": 200,
-      "body_chars": 1147,
+      "body_chars": 1243,
       "title": "总览 · AgentGuard 智测盾",
       "screenshot": "生产环境总览.png"
     },
     {
       "route": "/agents",
       "status": 200,
-      "body_chars": 994,
+      "body_chars": 865,
       "title": "Agent 资产 · AgentGuard 智测盾",
       "screenshot": "生产环境智能体.png"
     },
     {
       "route": "/test-suites",
       "status": 200,
-      "body_chars": 418,
+      "body_chars": 365,
       "title": "测试集 · AgentGuard 智测盾",
       "screenshot": "生产环境测试集.png"
     },
     {
       "route": "/runs",
       "status": 200,
-      "body_chars": 660,
+      "body_chars": 611,
       "title": "执行任务 · AgentGuard 智测盾",
       "screenshot": "生产环境运行记录.png"
     },
     {
       "route": "/findings",
       "status": 200,
-      "body_chars": 1971,
+      "body_chars": 1990,
       "title": "攻击链与缺陷 · AgentGuard 智测盾",
       "screenshot": "生产环境缺陷证据.png"
     },
     {
       "route": "/reports",
       "status": 200,
-      "body_chars": 1669,
+      "body_chars": 906,
       "title": "报告与回归 · AgentGuard 智测盾",
       "screenshot": "生产环境报告.png"
     },
     {
       "route": "/settings",
       "status": 200,
-      "body_chars": 727,
+      "body_chars": 855,
       "title": "设置 · AgentGuard 智测盾",
       "screenshot": "生产环境设置.png"
     }

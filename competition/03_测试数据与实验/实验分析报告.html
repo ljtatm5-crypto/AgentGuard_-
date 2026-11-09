@@ -235,6 +235,67 @@ id="实验一确定性校园靶场前后版本对照生产复验">实验一：�
 </table>
 <p>结论：修复后同一测试集通过数从 7/26 提升到 26/26，共保存 52
 条逐用例结果。所有判定来源均为固定规则，未使用真实大模型。</p>
+<h2
+id="实验一续独立审核真值与风险指标">实验一（续）：独立审核真值与风险指标</h2>
+<ul>
+<li>真值定义：<code>agent-vulnerability-v1</code>。</li>
+<li>真值文件：<code>ground_truth_seeded_26.csv</code>。</li>
+<li>规则：只有运行 <code>agent_id</code> 命中
+<code>reviewed_agent_ids</code> 且版本匹配时才选择
+<code>v1_risk_present</code> /
+<code>v2_risk_present</code>；<code>risk_tag</code>
+只代表攻击意图，不参与真值推断。</li>
+<li>未审核真值不进入 Precision / Recall / F1。</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>项目</th>
+<th style="text-align: right;">数值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>已审核运行</td>
+<td style="text-align: right;">52</td>
+</tr>
+<tr>
+<td>未审核运行</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td>TP</td>
+<td style="text-align: right;">19</td>
+</tr>
+<tr>
+<td>FP</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td>FN</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td>TN</td>
+<td style="text-align: right;">33</td>
+</tr>
+<tr>
+<td>Precision</td>
+<td style="text-align: right;">100.0%</td>
+</tr>
+<tr>
+<td>Recall</td>
+<td style="text-align: right;">100.0%</td>
+</tr>
+<tr>
+<td>F1</td>
+<td style="text-align: right;">100.0%</td>
+</tr>
+</tbody>
+</table>
+<p>上述指标由 <code>scripts/recompute_ground_truth_metrics.py</code>
+从生产逐用例结果和独立真值文件复算。它证明确定性校园靶场 V1.0 缺陷与
+V2.0 修复的回归效果，不代表真实 LLM/Dify 的安全准确率。</p>
 <h2 id="实验二ai-生成用例与混合判定">实验二：AI 生成用例与混合判定</h2>
 <ul>
 <li>代码路径已实现：<code>llm_provider.py</code>、<code>/api/v2/test-suites/generate</code>。</li>
@@ -264,7 +325,7 @@ fix。</li>
 跨部署持久化</h2>
 <ul>
 <li>生产数据库：Neon PostgreSQL，Alembic 当前版本
-<code>0001_initial (head)</code>。</li>
+<code>0002_case_ground_truth (head)</code>。</li>
 <li>两个 Run ID 在创建后经历两次生产重新部署，仍通过
 <code>/api/v2/runs/{id}</code> 返回 200。</li>
 <li>证据文件：<code>04_运行证据/neon_cross_deployment_persistence.json</code>、<code>neon_alembic.json</code>。</li>

@@ -1,0 +1,77 @@
+{
+  "experiment": "production-access-control-and-metric-verification",
+  "generated_at": "2026-11-09T07:46:14.891796+00:00",
+  "git_commit": "68820609d32b74d508fab0403d4b94b1f3bd9106",
+  "frontend_deployment_id": "dpl_9GXWdxMRNAkWRQ2iH7uxQsL2w2bE",
+  "backend_deployment_id": "dpl_AS2mQGA6wwy1xxZCjQA69GQkRaeK",
+  "base_url": "https://agentguard-api-three.vercel.app",
+  "checks": {
+    "health": {
+      "status": 200
+    },
+    "capabilities": {
+      "status": 200
+    },
+    "runs_anonymous": {
+      "status": 200
+    },
+    "metrics_anonymous": {
+      "status": 200
+    },
+    "findings_anonymous": {
+      "status": 200
+    },
+    "legacy_metrics_anonymous": {
+      "status": 200
+    },
+    "run_detail_anonymous": {
+      "status": 401
+    },
+    "run_detail_wrong_token": {
+      "status": 403
+    },
+    "run_detail_authorized": {
+      "status": 200
+    },
+    "trace_authorized": {
+      "status": 200
+    },
+    "authorizations_anonymous": {
+      "status": 401
+    },
+    "authorizations_authorized": {
+      "status": 200
+    }
+  },
+  "capabilities": {
+    "environment": "production",
+    "database": "postgresql",
+    "llm_enabled": false,
+    "private_reads_require_auth": true,
+    "rate_limit_scope": "per_process"
+  },
+  "metrics": {
+    "risk_metric_status": "READY",
+    "risk_labelled_cases": 52,
+    "risk_unreviewed_cases": 0,
+    "risk_confusion_matrix": {
+      "tp": 19,
+      "fp": 0,
+      "fn": 0,
+      "tn": 33
+    },
+    "risk_detection_rate": 1.0,
+    "risk_precision": 1.0,
+    "risk_f1": 1.0,
+    "risk_ground_truth_agent_ids": [
+      "desktop-campus-v1",
+      "desktop-campus-v2"
+    ],
+    "risk_ground_truth_definition_versions": [
+      "agent-vulnerability-v1"
+    ]
+  },
+  "anonymous_findings_have_no_chain_or_event_ids": true,
+  "legacy_metrics_total_runs": 52,
+  "status": "PASS"
+}

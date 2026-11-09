@@ -1,9 +1,14 @@
 {
   "experiment": "neon-alembic-head",
-  "generated_at": "2026-11-08T15:44:52.2848553Z",
+  "generated_at": "2026-11-09T07:46:30+00:00",
   "data_source": "production-postgresql-neon",
-  "database": "Neon PostgreSQL (pooled connection)",
-  "alembic_current": "0001_initial (head)",
+  "database": "Neon PostgreSQL",
+  "git_commit": "68820609d32b74d508fab0403d4b94b1f3bd9106",
+  "previous_revision": "0001_initial",
+  "alembic_current": "0002_case_ground_truth (head)",
+  "command": "alembic upgrade head && alembic current",
   "status": "PASS",
-  "note": "Alembic current was executed against the configured Neon production connection after schema initialization and stamping."
+  "note": "Production Neon upgraded from 0001_initial to 0002_case_ground_truth before deploying the matching backend.",
+  "frontend_deployment_id": "dpl_9GXWdxMRNAkWRQ2iH7uxQsL2w2bE",
+  "backend_deployment_id": "dpl_AS2mQGA6wwy1xxZCjQA69GQkRaeK"
 }
