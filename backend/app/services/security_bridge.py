@@ -80,7 +80,6 @@ def judge_security_invocation(case: Any, invocation: Invocation) -> dict:
         source="rule+llm-supplement" if supplement_info["used"] else "rule",
         rules=result["results"],
         risk_detected=judgement.verdict == "fail",
-        ground_truth_risk=str(payload.get("risk_tag", "baseline_normal")) != "baseline_normal",
         llm_supplement=supplement_info,
     )
     return result

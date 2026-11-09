@@ -13,10 +13,33 @@ from sqlalchemy.pool import StaticPool
 
 from app.api.desktop import router
 from app.api.authorizations import router as authorizations_router
+from app.api.metrics import router as metrics_router
+from app.core.config import Settings
 from app.db.session import Base, get_db
-from app.models.entities import Finding, TraceEvent, TestCase as CaseRecord, TestRun as RunRecord, TestSuite as SuiteRecord
+from app.security.access import SlidingWindowRateLimiter, WriteAccessMiddleware
+from app.models.entities import Agent as AgentRecord, Finding, TraceEvent, TestCase as CaseRecord, TestRun as RunRecord, TestSuite as SuiteRecord
 from app.services.agent_adapter import reset_runtime
 from app.services.desktop_contract import SEED_AGENT_IDS, SEED_SUITE_ID, ensure_desktop_data
+
+
+def build_desktop_app(db: Session, *, allow_anonymous: bool = True, token: str = "") -> FastAPI:
+    application = FastAPI()
+    settings = Settings(
+        environment="test" if allow_anonymous else "production",
+        allow_anonymous_writes=allow_anonymous,
+        write_token=token,
+        audit_log_enabled=False,
+    )
+    application.add_middleware(
+        WriteAccessMiddleware,
+        settings_provider=lambda: settings,
+        rate_limiter=SlidingWindowRateLimiter(),
+    )
+    application.include_router(router, prefix="/api/v2")
+    application.include_router(authorizations_router, prefix="/api")
+    application.include_router(metrics_router, prefix="/api")
+    application.dependency_overrides[get_db] = lambda: db
+    return application
 
 
 @pytest.fixture
@@ -25,15 +48,10 @@ def desktop():
     Base.metadata.create_all(engine)
     with Session(engine, expire_on_commit=False) as db:
         ensure_desktop_data(db)
-        application = FastAPI()
-        application.include_router(router, prefix="/api/v2")
-        application.include_router(authorizations_router, prefix="/api")
-        application.dependency_overrides[get_db] = lambda: db
-        with TestClient(application) as client:
+        with TestClient(build_desktop_app(db)) as client:
             yield client, db
     reset_runtime()
     engine.dispose()
-
 
 def execute(client, version):
     response = client.post("/api/v2/runs", json={"agent_id": SEED_AGENT_IDS[version], "suite_id": SEED_SUITE_ID})
@@ -129,6 +147,124 @@ def test_real_execution_aggregate_evidence_rejudge_and_paired_metrics(desktop):
     assert metrics["attack_success_rate_before"] > metrics["attack_success_rate_after"]
     assert set(metrics["computed_from_run_ids"]) == {before["id"], after["id"]}
 
+
+def test_run_batches_persist_completed_cases_before_later_failure(desktop, monkeypatch):
+    client, db = desktop
+    original_commit = db.commit
+    commits = 0
+
+    def flaky_commit():
+        nonlocal commits
+        commits += 1
+        if commits == 2:
+            raise RuntimeError("simulated batch persistence failure")
+        return original_commit()
+
+    monkeypatch.setattr(db, "commit", flaky_commit)
+    with pytest.raises(RuntimeError, match="simulated batch persistence failure"):
+        client.post("/api/v2/runs", json={
+            "agent_id": SEED_AGENT_IDS["v1.0"],
+            "suite_id": SEED_SUITE_ID,
+        })
+    monkeypatch.setattr(db, "commit", original_commit)
+    persisted = db.scalar(select(func.count()).select_from(RunRecord))
+    assert persisted == 5
+
+
+def test_metrics_use_reviewed_version_specific_ground_truth(desktop):
+    client, _ = desktop
+    before = execute(client, "v1.0")
+    after = execute(client, "v2.0")
+    metrics = client.get("/api/v2/metrics").json()
+    assert before["failed"] == 19
+    assert after["failed"] == 0
+    assert metrics["risk_metric_status"] == "READY"
+    assert metrics["risk_labelled_cases"] == before["total"] + after["total"]
+    assert metrics["risk_ground_truth_cases"] == 19
+    assert metrics["risk_actual_positive_cases"] == 19
+    assert metrics["risk_confusion_matrix"] == {"tp": 19, "fp": 0, "fn": 0, "tn": 33}
+    assert metrics["risk_detection_rate"] == 1
+    assert metrics["risk_precision"] == 1
+    assert metrics["risk_f1"] == 1
+    assert metrics["risk_ground_truth_definition_versions"] == ["agent-vulnerability-v1"]
+
+
+def test_attack_risk_tag_without_review_is_not_ground_truth(desktop):
+    client, db = desktop
+    case = db.get(CaseRecord, "desktop-AG-D-001")
+    truth = dict(case.ground_truth)
+    truth["review_status"] = "draft"
+    case.ground_truth = truth
+    db.commit()
+    execute(client, "v1.0")
+    metrics = client.get("/api/v2/metrics").json()
+    assert metrics["risk_labelled_cases"] == 25
+    assert metrics["risk_unreviewed_cases"] == 1
+    assert sum(metrics["risk_confusion_matrix"].values()) == 25
+    assert metrics["risk_ground_truth_cases"] == 18
+
+
+def test_anonymous_summary_and_private_evidence_boundary(desktop):
+    client, db = desktop
+    run = execute(client, "v1.0")
+    finding_id = client.get("/api/v2/findings").json()[0]["id"]
+
+    with TestClient(build_desktop_app(db, allow_anonymous=False, token="operator-secret")) as public:
+        assert public.get("/api/v2/runs").status_code == 200
+        assert public.get("/api/v2/metrics").status_code == 200
+        agents = public.get("/api/v2/agents").json()
+        assert all(agent["id"] in SEED_AGENT_IDS.values() for agent in agents)
+        suites = public.get("/api/v2/test-suites").json()
+        assert suites and all("input" not in suite for suite in suites)
+        assert public.get(f"/api/v2/test-suites/{SEED_SUITE_ID}/cases").status_code == 401
+        summary = public.get("/api/v2/findings").json()
+        assert summary and all(item["chain"] == [] for item in summary)
+        assert all(item["evidence"]["event_ids"] == [] for item in summary)
+        assert public.get(f"/api/v2/runs/{run['id']}").json()["error_code"] == "read_auth_required"
+        assert public.get(f"/api/v2/runs/{run['id']}/trace").status_code == 401
+        assert public.get(f"/api/v2/findings/{finding_id}/chain").status_code == 401
+        assert public.get("/api/authorizations").status_code == 401
+
+    with TestClient(build_desktop_app(db, allow_anonymous=False, token="operator-secret")) as authorized:
+        headers = {"Authorization": "Bearer operator-secret"}
+        detail = authorized.get(f"/api/v2/runs/{run['id']}", headers=headers)
+        trace = authorized.get(f"/api/v2/runs/{run['id']}/trace", headers=headers)
+        chain = authorized.get(f"/api/v2/findings/{finding_id}/chain", headers=headers)
+        assert detail.status_code == 200 and detail.json()["results"]
+        assert trace.status_code == 200 and trace.json()
+        assert chain.status_code == 200 and chain.json()["chain"]
+
+
+def test_anonymous_legacy_metrics_are_scoped_to_demo_agents(desktop):
+    client, db = desktop
+    run = execute(client, "v1.0")
+    db.add(AgentRecord(
+        id="private-agent-000000000000000000000001",
+        name="私有客户智能体",
+        version="private-v1",
+        adapter="mock",
+        endpoint="local://private-agent",
+    ))
+    db.add(RunRecord(
+        task_id="private-task-0000000000000000000001",
+        agent_id="private-agent-000000000000000000000001",
+        suite_id=SEED_SUITE_ID,
+        case_id="desktop-AG-N-001",
+        agent_version="private-v1",
+        status="passed",
+        latency=12,
+    ))
+    db.commit()
+
+    with TestClient(build_desktop_app(db, allow_anonymous=False, token="operator-secret")) as public:
+        summary = public.get("/api/metrics")
+        assert summary.status_code == 200
+        assert summary.json()["total_runs"] == run["total"]
+
+    with TestClient(build_desktop_app(db, allow_anonymous=False, token="operator-secret")) as authorized:
+        summary = authorized.get("/api/metrics", headers={"Authorization": "Bearer operator-secret"})
+        assert summary.status_code == 200
+        assert summary.json()["total_runs"] == run["total"] + 1
 
 def test_template_generation_preserves_rule_origin_and_local_validation(desktop):
     client, _ = desktop

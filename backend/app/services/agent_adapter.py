@@ -241,6 +241,7 @@ def _invoke_remote(agent: Any, input_text: str, adapter: str, session_id: str | 
         method="POST",
         headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
         body=json.dumps(request_body, ensure_ascii=False).encode("utf-8"),
+        timeout=get_settings().remote_request_timeout_seconds,
     )
     if status >= 400:
         raise RuntimeError(f"被测 Agent 返回 HTTP {status}")

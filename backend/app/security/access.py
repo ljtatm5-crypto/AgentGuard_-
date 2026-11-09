@@ -13,6 +13,7 @@ from hashlib import sha256
 import hmac
 import json
 import logging
+import re
 import threading
 import time
 from typing import Callable
@@ -26,6 +27,14 @@ from app.core.config import Settings, get_settings
 
 
 WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+PRIVATE_READ_PATTERNS = (
+    re.compile(r"^/api/authorizations(?:/.*)?$"),
+    re.compile(r"^/api/(?:agents|test-suites|runs|findings)(?:/.*)?$"),
+    re.compile(r"^/api/v2/agents/[^/]+$"),
+    re.compile(r"^/api/v2/test-suites/[^/]+/cases$"),
+    re.compile(r"^/api/v2/runs/[^/]+(?:/trace)?$"),
+    re.compile(r"^/api/v2/findings/[^/]+/chain$"),
+)
 audit_logger = logging.getLogger("agentguard.audit")
 
 
@@ -99,6 +108,14 @@ async def _read_limited_body(request: Request, max_request_bytes: int) -> bool:
     return True
 
 
+def is_private_read(method: str, path: str) -> bool:
+    return method.upper() in {"GET", "HEAD"} and any(pattern.match(path) for pattern in PRIVATE_READ_PATTERNS)
+
+
+def is_operator_request(request: Request) -> bool:
+    return getattr(request.state, "principal", None) is not None
+
+
 def _principal(request: Request, settings: Settings) -> Principal | None:
     if settings.allow_anonymous_writes and settings.environment in {"development", "test"}:
         return Principal(subject="anonymous-local", role="operator")
@@ -127,12 +144,34 @@ class WriteAccessMiddleware(BaseHTTPMiddleware):
         request_id = request.headers.get("x-request-id") or str(uuid4())
         request.state.request_id = request_id
 
+        settings = self.settings_provider()
+        principal = _principal(request, settings)
+        if principal is not None:
+            request.state.principal = principal
+
         if request.method not in WRITE_METHODS:
+            if is_private_read(request.method, request.url.path) and principal is None:
+                supplied = _bearer_token(request)
+                if not settings.write_token.strip() and not settings.allow_anonymous_writes:
+                    response = _error(
+                        503,
+                        "read_access_not_configured",
+                        "私有读取接口尚未配置操作员令牌",
+                        {"X-Request-ID": request_id},
+                    )
+                else:
+                    response = _error(
+                        401 if not supplied else 403,
+                        "read_auth_required" if not supplied else "read_auth_invalid",
+                        "该接口包含原始证据或私有配置，需要操作员令牌",
+                        {"X-Request-ID": request_id},
+                    )
+                self._audit(request_id, request, None, response.status_code, "read_denied")
+                return response
             response = await call_next(request)
             response.headers["X-Request-ID"] = request_id
             return response
 
-        settings = self.settings_provider()
         content_length = request.headers.get("content-length")
         if content_length:
             try:
@@ -141,7 +180,6 @@ class WriteAccessMiddleware(BaseHTTPMiddleware):
             except ValueError:
                 return _error(400, "invalid_content_length", "Content-Length 非法", {"X-Request-ID": request_id})
 
-        principal = _principal(request, settings)
         if principal is None:
             supplied = _bearer_token(request)
             if not settings.write_token.strip() and not settings.allow_anonymous_writes:
@@ -161,7 +199,6 @@ class WriteAccessMiddleware(BaseHTTPMiddleware):
             self._audit(request_id, request, None, response.status_code, "denied")
             return response
 
-        request.state.principal = principal
         allowed, retry_after = self.rate_limiter.allow(
             principal.subject, settings.write_rate_limit_per_minute
         )
@@ -204,7 +241,7 @@ class WriteAccessMiddleware(BaseHTTPMiddleware):
         if not self.settings_provider().audit_log_enabled:
             return
         audit_logger.info(json.dumps({
-            "event": "http_write",
+            "event": "http_write" if request.method in WRITE_METHODS else "http_read",
             "request_id": request_id,
             "method": request.method,
             "path": request.url.path,

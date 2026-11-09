@@ -13,6 +13,8 @@ import type { JudgeResult, TestRun } from '@/types/api'
 export default function ReportsPage() {
   const metrics = useAsync(() => api.getMetrics(), [])
   const runs = useAsync(() => api.listRuns(), [])
+  const capabilities = useAsync(() => api.getCapabilities(), [])
+  const isProduction = capabilities.state.phase === 'ready' && capabilities.state.data.environment === 'production'
   const [exporting, setExporting] = useState(false)
   const [pdfLoading, setPdfLoading] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
@@ -23,11 +25,17 @@ export default function ReportsPage() {
    * Markdown / CSV / PDF 共用同一次取数，保证三种格式的字段与口径完全一致。
    */
   async function collectSnapshot(): Promise<ReportSnapshot> {
-    const [currentMetrics, currentRuns, findings] = await Promise.all([
+    const [currentMetrics, currentRuns, findings, caps] = await Promise.all([
       api.getMetrics(),
       api.listRuns(),
       api.listFindings(),
+      api.getCapabilities(),
     ])
+    const dataSource = USE_MOCK
+      ? 'Mock 示例数据（用于演示，不作为实测结果）'
+      : caps.environment === 'production'
+        ? `Vercel 生产 API / ${caps.database === 'postgresql' ? 'PostgreSQL' : 'SQLite'}`
+        : `本地或开发 API / ${caps.database === 'postgresql' ? 'PostgreSQL' : 'SQLite'}`
     const runDetails = await Promise.allSettled(currentRuns.map((run) => api.getRunDetail(run.id)))
     const details: Awaited<ReturnType<typeof api.getRunDetail>>[] = []
     const unavailableRunIds: string[] = []
@@ -35,7 +43,7 @@ export default function ReportsPage() {
       if (result.status === 'fulfilled') details.push(result.value)
       else unavailableRunIds.push(currentRuns[index].id)
     })
-    return { metrics: currentMetrics, runs: currentRuns, details, findings, unavailableRunIds, isMock: USE_MOCK }
+    return { metrics: currentMetrics, runs: currentRuns, details, findings, unavailableRunIds, isMock: USE_MOCK, dataSource }
   }
 
   async function exportReport() {
@@ -153,7 +161,7 @@ export default function ReportsPage() {
       </section>
 
       <section className="panel export-panel">
-        <div className="panel-toolbar"><h2>导出报告</h2><span className={`tag ${USE_MOCK ? 'tag-warning' : 'tag-info'}`}>{USE_MOCK ? 'Mock 示例数据' : '本地 API 数据'}</span></div>
+        <div className="panel-toolbar"><h2>导出报告</h2><span className={`tag ${USE_MOCK ? 'tag-warning' : 'tag-info'}`}>{USE_MOCK ? 'Mock 示例数据' : isProduction ? 'Vercel 生产 API 数据' : '本地/开发 API 数据'}</span></div>
         <p className="page-desc">
           包含测试集版本、运行记录、用例判定、人工复核记录及指标口径。文本字段中的常见令牌自动脱敏。
           {USE_MOCK && ' 当前为示例模式，报告会明确标注数据来源。'}

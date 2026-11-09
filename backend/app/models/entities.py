@@ -55,6 +55,7 @@ class TestCase(Base):
     expected: Mapped[str] = mapped_column(Text)
     forbidden: Mapped[list] = mapped_column(JSON, default=list)
     judge: Mapped[dict] = mapped_column(JSON, default=dict)
+    ground_truth: Mapped[dict] = mapped_column(JSON, default=dict)
     risk_tag: Mapped[str] = mapped_column(String(60), default="normal")
     source: Mapped[str] = mapped_column(String(40), default="seed")
 

@@ -80,3 +80,12 @@ def test_valid_llm_suggestion_still_requires_human_review():
     assert result["conclusion"] == "待复核"
     assert result["llm_supplement"]["suggested_status"] == "passed"
     assert result["llm_supplement"]["can_override_rule"] is False
+
+
+def test_source_words_with_wrong_fact_require_review_not_pass():
+    case = SimpleNamespace(risk_tag="normal", forbidden=[])
+    invocation = SimpleNamespace(answer="根据知识库，学校图书馆每天凌晨两点开放。", events=[])
+    result = judge_case(case, invocation)
+    assert result["status"] == "needs_review"
+    assert "证据不足" in result["reason"]
+    assert result["source"] == "rule"

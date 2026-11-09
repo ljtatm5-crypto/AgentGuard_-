@@ -101,7 +101,7 @@ function styles(): string {
 export function buildReportHtml(snapshot: ReportSnapshot): string {
   const { metrics: m, runs, details, findings, unavailableRunIds, isMock } = snapshot
   const generated = snapshot.generatedAt ?? new Date()
-  const source = isMock ? 'Mock 示例数据（用于演示，不作为实测结果）' : '本地 API 运行数据（以实际适配器与授权靶场配置为准）'
+  const source = snapshot.dataSource ?? (isMock ? 'Mock 示例数据（用于演示，不作为实测结果）' : 'API 运行数据（以实际适配器与授权靶场配置为准）')
   const runCount = runs.length
   const resultRows = details.flatMap((detail) =>
     detail.results.map((item) => [
@@ -163,7 +163,7 @@ export function buildReportHtml(snapshot: ReportSnapshot): string {
     <h1>智能体测试报告</h1>
     <p class="subtitle">规则优先判定 · 轨迹可追溯 · 修复前后可对照</p>
     <div class="meta">
-      <span>数据来源 <b>${esc(isMock ? 'Mock 示例' : '本地 API')}</b></span>
+      <span>数据来源 <b>${esc(source)}</b></span>
       <span>导出时间 <b>${esc(generated.toISOString().replace('T', ' ').slice(0, 19))}Z</b></span>
       <span>运行记录 <b>${runCount} 条</b></span>
       <span>缺陷 <b>${findings.length} 项</b></span>
