@@ -1,6 +1,7 @@
 import type { ZodType } from 'zod'
 import type {
   Agent,
+  Capabilities,
   Finding,
   JudgeResult,
   Metrics,
@@ -50,13 +51,12 @@ async function request<T>(path: string, schema: ZodType<T>, init?: RequestInit):
   const url = USE_MOCK ? mockApiPath(path) : `${BASE}${apiPath(path)}`
 
   let lastError: unknown
-  const method = (init?.method ?? 'GET').toUpperCase()
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(init?.headers as Record<string, string> | undefined),
   }
   const controlKey = getControlKey()
-  if (!USE_MOCK && !['GET', 'HEAD'].includes(method) && controlKey) {
+  if (!USE_MOCK && controlKey) {
     headers.Authorization = `Bearer ${controlKey}`
   }
 
@@ -118,6 +118,7 @@ async function request<T>(path: string, schema: ZodType<T>, init?: RequestInit):
 
 /* ---------------- Agent 资产（B 提供） ---------------- */
 export const api = {
+  getCapabilities: () => request<Capabilities>('/capabilities', schemas.capabilities),
   listAgents: () => request<Agent[]>('/agents', schemas.agents),
   getAgent: (id: string) => request<Agent>(`/agents/${id}`, schemas.agent),
   validateAgent: (payload: Record<string, unknown>) =>

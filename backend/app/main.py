@@ -68,6 +68,12 @@ def capabilities():
         "database": "postgresql" if settings.database_url.startswith(("postgresql", "postgres")) else "sqlite",
         "migrations": "alembic",
         "auto_create_schema": settings.db_auto_create,
+        "environment": settings.environment,
+        "llm_enabled": settings.llm_enabled,
+        "write_token_configured": bool(settings.write_token.strip()),
+        "private_reads_require_auth": True,
+        "rate_limit_scope": "per_process",
+        "public_data_scope": "seeded_demo_summary",
     }
 
 

@@ -191,6 +191,14 @@ const metricsSchema = z.object({
   risk_precision: z.number().nullable(),
   risk_f1: z.number().nullable(),
   risk_ground_truth_cases: z.number(),
+  risk_labelled_cases: z.number().optional(),
+  risk_actual_positive_cases: z.number().optional(),
+  risk_predicted_positive_cases: z.number().optional(),
+  risk_unreviewed_cases: z.number().optional(),
+  risk_metric_status: z.enum(['READY', 'NO_REVIEWED_GROUND_TRUTH']).optional(),
+  risk_metric_scope: z.string().optional(),
+  risk_ground_truth_definition_versions: z.array(z.string()).optional(),
+  risk_ground_truth_agent_ids: z.array(z.string()).optional(),
   risk_confusion_matrix: z.object({
     tp: z.number(),
     fp: z.number(),
@@ -202,6 +210,25 @@ const metricsSchema = z.object({
   trace_coverage_rate: z.number().nullable(),
   target_benchmarks: z.record(z.string(), z.number()),
   computed_from_run_ids: z.array(z.string()),
+  risk_computed_from_run_ids: z.array(z.string()).optional(),
+})
+
+const capabilitiesSchema = z.object({
+  public_read: z.boolean(),
+  controlled_writes: z.boolean(),
+  anonymous_writes: z.boolean(),
+  writes_require_auth: z.boolean(),
+  max_cases_per_run: z.number(),
+  async_tasks: z.boolean(),
+  database: z.enum(['postgresql', 'sqlite']),
+  migrations: z.string(),
+  auto_create_schema: z.boolean(),
+  environment: z.string(),
+  llm_enabled: z.boolean(),
+  write_token_configured: z.boolean(),
+  private_reads_require_auth: z.boolean(),
+  rate_limit_scope: z.string(),
+  public_data_scope: z.string(),
 })
 
 export const schemas = {
@@ -218,6 +245,7 @@ export const schemas = {
   judgeResults: z.array(judgeResultSchema),
   suiteGeneration: suiteGenerationSchema,
   metrics: metricsSchema,
+  capabilities: capabilitiesSchema,
 } as const
 
 export { RunStatus, Severity }
