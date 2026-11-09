@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { ArrowRight, CheckCircle, DownloadSimple, FileCsv, FilePdf, FileText } from '@phosphor-icons/react'
-import { api, ApiRequestError, USE_MOCK } from '@/api/client'
+import { api, ApiRequestError, getControlKey, USE_MOCK } from '@/api/client'
 import { AsyncBoundary } from '@/components/AsyncBoundary'
 import { StatusTag } from '@/components/Tags'
 import { useAsync } from '@/hooks/useAsync'
@@ -36,13 +36,17 @@ export default function ReportsPage() {
       : caps.environment === 'production'
         ? `Vercel 生产 API / ${caps.database === 'postgresql' ? 'PostgreSQL' : 'SQLite'}`
         : `本地或开发 API / ${caps.database === 'postgresql' ? 'PostgreSQL' : 'SQLite'}`
-    const runDetails = await Promise.allSettled(currentRuns.map((run) => api.getRunDetail(run.id)))
     const details: Awaited<ReturnType<typeof api.getRunDetail>>[] = []
     const unavailableRunIds: string[] = []
-    runDetails.forEach((result, index) => {
-      if (result.status === 'fulfilled') details.push(result.value)
-      else unavailableRunIds.push(currentRuns[index].id)
-    })
+    if (USE_MOCK || getControlKey()) {
+      const runDetails = await Promise.allSettled(currentRuns.map((run) => api.getRunDetail(run.id)))
+      runDetails.forEach((result, index) => {
+        if (result.status === 'fulfilled') details.push(result.value)
+        else unavailableRunIds.push(currentRuns[index].id)
+      })
+    } else {
+      unavailableRunIds.push(...currentRuns.map((run) => run.id))
+    }
     return { metrics: currentMetrics, runs: currentRuns, details, findings, unavailableRunIds, isMock: USE_MOCK, dataSource }
   }
 
@@ -199,11 +203,12 @@ function RunComparison({ runs }: { runs: TestRun[] }) {
 
   const beforeRun = chronological.find((run) => run.id === beforeId)
   const afterRun = chronological.find((run) => run.id === afterId)
+  const hasPrivateReadAccess = USE_MOCK || Boolean(getControlKey())
   const details = useAsync(
-    () => beforeRun && afterRun
+    () => hasPrivateReadAccess && beforeRun && afterRun
       ? Promise.all([api.getRunDetail(beforeRun.id), api.getRunDetail(afterRun.id)])
       : Promise.resolve(null),
-    [beforeRun?.id, afterRun?.id],
+    [beforeRun?.id, afterRun?.id, hasPrivateReadAccess],
   )
   const sameSuite = beforeRun && afterRun && beforeRun.suite_id === afterRun.suite_id
 
@@ -225,6 +230,11 @@ function RunComparison({ runs }: { runs: TestRun[] }) {
         </label>
       </div>
       {!sameSuite && <p className="form-error" role="alert">两次运行必须使用同一测试集才能做逐用例对比。</p>}
+      {!hasPrivateReadAccess && (
+        <p className="muted small" role="status">
+          逐用例详情属于私有运行证据。请在设置页输入操作员令牌后刷新本页；当前仅展示公开摘要。
+        </p>
+      )}
       <AsyncBoundary state={details.state} onRetry={details.retry}>
         {(data) => !data || !sameSuite ? null : <DiffTable before={data[0].results} after={data[1].results} beforeRun={beforeRun} afterRun={afterRun} />}
       </AsyncBoundary>
