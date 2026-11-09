@@ -190,6 +190,7 @@ export interface Metrics {
   risk_metric_status?: 'READY' | 'NO_REVIEWED_GROUND_TRUTH'
   risk_metric_scope?: string
   risk_ground_truth_definition_versions?: string[]
+  risk_ground_truth_agent_ids?: string[]
   risk_confusion_matrix: {
     tp: number
     fp: number

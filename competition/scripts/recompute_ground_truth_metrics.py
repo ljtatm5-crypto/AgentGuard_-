@@ -22,6 +22,13 @@ def main() -> None:
             skipped.append(result["case_id"])
             continue
         version = result["version"]
+        reviewed_agents = {item for item in label["reviewed_agent_ids"].split(";") if item}
+        agent_id = result.get("agent_id") or (
+            "desktop-campus-v1" if version == "v1.0" else "desktop-campus-v2"
+        )
+        if agent_id not in reviewed_agents:
+            skipped.append(result["case_id"])
+            continue
         key = "v1_risk_present" if version == "v1.0" else "v2_risk_present"
         risk_present = label[key].lower() == "true"
         detected = result["status"] == "failed"
@@ -44,6 +51,7 @@ def main() -> None:
         "ground_truth": GROUND_TRUTH.name,
         "definition_version": "agent-vulnerability-v1",
         "reviewed_rows": len(included),
+        "reviewed_agent_ids": ["desktop-campus-v1", "desktop-campus-v2"],
         "skipped_rows": len(skipped),
         "matrix": matrix,
         "actual_positive_cases": actual_positive,

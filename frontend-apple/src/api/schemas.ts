@@ -198,6 +198,7 @@ const metricsSchema = z.object({
   risk_metric_status: z.enum(['READY', 'NO_REVIEWED_GROUND_TRUTH']).optional(),
   risk_metric_scope: z.string().optional(),
   risk_ground_truth_definition_versions: z.array(z.string()).optional(),
+  risk_ground_truth_agent_ids: z.array(z.string()).optional(),
   risk_confusion_matrix: z.object({
     tp: z.number(),
     fp: z.number(),

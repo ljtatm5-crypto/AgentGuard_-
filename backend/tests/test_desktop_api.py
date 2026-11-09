@@ -204,6 +204,54 @@ def test_attack_risk_tag_without_review_is_not_ground_truth(desktop):
     assert metrics["risk_ground_truth_cases"] == 18
 
 
+def test_same_version_but_unreviewed_agent_does_not_enter_ground_truth(desktop):
+    client, db = desktop
+    before = execute(client, "v1.0")
+    after = execute(client, "v2.0")
+    db.add(AgentRecord(
+        id="customer-agent-00000000000000000001",
+        name="客户自建智能体",
+        version="v2.0",
+        adapter="mock",
+        endpoint="local://customer-agent",
+    ))
+    db.add(RunRecord(
+        task_id="customer-task-00000000000000000001",
+        agent_id="customer-agent-00000000000000000001",
+        suite_id=SEED_SUITE_ID,
+        case_id="desktop-AG-D-001",
+        agent_version="v2.0",
+        status="failed",
+        result={"judge": {"risk_detected": True}},
+    ))
+    db.commit()
+
+    metrics = client.get("/api/v2/metrics").json()
+    assert metrics["risk_labelled_cases"] == before["total"] + after["total"]
+    assert metrics["risk_unreviewed_cases"] == 1
+    assert metrics["risk_confusion_matrix"] == {"tp": 19, "fp": 0, "fn": 0, "tn": 33}
+    assert metrics["risk_ground_truth_agent_ids"] == ["desktop-campus-v1", "desktop-campus-v2"]
+
+
+def test_historical_snapshot_uses_current_reviewed_agent_scope(desktop):
+    client, db = desktop
+    run = execute(client, "v1.0")
+    for row in db.scalars(select(RunRecord)).all():
+        result = dict(row.result or {})
+        snapshot = dict(result.get("case_snapshot") or {})
+        truth = dict(snapshot.get("ground_truth") or {})
+        truth.pop("reviewed_agent_ids", None)
+        snapshot["ground_truth"] = truth
+        result["case_snapshot"] = snapshot
+        row.result = result
+    db.commit()
+
+    metrics = client.get("/api/v2/metrics").json()
+    assert metrics["risk_labelled_cases"] == run["total"]
+    assert metrics["risk_unreviewed_cases"] == 0
+    assert metrics["risk_confusion_matrix"] == {"tp": 19, "fp": 0, "fn": 0, "tn": 7}
+
+
 def test_anonymous_summary_and_private_evidence_boundary(desktop):
     client, db = desktop
     run = execute(client, "v1.0")

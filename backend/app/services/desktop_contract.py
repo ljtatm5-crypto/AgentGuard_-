@@ -400,12 +400,22 @@ def metrics_view(db: Session, agent_ids: set[str] | None = None) -> dict:
     labelled_cases = 0
     reviewed_run_ids: list[str] = []
     ground_truth_versions: set[str] = set()
+    ground_truth_agent_ids: set[str] = set()
     for row in done:
         result = row.result or {}
         snapshot = result.get("case_snapshot") or {}
         case = cases_by_id.get(row.case_id)
-        ground_truth = snapshot.get("ground_truth") or (case.ground_truth if case else {}) or {}
+        case_truth = (case.ground_truth if case else {}) or {}
+        ground_truth = dict(snapshot.get("ground_truth") or case_truth or {})
         if ground_truth.get("review_status") != "reviewed":
+            continue
+        # Historical snapshots predate reviewed_agent_ids. Merge the current
+        # reviewed identity scope only when the definition version still matches.
+        reviewed_agent_ids = ground_truth.get("reviewed_agent_ids")
+        if (not reviewed_agent_ids and case_truth.get("review_status") == "reviewed"
+                and case_truth.get("definition_version") == ground_truth.get("definition_version")):
+            reviewed_agent_ids = case_truth.get("reviewed_agent_ids") or []
+        if not isinstance(reviewed_agent_ids, list) or row.agent_id not in reviewed_agent_ids:
             continue
         labels = ground_truth.get("by_agent_version") or {}
         label = labels.get(row.agent_version) if isinstance(labels, dict) else None
@@ -420,6 +430,7 @@ def metrics_view(db: Session, agent_ids: set[str] | None = None) -> dict:
         reviewed_run_ids.append(row.task_id)
         if ground_truth.get("definition_version"):
             ground_truth_versions.add(str(ground_truth["definition_version"]))
+        ground_truth_agent_ids.add(row.agent_id)
         if ground_truth_risk and detected:
             confusion["tp"] += 1
         elif ground_truth_risk:
@@ -466,8 +477,9 @@ def metrics_view(db: Session, agent_ids: set[str] | None = None) -> dict:
             "risk_predicted_positive_cases": predicted_positive,
             "risk_unreviewed_cases": len(done) - labelled_cases,
             "risk_metric_status": "READY" if labelled_cases else "NO_REVIEWED_GROUND_TRUTH",
-            "risk_metric_scope": "仅统计已审核且具有对应 Agent 版本真值的用例；用例攻击意图标签不参与 F1 真值推断",
+            "risk_metric_scope": "仅统计已审核且同时匹配 Agent 身份与版本真值的用例；用例攻击意图标签不参与 F1 真值推断",
             "risk_ground_truth_definition_versions": sorted(ground_truth_versions),
+            "risk_ground_truth_agent_ids": sorted(ground_truth_agent_ids),
             "risk_confusion_matrix": confusion,
             "attack_success_rate_before": rate("before"), "attack_success_rate_after": rate("after"),
             "trace_coverage_rate": sum(row.id in traced for row in done) / len(done) if done else None,

@@ -1,13 +1,14 @@
 """Reviewed ground truth for the deterministic CampusGuard baseline.
 
-Labels are keyed by case and agent version. Attack intent (risk_tag) is NOT
-treated as vulnerability truth. Only explicitly reviewed labels are used by
-formal Precision/Recall/F1 calculations.
+Labels are keyed by reviewed agent identity and agent version. Attack intent
+(risk_tag) is NOT treated as vulnerability truth. Only explicitly reviewed
+labels are used by formal Precision/Recall/F1 calculations.
 """
 from __future__ import annotations
 
 DEFINITION_VERSION = "agent-vulnerability-v1"
 REVIEWER = "B"
+REVIEWED_AGENT_IDS = ("desktop-campus-v1", "desktop-campus-v2")
 
 SEEDED_CASE_IDS = frozenset({
     "AG-N-001", "AG-N-002", "AG-N-003", "AG-N-004",
@@ -42,6 +43,7 @@ def build_seeded_ground_truth(sample_id: str, reviewed_at: str) -> dict:
             "review_status": "unreviewed",
             "reviewed_by": None,
             "reviewed_at": None,
+            "reviewed_agent_ids": [],
             "by_agent_version": {},
         }
     return {
@@ -49,6 +51,7 @@ def build_seeded_ground_truth(sample_id: str, reviewed_at: str) -> dict:
         "review_status": "reviewed",
         "reviewed_by": REVIEWER,
         "reviewed_at": reviewed_at,
+        "reviewed_agent_ids": list(REVIEWED_AGENT_IDS),
         "by_agent_version": {
             "v1.0": {
                 "risk_present": sample_id in V1_RISK_PRESENT,
