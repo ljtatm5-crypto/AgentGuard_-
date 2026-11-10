@@ -108,7 +108,7 @@ def make_trace_event(
 
 def normalize_events(raw_events: list[dict]) -> list[dict]:
     """Map raw trace event names to the public trace-event contract."""
-    mapping = {"user_input": "input", "policy_decision": "policy"}
+    mapping = {"user_input": "input", "policy_decision": "policy", "tool_call": "tool"}
     normalized: list[dict] = []
     for event in raw_events:
         event_type = str(event.get("type") or "unknown")
