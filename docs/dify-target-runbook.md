@@ -137,3 +137,23 @@ curl.exe -X POST http://127.0.0.1:8000/api/authorizations/AUTH-2026-B-001/revoke
 **Q：Dify 跑在 Docker 里，后端在宿主机，怎么连？**
 用 `host.docker.internal` 反过来不行——是**后端连 Dify**，所以填 Dify 容器的宿主机映射端口，
 例如 `http://192.168.1.20:8080` 或 `http://127.0.0.1:8080`（端口已映射到宿主机）。
+
+## 六、多轮会话契约（2026-11-11 补齐）
+
+每个测试用例由执行器生成独立 `session_id`。Dify 适配器按以下顺序执行：
+
+1. 第一轮发送空 `conversation_id`；
+2. 保存 Dify 响应中的 `conversation_id`；
+3. 同一用例后续轮次复用该值；
+4. 不同用例使用不同 `session_id`，不会串线；
+5. 用例结束后 `release_session()` 清除本地引用；
+6. 网络错误或响应缺少 `conversation_id` 时不更新会话引用。
+
+契约测试：
+
+```powershell
+cd backend
+.\.venv\Scripts\python.exe -m pytest tests/test_multi_platform_adapters.py -q
+```
+
+该测试使用 loopback 假服务，不等同于真实 Dify 模型实验。真实 Dify 仍需配置授权地址、模型、知识库和 API Key 后才能标记为 PASS。

@@ -37,3 +37,5 @@
 - 真实大模型生成/Judge 记录：`BLOCKED`
 - 80 条人工审核结果：`NOT_RUN`
 - 演示视频：`TODO`
+
+- `adapter_contract/`：Dify/FastGPT 契约测试真实结果；不包含真实模型实验，不能当作安全准确率证据。

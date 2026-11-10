@@ -75,12 +75,23 @@ docker compose up --build
 4. 打开 `/runs/:id`，查看轨迹、工具权限判定和攻击链。
 5. 在“报告”页查看通过率、风险检出率和修复前后对比占位。
 
-## 接下来接入自建 Dify 靶场
+## 自建 Dify / FastGPT 靶场
 
-自建 Dify 已支持受控接入。将目标主机加入 `AGENTGUARD_ALLOWED_TARGET_HOSTS`，在服务端
-设置 API Key 环境变量（例如 `DIFY_AGENT_API_KEY`），然后在 Agent 资产页选择
-“授权自建 Dify”，填写 Chat Messages 完整地址、凭据环境变量名和授权记录编号。
-适配器不跟随重定向、不读取系统代理，公网未知目标仍然拒绝。
+Dify 与 FastGPT 都已接入统一适配层。将目标主机加入 `AGENTGUARD_ALLOWED_TARGET_HOSTS`，
+在服务端设置 API Key 环境变量，然后在 Agent 资产页选择“授权自建 Dify”或
+“授权自建 FastGPT”，填写平台地址、凭据环境变量名、授权记录编号；FastGPT 还需要
+服务端 `appId`。
+
+- Dify：多轮会话复用服务端返回的 `conversation_id`，用例结束释放。
+- FastGPT：同一用例复用稳定 `chatId`，`detail=true` 时尝试映射检索/工具事件。
+- 两者都不跟随重定向、不走系统代理，并保留白名单、授权记录和 DNS 固定门禁。
+- 不能从平台响应中获得的检索、工具或工作流节点，统一标记为不可观测，不补造轨迹。
+
+接入文档：
+
+- `docs/dify-target-runbook.md`
+- `docs/fastgpt-target-runbook.md`
+- `docs/multi-platform-adapter-matrix.md`
 
 可选自建大模型通过 `AGENTGUARD_LLM_ENABLED`、`AGENTGUARD_LLM_CHAT_URL`、
 `AGENTGUARD_LLM_MODEL` 和 `AGENTGUARD_LLM_API_KEY_ENV` 配置。AI 用例必须人工确认后保存；

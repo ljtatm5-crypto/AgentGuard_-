@@ -1,4 +1,4 @@
-"""统一执行入口；campus 为本机确定性靶场，远程适配器尚未启用。"""
+"""统一执行入口；campus 为本机确定性靶场，远程平台走受控适配器。"""
 from __future__ import annotations
 
 import hashlib
@@ -19,6 +19,7 @@ from app.security.rag import KNOWLEDGE_DIR, KnowledgeBase
 from app.security.scope import ScopeGuard, ScopeViolation
 from app.security.tools import ToolRegistry, VirtualCampus
 from app.security.trace import TraceRecorder
+from app.services.adapters import invoke_remote, release_remote_session
 
 EVENT_TYPE_MAP = {"user_input": "input", "policy_decision": "policy"}
 SENSITIVE_SCOPES = {"grades", "students", "payroll", "tokens", "admins"}
@@ -34,6 +35,11 @@ class Invocation:
     adapter: str = "mock"
     agent_version: str = ""
     raw: dict = field(default_factory=dict)
+    session_reference: str | None = None
+    usage: dict = field(default_factory=dict)
+    evidence_level: str = "unavailable"
+    observable_capabilities: dict = field(default_factory=dict)
+    error: str | None = None
 
 
 class _Runtime:
@@ -179,34 +185,30 @@ def invoke_agent(agent: Any, input_text: str, risk_tag: str = "normal",
         raw["trace_events"] = recorder.to_list()
         return Invocation(reply.text, events, int((time.perf_counter() - started) * 1000),
                           _assess_risk(events, reply.text, reply.flags), "campus", version, raw)
-    if adapter in {"dify", "openai", "openai_compat"}:
+    if adapter in {"dify", "fastgpt", "openai", "openai_compat"}:
         return _invoke_remote(agent, input_text, adapter, session_id=session_id, db=db)
     raise ValueError(f"未知 adapter: {adapter}")
 
 
 def _invoke_remote(agent: Any, input_text: str, adapter: str, session_id: str | None = None,
                    db: Any = None) -> Invocation:
-    """调用受控自建 Dify / OpenAI 兼容接口。
-
-    三层防护，缺一不可：
-      1. 目标门禁 `validate_target_scope`：白名单 + 服务端授权记录（传 db 时强制）；
-      2. DNS 固定 `resolve_pinned`：解析一次、只允许私网、把结果钉住；
-      3. 请求结束后 `verify_unchanged`：解析结果变化即判定 DNS 重绑定并拒绝。
-    另外全程不跟随重定向、不走系统代理。
-    """
+    """调用受控远程平台，并统一执行目标门禁、DNS 固定与响应归一化。"""
     from app.core.config import get_settings
     from app.core.target_scope import validate_target_scope
-    from app.security.models import now_iso
 
     endpoint = str(getattr(agent, "endpoint", "") or "")
     permissions = dict(getattr(agent, "permissions", None) or {})
+    agent_id = str(getattr(agent, "id", "") or "remote-agent")
+    effective_session = session_id or f"remote:{agent_id}"
     validate_target_scope(
-        endpoint=endpoint, adapter=adapter,
+        endpoint=endpoint,
+        adapter=adapter,
         target_scope=str(permissions.get("__target_scope__", "")),
         authorization_confirmed=str(permissions.get("__authorization_confirmed__", "")).lower() == "true",
         authorization_reference=permissions.get("__authorization_reference__"),
         allowed_hosts=get_settings().allowed_target_host_list,
-        db=db, agent_id=str(getattr(agent, "id", "") or "") or None,
+        db=db,
+        agent_id=agent_id,
     )
     guard = get_runtime().guard
     guard.assert_allowed(endpoint)
@@ -218,129 +220,39 @@ def _invoke_remote(agent: Any, input_text: str, adapter: str, session_id: str | 
         raise ValueError(f"服务端环境变量 {credential_env or '(未配置)'} 中没有可用凭据")
 
     started = time.perf_counter()
-    if adapter == "dify":
-        request_body = {
-            "inputs": {},
-            "query": input_text,
-            "response_mode": "blocking",
-            "conversation_id": "",
-            "user": session_id or "agentguard",
-        }
-    else:
-        request_body = {
-            "model": str(getattr(agent, "model", "") or "gpt-4o-mini"),
-            "messages": [{"role": "user", "content": input_text}],
-            "temperature": 0,
-        }
-
-    # Both remote adapters use the same pinned-IP connection path. Sending the
-    # original endpoint through httpx would perform a second DNS lookup and
-    # reopen the rebinding race that netguard is meant to close.
-    status, body = pinned_request(
-        pin,
-        method="POST",
-        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-        body=json.dumps(request_body, ensure_ascii=False).encode("utf-8"),
+    result = invoke_remote(
+        adapter=adapter,
+        agent_id=agent_id,
+        session_id=effective_session,
+        input_text=input_text,
+        pin=pin,
+        api_key=api_key,
+        permissions=permissions,
+        model=str(getattr(agent, "model", "") or ""),
         timeout=get_settings().remote_request_timeout_seconds,
+        request_fn=pinned_request,
+        verify_fn=verify_unchanged,
     )
-    if status >= 400:
-        raise RuntimeError(f"被测 Agent 返回 HTTP {status}")
-    payload = json.loads(body.decode("utf-8", errors="replace"))
-
-    # 连接后复验：解析结果必须与固定值一致，否则判定为 DNS 重绑定。
-    verify_unchanged(pin)
-
-    if adapter != "dify":
-        choices = payload.get("choices") or []
-        answer = str((choices[0].get("message") or {}).get("content", "")) if choices else ""
-        now = now_iso()
-        events = [
-            {"id": new_id("evt"), "type": "input", "tool": None,
-             "params": {"content": input_text}, "output": None, "error": None, "duration_ms": 0},
-            {"id": new_id("evt"), "type": "response", "tool": None, "params": {"pinned_ip": pin.ip},
-             "output": answer, "error": None, "duration_ms": int((time.perf_counter() - started) * 1000)},
-        ]
-        return Invocation(
-            answer=answer, events=events,
-            latency=int((time.perf_counter() - started) * 1000),
-            risk_triggered="AG-SYS-BOUNDARY" in answer, adapter=adapter,
-            agent_version=str(getattr(agent, "version", "") or ""),
-            raw={"answer": answer, "pinned_ip": pin.ip, "trace_events": events},
-        )
-
-    nested = payload.get("data")
-    answer = str(payload.get("answer") or (nested.get("answer") if isinstance(nested, dict) else "") or "")
-    conversation_id = str(payload.get("conversation_id") or "")
-    trace_events = [
-        {
-            "id": new_id("evt"),
-            "run_id": session_id or "remote",
-            "type": "user_input",
-            "timestamp": now_iso(),
-            "tool": "",
-            "params": {"content": input_text},
-            "output": "",
-            "error": "",
-        },
-        {
-            "id": new_id("evt"),
-            "run_id": session_id or "remote",
-            "type": "response",
-            "timestamp": now_iso(),
-            "tool": "",
-            "params": {"conversation_id": conversation_id},
-            "output": answer,
-            "error": "",
-        },
-    ]
-    metadata = payload.get("metadata")
-    resources = metadata.get("retrieved_resources", []) if isinstance(metadata, dict) else []
-    for resource in resources or []:
-        trace_events.insert(
-            -1,
-            {
-                "id": new_id("evt"),
-                "run_id": session_id or "remote",
-                "type": "retrieval",
-                "timestamp": now_iso(),
-                "tool": "",
-                "params": {"resource": resource},
-                "output": "",
-                "error": "",
-            },
-        )
-    events = [
-        {
-            "id": event["id"],
-            "type": "input" if event["type"] == "user_input" else event["type"],
-            "tool": None,
-            "params": event["params"],
-            "output": event["output"] or None,
-            "error": None,
-            "duration_ms": 0,
-        }
-        for event in trace_events
-    ]
-    raw = {
-        "answer": answer,
-        "conversation_id": conversation_id,
-        "trace_events": trace_events,
-    }
     return Invocation(
-        answer=answer,
-        events=events,
+        answer=result.answer,
+        events=result.events,
         latency=int((time.perf_counter() - started) * 1000),
-        risk_triggered=False,
-        adapter="dify",
+        risk_triggered=result.risk_triggered,
+        adapter=adapter,
         agent_version=str(getattr(agent, "version", "") or ""),
-        raw=raw,
+        raw=result.raw,
+        session_reference=result.session_reference,
+        usage=result.usage,
+        evidence_level=result.evidence_level,
+        observable_capabilities=result.observable_capabilities,
     )
 
 
 def release_session(agent_id: str, session_id: str) -> None:
-    """多轮用例结束后释放其虚拟库；持久化证据由 A 的执行器负责。"""
+    """释放本地虚拟库与远程平台会话引用。"""
     if _runtime is not None:
         _runtime.release(str(agent_id), session_id)
+    release_remote_session(str(agent_id), session_id)
 
 
 def reset_runtime() -> None:
@@ -349,6 +261,8 @@ def reset_runtime() -> None:
         if _runtime is not None:
             _runtime.close()
         _runtime = None
+        from app.services.adapters.session_store import clear_session_store
+        clear_session_store()
 
 
 __all__ = ["Invocation", "invoke_agent", "policy_for", "get_runtime", "reset_runtime",
