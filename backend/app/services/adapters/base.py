@@ -108,7 +108,7 @@ def make_trace_event(
 
 def normalize_events(raw_events: list[dict]) -> list[dict]:
     """Map raw trace event names to the public trace-event contract."""
-    mapping = {"user_input": "input", "policy_decision": "policy"}
+    mapping = {"user_input": "input", "policy_decision": "policy", "tool_call": "tool"}
     normalized: list[dict] = []
     for event in raw_events:
         event_type = str(event.get("type") or "unknown")
@@ -126,7 +126,7 @@ def normalize_events(raw_events: list[dict]) -> list[dict]:
 
 def evidence_level(raw_events: list[dict]) -> str:
     types = {str(event.get("type")) for event in raw_events}
-    if types & {"retrieval", "tool", "policy", "memory_read", "memory_write"}:
+    if types & {"retrieval", "tool", "tool_call", "policy", "memory_read", "memory_write"}:
         return "observable"
     return "partial" if "response" in types else "unavailable"
 
@@ -139,7 +139,7 @@ def capability_summary(
 ) -> dict[str, Any]:
     types = {str(event.get("type")) for event in raw_events}
     has_rag = "retrieval" in types
-    has_tool = "tool" in types
+    has_tool = bool(types & {"tool", "tool_call"})
     return {
         "adapter": adapter,
         "question_answer": "response" in types,
@@ -148,5 +148,5 @@ def capability_summary(
         "tool_events": "observable" if has_tool else "unavailable",
         "workflow_events": "unavailable",
         "long_term_memory": "unavailable",
-        "notes": "仅声明实际可观测到的事件，不推断平台内部思维过程。",
+        "notes": "仅声明本次响应中实际可观测到的事件，不推断平台内部思维过程。",
     }

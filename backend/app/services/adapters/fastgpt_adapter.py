@@ -142,7 +142,7 @@ def _extract_detail_events(response_data: Any, *, session_id: str) -> tuple[list
             tool_name = str(node.get("toolName") or node.get("name") or module_name or "fastgpt_tool")
             tool_events.append(
                 make_trace_event(
-                    event_type="tool",
+                    event_type="tool_call",
                     run_id=session_id,
                     tool=tool_name,
                     params={
