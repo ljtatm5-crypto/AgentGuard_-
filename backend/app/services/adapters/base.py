@@ -100,7 +100,9 @@ def make_trace_event(
         "params": sanitize_payload(params or {}),
         "output": redact(output, limit=4000) if output else "",
         "error": redact(error, limit=1000) if error else "",
-        "duration_ms": int(duration_ms or 0),
+        # Raw security events use the TraceEvent dataclass field name.
+        # normalize_events() maps this to the public ``duration_ms`` contract.
+        "latency_ms": int(duration_ms or 0),
     }
 
 
@@ -117,7 +119,7 @@ def normalize_events(raw_events: list[dict]) -> list[dict]:
             "params": event.get("params") or {},
             "output": event.get("output") or None,
             "error": event.get("error") or None,
-            "duration_ms": int(event.get("duration_ms") or 0),
+            "duration_ms": int(event.get("duration_ms") or event.get("latency_ms") or 0),
         })
     return normalized
 
@@ -146,5 +148,5 @@ def capability_summary(
         "tool_events": "observable" if has_tool else "unavailable",
         "workflow_events": "unavailable",
         "long_term_memory": "unavailable",
-        "notes": "仅声明本次响应中实际可观测到的事件，不推断平台内部思维过程。",
+        "notes": "仅声明实际可观测到的事件，不推断平台内部思维过程。",
     }
