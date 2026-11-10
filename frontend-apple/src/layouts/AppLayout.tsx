@@ -30,7 +30,7 @@ export default function AppLayout() {
   const runtimeModeDetail = USE_MOCK
     ? '示例数据，仅用于演示'
     : caps
-      ? `${caps.database === 'postgresql' ? 'PostgreSQL' : 'SQLite'} · ${caps.anonymous_writes ? '匿名本地权限' : '受控写权限'}`
+      ? `${caps.database === 'postgresql' ? 'PostgreSQL' : 'SQLite'} · ${caps.anonymous_writes ? '公开演示权限' : '受控写权限'}`
       : '正在读取运行能力…'
   const [searchOpen, setSearchOpen] = useState(false)
   const [query, setQuery] = useState('')

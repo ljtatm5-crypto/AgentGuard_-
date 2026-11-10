@@ -71,7 +71,7 @@ def capabilities():
         "environment": settings.environment,
         "llm_enabled": settings.llm_enabled,
         "write_token_configured": bool(settings.write_token.strip()),
-        "private_reads_require_auth": True,
+        "private_reads_require_auth": not settings.allow_anonymous_writes,
         "rate_limit_scope": "per_process",
         "public_data_scope": "seeded_demo_summary",
     }
