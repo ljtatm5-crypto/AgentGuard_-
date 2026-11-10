@@ -44,7 +44,7 @@ AgentGuard 智测盾是面向 AI 智能体的质量、安全与行为风险自�
 生产数据库：Neon PostgreSQL（Alembic `0002_case_ground_truth (head)`）
 源码：https://github.com/ljtatm5-crypto/AgentGuard_-
 
-生产写操作需要服务端操作员令牌；在设置页输入令牌后，令牌只保存在当前浏览器会话。
+当前 Vercel 公开演示环境可直接执行受控规模的测试；代码默认仍支持服务端操作员令牌，可在关闭公开演示模式后恢复私有证据与写操作保护。
 
 ## 7. 安全边界
 

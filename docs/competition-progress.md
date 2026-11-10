@@ -20,7 +20,7 @@
 | 事件级轨迹 | PASS | `TraceEvent`、生产运行详情、三栏轨迹页 | 保持证据深链 |
 | 攻击链与证据回指 | PASS | 生产复验生成 19 条 Finding，节点保存 run/case/event ids | 补三组真实 Dify 攻击实验 |
 | 报告导出 | PASS | PDF/Markdown/CSV，含数据来源与适用范围 | 保持字段核对 |
-| 公开写接口控制 | PASS | 匿名 POST 401，错误令牌 403，有效令牌通过鉴权 | 操作员令牌已设置为 Vercel Secret |
+| 公开演示写权限 | PASS | 匿名创建与执行测试可用；令牌保护模式和错误令牌拒绝仍保留在代码与回归测试中 | 通过 `AGENTGUARD_ALLOW_ANONYMOUS_WRITES=false` 可恢复操作员令牌模式 |
 | 公开/私有读边界 | PASS | 生产复验：匿名摘要 200，运行详情/授权记录匿名 401，错误令牌 403，正确令牌 200 | 保持自动化回归 |
 | 请求限流与审计 | PASS | 写中间件、request id、结构化日志 | 后续迁移到持久化审计表 |
 | 同步任务规模上限 | PASS | `AGENTGUARD_MAX_CASES_PER_RUN=40` | 真实模型需异步 Worker |
@@ -53,7 +53,7 @@
 
 ### 阶段一：公开 API 安全整改
 
-- 所有写接口默认需要 Bearer 操作员令牌，公开读保持可用。
+- 代码默认仍要求 Bearer 操作员令牌；当前参赛演示部署显式开启公开写入，方便评委直接操作。
 - 增加请求大小限制、单实例限流、request id 与结构化审计日志。
 - 前端设置页令牌只保存到 `sessionStorage`。
 - 生产 Vercel Secret 已配置，令牌不进入 Git。

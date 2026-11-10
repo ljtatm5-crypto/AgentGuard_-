@@ -117,8 +117,12 @@ def is_operator_request(request: Request) -> bool:
 
 
 def _principal(request: Request, settings: Settings) -> Principal | None:
-    if settings.allow_anonymous_writes and settings.environment in {"development", "test"}:
-        return Principal(subject="anonymous-local", role="operator")
+    # Competition/demo deployments may explicitly open the workspace so judges
+    # can run tests without distributing an operator credential. Keep this
+    # behind an environment flag; the secure default remains deny-by-default.
+    if settings.allow_anonymous_writes:
+        client = request.client.host if request.client else "unknown"
+        return Principal(subject=f"anonymous-demo:{client}", role="operator")
 
     supplied = _bearer_token(request)
     expected = settings.write_token.strip()

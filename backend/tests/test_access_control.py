@@ -8,9 +8,9 @@ from app.core.config import Settings
 from app.security.access import SlidingWindowRateLimiter, WriteAccessMiddleware, audit_logger
 
 
-def make_client(*, token: str = "operator-secret", allow_anonymous: bool = False, limit: int = 30, audit_log_enabled: bool = False) -> TestClient:
+def make_client(*, token: str = "operator-secret", allow_anonymous: bool = False, limit: int = 30, audit_log_enabled: bool = False, environment: str = "test") -> TestClient:
     settings = Settings(
-        environment="test",
+        environment=environment,
         allow_anonymous_writes=allow_anonymous,
         write_token=token,
         write_rate_limit_per_minute=limit,
@@ -32,6 +32,10 @@ def make_client(*, token: str = "operator-secret", allow_anonymous: bool = False
     async def write(request: Request):
         await request.body()
         return {"ok": True}
+
+    @app.get("/api/v2/runs/{task_id}")
+    def private_read(task_id: str):
+        return {"task_id": task_id, "raw": "demo evidence"}
 
     return TestClient(app)
 
@@ -64,6 +68,14 @@ def test_write_accepts_valid_token():
 def test_explicit_anonymous_mode_for_local_tests():
     response = make_client(allow_anonymous=True).post("/write", json={})
     assert response.status_code == 200
+
+
+def test_public_demo_mode_opens_writes_and_private_reads_in_production():
+    client = make_client(allow_anonymous=True, environment="production")
+    assert client.post("/write", json={}).status_code == 200
+    evidence = client.get("/api/v2/runs/demo-run")
+    assert evidence.status_code == 200
+    assert evidence.json()["raw"] == "demo evidence"
 
 
 def test_rate_limit_is_enforced():
