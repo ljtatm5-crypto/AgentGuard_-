@@ -6,7 +6,7 @@
 - 后端健康检查：https://agentguard-api-three.vercel.app/healthz
 - API 文档：https://agentguard-api-three.vercel.app/docs
 
-公开摘要读取无需登录。原始轨迹、运行详情、攻击链证据、授权记录和写操作需要在设置页输入 `AGENTGUARD_WRITE_TOKEN`。
+当前公开演示部署无需登录或操作员令牌，可直接查看公开摘要、原始运行证据并执行测试。安全默认仍支持通过 `AGENTGUARD_WRITE_TOKEN` 恢复受控模式。
 
 ## 本地运行
 

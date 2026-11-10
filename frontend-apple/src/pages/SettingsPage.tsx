@@ -32,6 +32,7 @@ export default function SettingsPage() {
   const capabilities = useAsync(() => api.getCapabilities(), [])
   const caps = capabilities.state.phase === 'ready' ? capabilities.state.data : null
   const isProduction = caps?.environment === 'production'
+  const publicDemo = caps?.anonymous_writes ?? false
   const modeLabel = USE_MOCK ? 'Mock 演示' : isProduction ? 'Vercel 生产' : '本地运行'
   const connectionLabel = USE_MOCK ? '内置 Mock' : isProduction ? 'Vercel 生产 API' : '本地/开发 API'
   const databaseLabel = caps ? (caps.database === 'postgresql' ? 'PostgreSQL' : 'SQLite') : '读取中'
@@ -43,9 +44,11 @@ export default function SettingsPage() {
     detail: USE_MOCK
       ? '当前使用浏览器内置演示数据，不需要连接后端即可完成功能体验。'
       : isProduction
-        ? '当前读取 Vercel 生产 API；公开页面展示脱敏摘要，原始轨迹与授权记录需要操作员令牌。'
+        ? publicDemo
+          ? '当前为公开演示模式：可以直接创建任务、执行测试并查看运行证据。'
+          : '当前读取 Vercel 生产 API；公开页面展示脱敏摘要，原始轨迹与授权记录需要操作员令牌。'
         : '当前读取本地或开发环境 API，数据来自已保存运行记录。',
-    status: USE_MOCK ? '演示数据' : isProduction ? '生产摘要' : '本地运行',
+    status: USE_MOCK ? '演示数据' : isProduction ? (publicDemo ? '公开演示' : '生产摘要') : '本地运行',
     icon: SquaresFour,
   }]
   const [controlKey, setControlKeyValue] = useState(getControlKey)
@@ -74,8 +77,8 @@ export default function SettingsPage() {
           <span className={`mode-pill ${USE_MOCK ? 'is-mock' : 'is-live'}`}>
             <span className="dot" />{modeLabel}
           </span>
-          <h2>{USE_MOCK ? '智能体测试工作区' : isProduction ? '线上生产工作区' : '本地测试工作区'}</h2>
-          <p>{USE_MOCK ? '所有内容来自预置示例，适合产品演示和功能验收。' : isProduction ? '当前连接 Vercel 生产 API 与持久化数据库；公开摘要可匿名查看，私有证据需要操作员令牌。' : '当前连接本地或开发 API，可查看已保存运行记录。'}</p>
+          <h2>{USE_MOCK ? '智能体测试工作区' : isProduction ? (publicDemo ? '线上公开演示工作区' : '线上生产工作区') : '本地测试工作区'}</h2>
+          <p>{USE_MOCK ? '所有内容来自预置示例，适合产品演示和功能验收。' : isProduction ? (publicDemo ? '当前连接 Vercel 生产 API 与持久化数据库；无需操作员令牌，可直接执行受控规模的测试。' : '当前连接 Vercel 生产 API 与持久化数据库；公开摘要可匿名查看，私有证据需要操作员令牌。') : '当前连接本地或开发 API，可查看已保存运行记录。'}</p>
         </div>
         <div className="settings-facts">
           <span><small>数据连接</small><strong>{connectionLabel}</strong></span>
@@ -87,7 +90,7 @@ export default function SettingsPage() {
         </div>
       </MotionSurface>
 
-      {!USE_MOCK && (
+      {!USE_MOCK && caps?.writes_require_auth && (
         <section className="panel write-access-panel" data-testid="write-access-panel">
           <div className="panel-head">
             <div>

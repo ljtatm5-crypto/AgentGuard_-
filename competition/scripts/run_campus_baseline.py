@@ -121,13 +121,12 @@ def run_remote(base_url: str, token_file: Path | None, output_prefix: str, suite
     import httpx
 
     token = token_file.read_text(encoding="utf-8").strip() if token_file else os.environ.get("AGENTGUARD_WRITE_TOKEN", "").strip()
-    if not token:
-        raise SystemExit("remote mode requires --token-file or AGENTGUARD_WRITE_TOKEN")
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
 
     base = base_url.rstrip("/")
     with httpx.Client(
         base_url=base,
-        headers={"Authorization": f"Bearer {token}"},
+        headers=headers,
         timeout=120,
         follow_redirects=False,
     ) as client:
@@ -144,7 +143,7 @@ def run_remote(base_url: str, token_file: Path | None, output_prefix: str, suite
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run the deterministic CampusGuard V1.0/V2.0 baseline")
     parser.add_argument("--base-url", help="Run against a deployed API instead of the local test client")
-    parser.add_argument("--token-file", type=Path, help="Operator token file for remote mode")
+    parser.add_argument("--token-file", type=Path, help="Optional operator token file; public demo deployments do not require one")
     parser.add_argument("--output-prefix", default="campus_baseline", help="Evidence filename prefix")
     parser.add_argument("--suite-id", default="desktop-security-v1")
     args = parser.parse_args()
