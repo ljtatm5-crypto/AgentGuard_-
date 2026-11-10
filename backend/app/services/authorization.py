@@ -28,7 +28,7 @@ from sqlalchemy.orm import Session
 from app.models.entities import AuthorizationRecord
 
 REFERENCE_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{3,79}$")
-TARGET_SCOPES = {"self_hosted_dify", "authorized_external"}
+TARGET_SCOPES = {"self_hosted_dify", "self_hosted_fastgpt", "authorized_external"}
 DEFAULT_VALID_DAYS = 30
 
 

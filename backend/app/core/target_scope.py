@@ -41,7 +41,7 @@ def validate_target_scope(
             raise TargetScopeError("Mock 适配器只能使用 local:// 地址和 local_mock 范围。")
         return TargetScopeDecision(True, target_scope, "local", "本地模拟靶场")
 
-    if target_scope not in {"self_hosted_dify", "authorized_external"}:
+    if target_scope not in {"self_hosted_dify", "self_hosted_fastgpt", "authorized_external"}:
         raise TargetScopeError("非 Mock Agent 必须标记为自建 Dify 靶场或已授权外部靶场。")
     if not authorization_confirmed or not (authorization_reference or "").strip():
         raise TargetScopeError("缺少书面授权/自建靶场记录，禁止连接该目标。")
@@ -87,5 +87,6 @@ def validate_target_scope(
                 f"授权编号 {authorization_reference or '(缺失)'} 未通过服务端校验：{checked.reason}"
             )
 
-    label = "自建 Dify 靶场" if target_scope == "self_hosted_dify" else "明确授权靶场"
+    labels = {"self_hosted_dify": "自建 Dify 靶场", "self_hosted_fastgpt": "自建 FastGPT 靶场", "authorized_external": "明确授权靶场"}
+    label = labels.get(target_scope, "明确授权靶场")
     return TargetScopeDecision(True, target_scope, host, label)

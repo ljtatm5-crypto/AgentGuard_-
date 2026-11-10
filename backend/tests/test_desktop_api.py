@@ -670,3 +670,103 @@ def test_ai_generated_cases_require_human_accept_before_save(desktop, monkeypatc
     assert saved["review_required"] is False
     assert saved["generation_source"] == "human_reviewed_ai_draft"
     assert all(case["source"] == "ai_generated" for case in saved["cases"])
+
+
+def test_authorized_fastgpt_asset_requires_app_id_and_server_credential(desktop, monkeypatch):
+    client, _ = desktop
+    payload = {
+        "name": "FastGPT 校园靶场",
+        "version": "v2.0",
+        "agent_type": "rag",
+        "connection_mode": "fastgpt_authorized",
+        "endpoint": "http://127.0.0.1:9997/api/v1/chat/completions",
+        "credential_env": "AGENTGUARD_TEST_FASTGPT_KEY",
+        "authorization_reference": "AUTH-FASTGPT-001",
+        "authorization_confirmed": True,
+        "app_id": "app-contract-001",
+    }
+    monkeypatch.delenv("AGENTGUARD_TEST_FASTGPT_KEY", raising=False)
+    missing = client.post("/api/v2/agents/validate", json=payload)
+    assert missing.status_code == 422
+    assert missing.json()["error_code"] == "credential_missing"
+
+    monkeypatch.setenv("AGENTGUARD_TEST_FASTGPT_KEY", "local-fastgpt-secret")
+    no_app = client.post("/api/v2/agents/validate", json={**payload, "app_id": ""})
+    assert no_app.status_code == 422
+    assert no_app.json()["error_code"] == "contract_missing_field"
+
+    no_auth = client.post("/api/v2/agents/validate", json=payload)
+    assert no_auth.status_code == 403
+    assert no_auth.json()["error_code"] == "scope_denied"
+
+    authorization = client.post("/api/authorizations", json={
+        "reference": "AUTH-FASTGPT-001",
+        "owner": "队员B",
+        "purpose": "FastGPT 本地契约测试",
+        "target_scope": "self_hosted_fastgpt",
+        "host": "127.0.0.1",
+        "port": 9997,
+        "valid_days": 1,
+    })
+    assert authorization.status_code == 200, authorization.text
+
+    created = client.post("/api/v2/agents/validate", json=payload)
+    assert created.status_code == 200, created.text
+    body = created.json()
+    assert body["adapter"] == "fastgpt"
+    assert body["platform"] == "FastGPT"
+    assert body["observable_capabilities"]["multi_turn"] is True
+    assert body["observable_capabilities"]["rag_events"] == "observable_when_detail_returned"
+    assert "local-fastgpt-secret" not in json.dumps(body)
+    stored_authorization = client.get("/api/authorizations/AUTH-FASTGPT-001").json()
+    assert stored_authorization["agent_id"] == body["id"]
+
+
+def test_create_run_accepts_fastgpt_adapter(desktop, monkeypatch):
+    client, _ = desktop
+    monkeypatch.setenv("AGENTGUARD_TEST_FASTGPT_KEY", "local-fastgpt-secret")
+    client.post("/api/authorizations", json={
+        "reference": "AUTH-FASTGPT-RUN-001",
+        "owner": "队员B",
+        "purpose": "FastGPT 执行链契约测试",
+        "target_scope": "self_hosted_fastgpt",
+        "host": "127.0.0.1",
+        "port": 9996,
+        "valid_days": 1,
+    })
+    created = client.post("/api/v2/agents/validate", json={
+        "name": "FastGPT 执行链契约",
+        "version": "v2.0",
+        "agent_type": "rag",
+        "connection_mode": "fastgpt_authorized",
+        "endpoint": "http://127.0.0.1:9996/api/v1/chat/completions",
+        "credential_env": "AGENTGUARD_TEST_FASTGPT_KEY",
+        "authorization_reference": "AUTH-FASTGPT-RUN-001",
+        "authorization_confirmed": True,
+        "app_id": "app-run-contract",
+    })
+    assert created.status_code == 200, created.text
+
+    from app.services.agent_adapter import Invocation
+
+    def fake_invoke(_agent, text, _risk_tag="normal", session_id=None, db=None):
+        from uuid import uuid4
+        suffix = uuid4().hex[:12]
+        input_id = f"evt-fastgpt-input-{suffix}"
+        response_id = f"evt-fastgpt-response-{suffix}"
+        events = [
+            {"id": input_id, "type": "input", "params": {"content": text}, "output": None, "error": None, "duration_ms": 0},
+            {"id": response_id, "type": "response", "params": {}, "output": "ok", "error": None, "duration_ms": 1},
+        ]
+        raw_events = [
+            {"id": input_id, "run_id": session_id or "fastgpt", "type": "user_input", "params": {"content": text}, "output": "", "error": "", "timestamp": "2026-11-11T00:00:00+00:00"},
+            {"id": response_id, "run_id": session_id or "fastgpt", "type": "response", "params": {}, "output": "ok", "error": "", "timestamp": "2026-11-11T00:00:01+00:00"},
+        ]
+        return Invocation(answer="ok", events=events, latency=1, adapter="fastgpt", raw={"trace_events": raw_events},
+                            evidence_level="partial", observable_capabilities={"adapter": "fastgpt", "multi_turn": True})
+
+    monkeypatch.setattr("app.services.agent_adapter.invoke_agent", fake_invoke)
+    response = client.post("/api/v2/runs", json={"agent_id": created.json()["id"], "suite_id": SEED_SUITE_ID})
+    assert response.status_code == 200, response.text
+    assert response.json()["adapter"] == "fastgpt"
+    assert response.json()["evidence_level"] == "partial"

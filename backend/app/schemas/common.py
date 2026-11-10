@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class AgentCreate(BaseModel):
     name: str = "校园智能助手"
     endpoint: str = "local://campus-assistant"
-    adapter: Literal["mock", "dify", "openai"] = "mock"
+    adapter: Literal["mock", "campus", "dify", "fastgpt", "openai", "openai_compat"] = "mock"
     model: str = "local-rule-model"
     version: str = "v0.1-demo"
     knowledge: list[str] = Field(default_factory=lambda: ["课程与考试", "校园通知", "图书馆规则"])
@@ -15,7 +15,7 @@ class AgentCreate(BaseModel):
     permissions: dict[str, str] = Field(
         default_factory=lambda: {"campus_search": "allow", "protected_write": "review"}
     )
-    target_scope: Literal["local_mock", "self_hosted_dify", "authorized_external"] = "local_mock"
+    target_scope: Literal["local_mock", "self_hosted_dify", "self_hosted_fastgpt", "authorized_external"] = "local_mock"
     authorization_confirmed: bool = False
     authorization_reference: str | None = None
 

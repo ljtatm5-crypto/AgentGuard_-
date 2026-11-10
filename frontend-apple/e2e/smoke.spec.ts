@@ -49,6 +49,17 @@ test('授权范围明确标注禁止外部站点目标', async ({ page }) => {
   await expect(scope).toContainText('禁止外部站点目标')
 })
 
+test('三种接入模式可见并展示 FastGPT 专属字段', async ({ page }) => {
+  await page.goto('/agents')
+  await page.getByTestId('connect-agent-btn').click()
+  await expect(page.getByTestId('connect-mode-dify')).toBeVisible()
+  await expect(page.getByTestId('connect-mode-fastgpt')).toBeVisible()
+  await page.getByTestId('connect-mode-fastgpt').click()
+  await expect(page.getByTestId('connect-fastgpt-endpoint')).toBeVisible()
+  await expect(page.getByTestId('connect-fastgpt-app-id')).toBeVisible()
+  await expect(page.getByTestId('connect-fastgpt-credential-env')).toBeVisible()
+})
+
 test('攻击链节点可定位到证据', async ({ page }) => {
   await page.goto('/findings')
   await page.getByRole('button', { name: '攻击链' }).first().click()

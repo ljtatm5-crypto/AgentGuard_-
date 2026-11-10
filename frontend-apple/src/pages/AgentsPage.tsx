@@ -24,6 +24,19 @@ const agentTypeLabel = Object.fromEntries(
   AGENT_TYPES.map((item) => [item.value, item.label]),
 ) as Record<Agent['agent_type'], string>
 
+type ConnectionMode = 'local_sandbox' | 'dify_authorized' | 'fastgpt_authorized'
+
+const capabilityText: Record<string, string> = {
+  observable: '可观测',
+  partial: '部分可观测',
+  unavailable: '不可观测',
+  observable_when_returned: '返回后可观测',
+  observable_when_detail_returned: 'detail 返回后可观测',
+  unavailable_unless_returned: '仅接口返回时可观测',
+  not_verified: '尚未验证',
+  simulated: '模拟事件',
+}
+
 function mergeAgents(initial: Agent[], connected: Agent[]): Agent[] {
   const merged = [...connected, ...initial]
   return merged.filter((agent, index) => merged.findIndex((item) => item.id === agent.id) === index)
@@ -32,12 +45,13 @@ function mergeAgents(initial: Agent[], connected: Agent[]): Agent[] {
 export default function AgentsPage() {
   const { state, retry } = useAsync(() => api.listAgents(), [])
   const [connectOpen, setConnectOpen] = useState(false)
-  const [connectionMode, setConnectionMode] = useState<'local_sandbox' | 'dify_authorized'>('local_sandbox')
+  const [connectionMode, setConnectionMode] = useState<ConnectionMode>('local_sandbox')
   const [name, setName] = useState('')
   const [agentType, setAgentType] = useState<Agent['agent_type']>('conversation')
   const [model, setModel] = useState('')
   const [endpoint, setEndpoint] = useState('')
   const [credentialEnv, setCredentialEnv] = useState('DIFY_AGENT_API_KEY')
+  const [appId, setAppId] = useState('')
   const [authorizationReference, setAuthorizationReference] = useState('')
   const [authorizationConfirmed, setAuthorizationConfirmed] = useState(false)
   const [connecting, setConnecting] = useState(false)
@@ -51,13 +65,19 @@ export default function AgentsPage() {
       setConnectError('请输入智能体名称')
       return
     }
-    if (connectionMode === 'dify_authorized') {
+    if (connectionMode !== 'local_sandbox') {
       if (USE_MOCK) {
-        setConnectError('真实 Dify 接入需要切换到 API 模式并使用后端网关')
+        setConnectError('真实平台接入需要切换到 API 模式并使用后端网关')
         return
       }
       if (!endpoint.trim()) {
-        setConnectError('请输入自建 Dify 的 Chat Messages 接口地址')
+        setConnectError(connectionMode === 'fastgpt_authorized'
+          ? '请输入自建 FastGPT 的 Chat Completions 地址'
+          : '请输入自建 Dify 的 Chat Messages 接口地址')
+        return
+      }
+      if (connectionMode === 'fastgpt_authorized' && !appId.trim()) {
+        setConnectError('请输入 FastGPT 应用 appId')
         return
       }
       if (!authorizationReference.trim() || !authorizationConfirmed) {
@@ -74,14 +94,17 @@ export default function AgentsPage() {
           ? `local://agent-${Date.now().toString(36)}`
           : endpoint.trim(),
         agent_type: agentType,
-        model: model.trim() || (connectionMode === 'local_sandbox' ? 'deterministic-local-sandbox' : 'dify-self-hosted'),
+        model: model.trim() || (connectionMode === 'local_sandbox'
+          ? 'deterministic-local-sandbox'
+          : connectionMode === 'fastgpt_authorized' ? 'fastgpt-self-hosted' : 'dify-self-hosted'),
         permissions: {},
         connection_mode: connectionMode,
       }
-      if (connectionMode === 'dify_authorized') {
+      if (connectionMode !== 'local_sandbox') {
         payload.credential_env = credentialEnv.trim()
         payload.authorization_reference = authorizationReference.trim()
         payload.authorization_confirmed = true
+        if (connectionMode === 'fastgpt_authorized') payload.app_id = appId.trim()
       }
       const created = await api.validateAgent(payload)
       setConnected((items) => mergeAgents(items, [created]))
@@ -89,6 +112,7 @@ export default function AgentsPage() {
       setName('')
       setModel('')
       setEndpoint('')
+      setAppId('')
       setAuthorizationReference('')
       setAuthorizationConfirmed(false)
       setConnectOpen(false)
@@ -115,7 +139,7 @@ export default function AgentsPage() {
           data-testid="connect-agent-btn"
         >
           {connectOpen ? <X size={17} /> : <Plus size={17} weight="bold" />}
-          {connectOpen ? '收起' : '创建本地测试资产'}
+          {connectOpen ? '收起' : '接入测试资产'}
         </button>
       </header>
 
@@ -124,10 +148,12 @@ export default function AgentsPage() {
           <div className="connect-head">
             <span className="connect-icon"><PlugsConnected size={24} weight="duotone" /></span>
             <div>
-              <h2 id="connect-title">{connectionMode === 'local_sandbox' ? '创建本地测试资产' : '接入授权 Dify 智能体'}</h2>
+              <h2 id="connect-title">{connectionMode === 'local_sandbox'
+                ? '创建本地测试资产'
+                : connectionMode === 'fastgpt_authorized' ? '接入授权 FastGPT 智能体' : '接入授权 Dify 智能体'}</h2>
               <p>{connectionMode === 'local_sandbox'
                 ? '在本地安全沙盒完成资产校验，再为它选择测试集和执行任务。'
-                : '通过服务端授权网关连接自建 Dify；凭据只从服务器环境变量读取。'}</p>
+                : `通过服务端授权网关连接自建 ${connectionMode === 'fastgpt_authorized' ? 'FastGPT' : 'Dify'}；凭据只从服务器环境变量读取，并明确标注可观测能力。`}</p>
             </div>
           </div>
 
@@ -143,11 +169,20 @@ export default function AgentsPage() {
             <button
               type="button"
               className={connectionMode === 'dify_authorized' ? 'active' : ''}
-              onClick={() => { setConnectionMode('dify_authorized'); setConnectError(null) }}
+              onClick={() => { setConnectionMode('dify_authorized'); setCredentialEnv('DIFY_AGENT_API_KEY'); setConnectError(null) }}
               data-testid="connect-mode-dify"
             >
               <strong>授权自建 Dify</strong>
-              <small>{USE_MOCK ? '需 API 模式与服务端凭据' : '仅允许私网或授权目标'}</small>
+              <small>{USE_MOCK ? '需 API 模式与服务端凭据' : 'RAG / 多轮 / 会话 ID'}</small>
+            </button>
+            <button
+              type="button"
+              className={connectionMode === 'fastgpt_authorized' ? 'active' : ''}
+              onClick={() => { setConnectionMode('fastgpt_authorized'); setCredentialEnv('FASTGPT_AGENT_API_KEY'); setConnectError(null) }}
+              data-testid="connect-mode-fastgpt"
+            >
+              <strong>授权自建 FastGPT</strong>
+              <small>{USE_MOCK ? '需 API 模式与服务端凭据' : 'appId / chatId / detail'}</small>
             </button>
           </div>
 
@@ -182,24 +217,37 @@ export default function AgentsPage() {
                 placeholder="选填，例如 qwen2.5-7b"
               />
             </label>
-            {connectionMode === 'dify_authorized' && (
+            {connectionMode !== 'local_sandbox' && (
               <div className="connect-dify-fields">
                 <label>
-                  Dify Chat Messages 地址
+                  {connectionMode === 'fastgpt_authorized' ? 'FastGPT Chat Completions 地址' : 'Dify Chat Messages 地址'}
                   <input
                     value={endpoint}
                     onChange={(event) => { setEndpoint(event.target.value); setConnectError(null) }}
-                    placeholder="http://内网Dify/v1/chat-messages"
-                    data-testid="connect-dify-endpoint"
+                    placeholder={connectionMode === 'fastgpt_authorized'
+                      ? 'http://内网FastGPT:3000/api/v1/chat/completions'
+                      : 'http://内网Dify/v1/chat-messages'}
+                    data-testid={connectionMode === 'fastgpt_authorized' ? 'connect-fastgpt-endpoint' : 'connect-dify-endpoint'}
                   />
                 </label>
+                {connectionMode === 'fastgpt_authorized' && (
+                  <label>
+                    FastGPT appId
+                    <input
+                      value={appId}
+                      onChange={(event) => { setAppId(event.target.value); setConnectError(null) }}
+                      placeholder="例如 app-xxxxxxxx"
+                      data-testid="connect-fastgpt-app-id"
+                    />
+                  </label>
+                )}
                 <label>
                   服务端凭据环境变量
                   <input
                     value={credentialEnv}
                     onChange={(event) => { setCredentialEnv(event.target.value); setConnectError(null) }}
-                    placeholder="DIFY_AGENT_API_KEY"
-                    data-testid="connect-dify-credential-env"
+                    placeholder={connectionMode === 'fastgpt_authorized' ? 'FASTGPT_AGENT_API_KEY' : 'DIFY_AGENT_API_KEY'}
+                    data-testid={connectionMode === 'fastgpt_authorized' ? 'connect-fastgpt-credential-env' : 'connect-dify-credential-env'}
                   />
                 </label>
                 <label>
@@ -216,7 +264,7 @@ export default function AgentsPage() {
                     checked={authorizationConfirmed}
                     onChange={(event) => { setAuthorizationConfirmed(event.target.checked); setConnectError(null) }}
                   />
-                  <span>我确认该 Dify 为自建或已获书面授权的内部目标</span>
+                  <span>我确认该目标为自建或已获书面授权的内部平台</span>
                 </label>
               </div>
             )}
@@ -232,7 +280,7 @@ export default function AgentsPage() {
             <ShieldCheck size={18} weight="duotone" />
             <span>{connectionMode === 'local_sandbox'
               ? '当前连接目标为本地安全沙盒；真实外部网站不可接入。'
-              : 'API Key 不会传给浏览器或写入数据库，只由服务端按环境变量名读取。'}</span>
+              : 'API Key 不会传给浏览器或写入数据库，只由服务端按环境变量名读取；不可观测事件不会被伪造。'}</span>
           </div>
           {connectError && <p className="form-error" role="alert" data-testid="connect-agent-error">{connectError}</p>}
         </section>
@@ -241,7 +289,7 @@ export default function AgentsPage() {
       {connected.length > 0 && (
         <div className="connect-success" role="status" data-testid="connect-agent-success">
           <CheckCircle size={18} weight="fill" />
-          已创建本地测试资产 {connected.at(-1)?.name}，可在下方列表继续配置测试
+          已创建测试资产 {connected.at(-1)?.name}，可在下方列表继续配置测试
         </div>
       )}
 
@@ -315,8 +363,12 @@ export default function AgentsPage() {
                       <span className="detail-label">连接信息</span>
                       <dl className="agent-facts">
                         <div><dt>接入地址</dt><dd className="mono">{selectedAgent.endpoint}</dd></div>
+                        <div><dt>平台</dt><dd>{selectedAgent.platform ?? '本地安全沙盒'}</dd></div>
                         <div><dt>模型</dt><dd className="mono">{selectedAgent.model}</dd></div>
                         <div><dt>测试范围</dt><dd>{selectedAgent.authorized_scope.target_type === 'internal_mock' ? '本地安全沙盒' : '已授权内部环境'}</dd></div>
+                        <div><dt>可观测能力</dt><dd>{selectedAgent.observable_capabilities
+                          ? `RAG ${capabilityText[selectedAgent.observable_capabilities.rag_events] ?? selectedAgent.observable_capabilities.rag_events} · 工具 ${capabilityText[selectedAgent.observable_capabilities.tool_events] ?? selectedAgent.observable_capabilities.tool_events} · 多轮 ${selectedAgent.observable_capabilities.multi_turn ? '支持' : '不可观测'}`
+                          : '由适配器在校验后声明'}</dd></div>
                       </dl>
                     </section>
 
