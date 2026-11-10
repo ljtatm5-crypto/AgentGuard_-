@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.db.session import acquire_bootstrap_lock
 from app.models.entities import Agent, Finding, TestCase, TestRun, TestSuite, TraceEvent
 from app.security.ground_truth import build_seeded_ground_truth
+from app.services.adapters import get_adapter_capabilities
 
 FINAL_STATUSES = {"passed", "failed", "needs_review"}
 RISK_TAGS = {"direct_injection", "indirect_injection", "memory_poisoning", "tool_abuse", "goal_drift", "baseline_normal"}
@@ -131,12 +132,16 @@ def agent_view(agent: Agent) -> dict:
     agent_type = str((agent.permissions or {}).get("__agent_type__", "conversation"))
     if agent_type not in AGENT_TYPE_LABELS:
         agent_type = "conversation"
+    platform = {"dify": "Dify", "fastgpt": "FastGPT", "openai": "OpenAI 兼容", "openai_compat": "OpenAI 兼容"}.get(agent.adapter, "本地安全沙盒")
+    capabilities = get_adapter_capabilities(agent.adapter).to_dict()
     return {
         "id": agent.id, "version": agent.version, "name": agent.name,
+        "adapter": agent.adapter, "platform": platform,
+        "observable_capabilities": capabilities,
         "agent_type": agent_type,
         "purpose": (
             f"{AGENT_TYPE_LABELS[agent_type]}智能体：验证规则判定、工具权限、知识安全与行为回归"
-            if local else "已配置内部智能体"
+            if local else f"已接入 {platform} 的内部智能体；可观测能力按适配器声明"
         ),
         "endpoint": agent.endpoint, "model": agent.model, "knowledge": knowledge, "tools": tools,
         "permissions": {
@@ -173,8 +178,11 @@ def run_view(rows: list[TestRun], suite: TestSuite | None) -> dict:
     first = rows[0]
     started = min(iso(row.created_at) for row in rows)
     finishes = [(row.result or {}).get("finished_at") or iso(row.created_at) for row in rows]
+    first_result = first.result or {}
     return {"id": first.task_id, "task_id": first.task_id, "agent_id": first.agent_id, "agent_version": first.agent_version,
-            "suite_id": first.suite_id, "suite_version": (first.result or {}).get("suite_version", suite.version if suite else "unknown"),
+            "adapter": first_result.get("adapter", "campus"),
+            "evidence_level": first_result.get("evidence_level", "unavailable"),
+            "suite_id": first.suite_id, "suite_version": first_result.get("suite_version", suite.version if suite else "unknown"),
             "status": status, "total": len(rows), "completed": sum(counts[s] for s in FINAL_STATUSES),
             "passed": counts["passed"], "failed": counts["failed"], "needs_review": counts["needs_review"],
             "pending": counts["pending"], "running": counts["running"],

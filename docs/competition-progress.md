@@ -1,6 +1,6 @@
 # AgentGuard 传智杯冲刺进度
 
-最后更新：2026-11-09
+最后更新：2026-11-11
 
 状态口径：`PASS` 已实际验证；`IN_PROGRESS` 正在实现；`BLOCKED` 缺外部条件；`NOT_RUN` 尚未执行。
 
@@ -11,7 +11,10 @@
 | React 测试工作台 | PASS | `frontend-apple/src`，7 个生产主路由 Playwright 实际访问 | 保持视觉基线 |
 | FastAPI `/api/v2` | PASS | `backend/app/api/desktop.py` | 保持契约兼容 |
 | 确定性校园安全靶场 | PASS | V1.0 7/26、V2.0 26/26，52 条生产逐用例结果 | 作为现场稳定复现实例 |
+| Dify 多轮会话 | PASS | `conversation_id` 契约测试通过，跨用例隔离与释放已覆盖 | 真实 Dify 模型实测仍需环境 |
+| FastGPT 适配器 | PASS | `appId/chatId/detail`、检索/工具事件映射、授权与执行链契约测试通过 | 真实 FastGPT 模型实测仍 BLOCKED |
 | 真实 Dify Agent | BLOCKED | 适配器、Runbook、知识与工具 OpenAPI 已准备 | 需要授权 Dify 地址、模型和 API Key |
+| 真实 FastGPT Agent | BLOCKED | 适配器、Runbook、授权/执行契约已准备 | 需要 Docker、模型、Embedding、appId 和 API Key |
 | AI 用例生成 | IN_PROGRESS | `llm_provider.py`、生成/人工接受链路 | 真实模型生成实验需凭据 |
 | 规则优先混合判定 | PASS | 规则优先、LLM 只做补充 | 补 Rule/LLM/Hybrid 对照实验（需模型） |
 | 事件级轨迹 | PASS | `TraceEvent`、生产运行详情、三栏轨迹页 | 保持证据深链 |
@@ -63,10 +66,13 @@
 - 生产环境使用 Neon 外部连接池 + SQLAlchemy `NullPool`，避免 Vercel 冷启动复用已关闭的 TLS 连接。
 - 两个生产 Run 记录在两次重新部署后仍可读取，跨部署持久化为 `PASS`。
 
-### 阶段三：双实例验证
+### 阶段三：多平台适配与双实例验证
 
 - 实例 A：确定性校园靶场已在生产环境实际执行，V1.0 为 7/26，V2.0 为 26/26。
 - 实例 B：已准备 Dify 实施清单、知识库测试数据与工具 OpenAPI 规范；真实 Dify Agent 仍为 `BLOCKED`，缺少授权地址、模型和 API Key。
+- 实例 C：FastGPT 专用适配、`appId/chatId/detail` 映射、检索/工具事件归一化、授权门禁和执行链契约测试已通过；真实 FastGPT 仍为 `BLOCKED`，当前环境没有 Docker、模型、Embedding、appId 和 API Key。
+- 契约测试证据：`competition/04_运行证据/adapter_contract/contract_test_summary.json`。
+- 跨平台实验状态：`competition/03_测试数据与实验/跨平台兼容性实验.md`。
 
 ### 阶段四：AI 用例生成与 Judge
 
@@ -102,7 +108,9 @@
 
 ## 关键阻塞
 
-1. 缺少真实 Dify 靶场地址、模型和 API Key；真实 Dify/LLM 端到端实验为 `BLOCKED`。
-2. 80 条候选用例尚未完成人工审核，不得声称“80 条已通过”。
-3. 演示视频尚未录制，视频地址仍为 TODO。
-4. 异步 Worker 或托管队列尚未实现；当前仅支持受控规模的同步任务。
+1. 当前执行环境没有可用 Docker，无法启动真实 Dify/FastGPT 靶场。
+2. 缺少真实 Dify 地址、模型和 `AGENTGUARD_DIFY_KEY`；真实 Dify 端到端实验为 `BLOCKED`。
+3. 缺少 FastGPT 模型、Embedding、appId、服务端凭据和授权地址；真实 FastGPT 实验为 `BLOCKED`。
+4. 80 条候选用例尚未完成人工审核，不得声称“80 条已通过”。
+5. 演示视频尚未录制，视频地址仍为 TODO。
+6. 异步 Worker 或托管队列尚未实现；当前仅支持受控规模的同步任务。

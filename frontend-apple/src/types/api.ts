@@ -36,6 +36,20 @@ export interface Agent {
   id: string
   version: string
   name: string
+  /** 适配器标识：campus / dify / fastgpt / openai_compat */
+  adapter?: string
+  platform?: string
+  /** 适配器声明的可观测能力；不可观测的能力必须明确标注 */
+  observable_capabilities?: {
+    adapter: string
+    question_answer: boolean
+    multi_turn: boolean
+    rag_events: string
+    tool_events: string
+    workflow_events: string
+    long_term_memory: string
+    notes: string
+  }
   /** 面向客户的智能体能力类型 */
   agent_type: 'conversation' | 'rag' | 'tool' | 'workflow'
   purpose: string
@@ -92,6 +106,8 @@ export interface TestRun {
   task_id: string
   agent_id: string
   agent_version: string
+  adapter?: string
+  evidence_level?: string
   suite_id: string
   suite_version: string
   status: RunStatus

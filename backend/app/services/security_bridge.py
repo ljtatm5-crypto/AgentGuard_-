@@ -30,11 +30,18 @@ def merge_security_invocations(invocations: list[Invocation]) -> Invocation:
     flags["actions"] = [action for inv in invocations for action in (inv.raw.get("flags") or {}).get("actions", [])]
     raw["flags"] = flags
     raw["text"] = last.answer
+    levels = [getattr(inv, "evidence_level", "unavailable") for inv in invocations]
+    merged_level = "observable" if "observable" in levels else "partial" if "partial" in levels else "unavailable"
     return Invocation(
         answer=last.answer, events=[event for inv in invocations for event in inv.events],
         latency=sum(inv.latency for inv in invocations),
         risk_triggered=any(inv.risk_triggered for inv in invocations),
         adapter=last.adapter, agent_version=last.agent_version, raw=raw,
+        session_reference=getattr(last, "session_reference", None),
+        usage={"turns": [getattr(inv, "usage", {}) for inv in invocations]},
+        evidence_level=merged_level,
+        observable_capabilities=getattr(last, "observable_capabilities", {}),
+        error=next((getattr(inv, "error", None) for inv in invocations if getattr(inv, "error", None)), None),
     )
 
 

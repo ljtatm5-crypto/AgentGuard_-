@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-09T07:51:21.036Z",
+  "generated_at": "2026-11-10T17:38:54.974Z",
   "root": "competition/04_运行证据",
   "files": [
     {
@@ -36,6 +36,16 @@
       "path": "页面截图\\生产环境总览.png",
       "bytes": 856546,
       "sha256": "b09fd15dbcd64081d3293e8530db1ffd64822c085ce670ee34c15cd0719772d9"
+    },
+    {
+      "path": "adapter_contract\\contract_test_summary.json",
+      "bytes": 2163,
+      "sha256": "fa2bb26cb51f62d25ea4aa482cea0c83e97f875b141d6ed2fe692202bac4be43"
+    },
+    {
+      "path": "adapter_contract\\README.md",
+      "bytes": 427,
+      "sha256": "4dd6c2103b9b9aa6c43283b94dfd3484c2e5a8a4f71b7bc146477373aa133d8f"
     },
     {
       "path": "campus_baseline.csv",
@@ -84,8 +94,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 1645,
-      "sha256": "5881ddb39b55229a67ad0d926b22cdd7704bff615ed734c22669986aa75fe8c0"
+      "bytes": 1819,
+      "sha256": "67d30cafa99e22674bc476b154d2a0a3431b43a2cb9839bba03db0d1fabc1953"
     }
   ]
 }

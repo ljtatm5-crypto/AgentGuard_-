@@ -123,7 +123,7 @@ def agent(agent_id: str, db: Session = Depends(get_db)):
 
 @router.post("/agents/validate")
 def validate_agent(payload: dict[str, Any], db: Session = Depends(get_db)):
-    """校验本地沙盒或明确授权的自建 Dify，不保存任何明文凭据。"""
+    """校验本地沙盒或明确授权的自建 Dify/FastGPT，不保存任何明文凭据。"""
     endpoint = str(payload.get("endpoint", ""))
     scope = payload.get("authorized_scope") or {}
     if not isinstance(scope, dict):
@@ -141,22 +141,29 @@ def validate_agent(payload: dict[str, Any], db: Session = Depends(get_db)):
         raise DesktopError(422, "contract_bad_enum", "智能体类型须为 conversation、rag、tool 或 workflow")
 
     connection_mode = str(payload.get("connection_mode", "local_sandbox"))
-    if connection_mode not in {"local_sandbox", "dify_authorized"}:
-        raise DesktopError(422, "contract_bad_enum", "连接方式须为 local_sandbox 或 dify_authorized")
+    if connection_mode not in {"local_sandbox", "dify_authorized", "fastgpt_authorized"}:
+        raise DesktopError(422, "contract_bad_enum", "连接方式须为 local_sandbox、dify_authorized 或 fastgpt_authorized")
     if connection_mode == "local_sandbox" and not endpoint.startswith("local://"):
         raise DesktopError(403, "scope_public_target_denied", "本地测试资产不能使用外部 HTTP(S) 地址")
-    if connection_mode == "dify_authorized":
+    if connection_mode in {"dify_authorized", "fastgpt_authorized"}:
         from app.core.config import get_settings
         from app.core.target_scope import TargetScopeError, validate_target_scope
 
+        is_fastgpt = connection_mode == "fastgpt_authorized"
+        adapter_name = "fastgpt" if is_fastgpt else "dify"
+        target_scope = "self_hosted_fastgpt" if is_fastgpt else "self_hosted_dify"
+        platform_label = "FastGPT" if is_fastgpt else "Dify"
         authorization_reference = str(payload.get("authorization_reference", "")).strip()
         credential_env = str(payload.get("credential_env", "")).strip()
         if not payload.get("authorization_confirmed") or not authorization_reference:
-            raise DesktopError(403, "scope_denied", "接入自建 Dify 前必须确认授权并填写授权记录编号")
+            raise DesktopError(403, "scope_denied", f"接入自建 {platform_label} 前必须确认授权并填写授权记录编号")
         if not re.fullmatch(r"[A-Z][A-Z0-9_]{2,63}", credential_env):
             raise DesktopError(422, "contract_bad_enum", "凭据环境变量名格式无效")
         if not os.getenv(credential_env):
             raise DesktopError(422, "credential_missing", f"服务端环境变量 {credential_env} 未配置")
+        app_id = str(payload.get("app_id", "")).strip()
+        if is_fastgpt and not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", app_id):
+            raise DesktopError(422, "contract_missing_field", "FastGPT 接入必须提供有效的 app_id")
         requested_agent_id = str(payload.get("agent_id") or "").strip()
         created_id = requested_agent_id or str(uuid4())
         if requested_agent_id and db.get(Agent, created_id) is not None:
@@ -164,8 +171,8 @@ def validate_agent(payload: dict[str, Any], db: Session = Depends(get_db)):
         try:
             validate_target_scope(
                 endpoint=endpoint,
-                adapter="dify",
-                target_scope="self_hosted_dify",
+                adapter=adapter_name,
+                target_scope=target_scope,
                 authorization_confirmed=True,
                 authorization_reference=authorization_reference,
                 allowed_hosts=get_settings().allowed_target_host_list,
@@ -174,16 +181,18 @@ def validate_agent(payload: dict[str, Any], db: Session = Depends(get_db)):
             )
         except TargetScopeError as exc:
             raise DesktopError(403, "scope_denied", str(exc)) from exc
+        tool_name = "fastgpt_chat" if is_fastgpt else "dify_chat"
         permissions = {
-            "tool:dify_chat": "allow",
+            f"tool:{tool_name}": "allow",
             "__agent_type__": agent_type,
-            "__target_scope__": "self_hosted_dify",
+            "__target_scope__": target_scope,
             "__authorization_confirmed__": "true",
             "__authorization_reference__": authorization_reference,
             "__credential_env__": credential_env,
         }
+        if is_fastgpt:
+            permissions["__fastgpt_app_id__"] = app_id
         from app.services.authorization import get_by_reference
-
         authorization = get_by_reference(db, authorization_reference)
         if authorization is not None and authorization.agent_id is None:
             authorization.agent_id = created_id
@@ -192,10 +201,10 @@ def validate_agent(payload: dict[str, Any], db: Session = Depends(get_db)):
             name=name,
             version=version,
             endpoint=endpoint,
-            adapter="dify",
-            model=str(payload.get("model") or "dify-self-hosted"),
+            adapter=adapter_name,
+            model=str(payload.get("model") or ("fastgpt-self-hosted" if is_fastgpt else "dify-self-hosted")),
             knowledge=[],
-            tools=[{"name": "dify_chat", "description": "调用自建 Dify 对话接口", "side_effect": "none"}],
+            tools=[{"name": tool_name, "description": f"调用自建 {platform_label} 对话接口", "side_effect": "none"}],
             permissions=permissions,
             status="validated",
         )
@@ -502,11 +511,12 @@ def runs(request: Request, db: Session = Depends(get_db)):
 @router.post("/runs")
 def create_run(payload: RunCreate, db: Session = Depends(get_db)):
     from app.services.agent_adapter import invoke_agent, release_session
+    from app.services.adapters import get_adapter_capabilities
     from app.services.security_bridge import merge_security_invocations
 
     asset = require(db, Agent, payload.agent_id, "agent_not_found", "智能体")
     suite = require(db, TestSuite, payload.suite_id, "suite_not_found", "测试集")
-    if asset.adapter not in {"campus", "local", "mock", "dify"}:
+    if asset.adapter not in {"campus", "local", "mock", "dify", "fastgpt"}:
         raise DesktopError(403, "scope_denied", "不支持的智能体连接类型")
     if asset.status != "validated":
         raise DesktopError(409, "agent_not_validated", "请先校验智能体配置")
@@ -582,6 +592,11 @@ def create_run(payload: RunCreate, db: Session = Depends(get_db)):
                               "risk_observed": invocation.risk_triggered, "security_case": risk_tag(case.risk_tag) != "baseline_normal",
                               "suite_version": suite.version, "started_at": iso(started), "finished_at": iso(datetime.now(timezone.utc)),
                               "case_snapshot": snapshot, "rules_fingerprint": fingerprint,
+                              "session_reference": getattr(invocation, "session_reference", None),
+                              "usage": getattr(invocation, "usage", {}),
+                              "evidence_level": getattr(invocation, "evidence_level", "unavailable"),
+                              "observable_capabilities": getattr(invocation, "observable_capabilities", {}),
+                              "adapter_error": getattr(invocation, "error", None),
                               "raw": raw}
                 sync_finding(db, run, case)
             except Exception as exc:
@@ -590,10 +605,12 @@ def create_run(payload: RunCreate, db: Session = Depends(get_db)):
                 run.status = "needs_review"
                 run.result = {"judge": {"source": "rule", "status": "needs_review", "reason": f"执行异常，须复核：{type(exc).__name__}: {exc}", "confidence": 0.0},
                               "adapter": asset.adapter, "suite_version": suite.version, "finished_at": iso(datetime.now(timezone.utc)),
-                              "case_snapshot": snapshot, "rules_fingerprint": fingerprint}
+                              "case_snapshot": snapshot, "rules_fingerprint": fingerprint,
+                              "evidence_level": "unavailable",
+                              "observable_capabilities": get_adapter_capabilities(asset.adapter).to_dict(),
+                              "adapter_error": f"{type(exc).__name__}: {exc}"}
             finally:
-                if asset.adapter in {"campus", "local"}:
-                    release_session(asset.id, session_id)
+                release_session(asset.id, session_id)
             batch_size = max(1, get_settings().run_batch_size)
             if index % batch_size == 0:
                 # Persist completed cases incrementally so a later timeout or

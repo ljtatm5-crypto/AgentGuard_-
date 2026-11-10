@@ -1,0 +1,69 @@
+{
+  "generated_at": "2026-11-11",
+  "evidence_kind": "adapter_contract",
+  "evidence_level": "contract_only",
+  "model_experiment": false,
+  "full_backend_suite": {
+    "collected": 138,
+    "status": "PASS",
+    "command": "cd backend && .\\.venv\\Scripts\\python.exe -m pytest -q"
+  },
+  "adapter_contract": {
+    "command": "cd backend && .\\.venv\\Scripts\\python.exe -m pytest tests/test_multi_platform_adapters.py -q",
+    "test_count": 10,
+    "status": "PASS",
+    "coverage": [
+      "dify conversation_id reuse, isolation and release",
+      "fastgpt appId/chatId/detail request mapping",
+      "fastgpt observable retrieval and tool event mapping",
+      "fastgpt top-level usage ignored as non-authoritative",
+      "fastgpt invalid JSON rejected explicitly"
+    ]
+  },
+  "api_execution_contract": {
+    "command": "cd backend && .\\.venv\\Scripts\\python.exe -m pytest tests/test_desktop_api.py -k fastgpt -q",
+    "test_count": 2,
+    "status": "PASS",
+    "coverage": [
+      "fastgpt authorization record and credential gate",
+      "fastgpt appId requirement",
+      "fastgpt adapter registration",
+      "fastgpt create_run execution path"
+    ]
+  },
+  "real_targets": {
+    "dify": {
+      "status": "BLOCKED",
+      "run_id": null,
+      "reason": "Docker unavailable; no authorized target, model or API key"
+    },
+    "fastgpt": {
+      "status": "BLOCKED",
+      "run_id": null,
+      "reason": "Docker unavailable; no authorized target, model, embedding or API key"
+    }
+  },
+  "blockers": [
+    "Docker command unavailable in the execution environment",
+    "AGENTGUARD_DIFY_KEY is not configured",
+    "AGENTGUARD_FASTGPT_KEY or selected credential_env is not configured"
+  ],
+  "non_claims": [
+    "Not a real LLM experiment",
+    "Not a security accuracy claim",
+    "Not proof that all Dify/FastGPT workflow nodes are observable"
+  ],
+  "frontend_verification": {
+    "typecheck": "PASS",
+    "lint": "PASS",
+    "build": "PASS",
+    "check_mock": "PASS",
+    "smoke": {
+      "passed": 58,
+      "skipped": 1
+    },
+    "api_e2e": {
+      "passed": 1
+    }
+  }
+}
