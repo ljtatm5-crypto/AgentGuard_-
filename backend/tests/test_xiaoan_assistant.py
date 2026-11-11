@@ -11,7 +11,7 @@ from app.core.config import Settings
 from app.db.session import Base, get_db
 from app.models.entities import Agent, Finding, TestCase, TestRun, TestSuite, TraceEvent
 from app.security.access import SlidingWindowRateLimiter, WriteAccessMiddleware
-from app.services.xiaoan.knowledge_loader import ensure_xiaoan_knowledge
+from app.services.xiaoan.knowledge_loader import ensure_assistant_schema, ensure_xiaoan_knowledge
 
 
 def build_app(db: Session, *, allow_anonymous: bool = False, token: str = "operator-secret") -> FastAPI:
@@ -181,3 +181,12 @@ def test_diagnosis_counts_events_beyond_presentation_cutoff():
             remediation = client.post("/api/v2/assistant/remediation", json={"finding_id": "finding-long"})
             assert remediation.status_code == 200
             assert any(item["type"] == "tool_call" for item in remediation.json()["evidence"])
+
+
+def test_assistant_schema_bootstrap_is_additive_and_idempotent():
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    with Session(engine) as db:
+        ensure_assistant_schema(db)
+        ensure_assistant_schema(db)
+        tables = set(__import__("sqlalchemy").inspect(engine).get_table_names())
+        assert {"assistant_documents", "assistant_chunks", "assistant_sessions", "assistant_messages", "assistant_feedback", "assistant_remediation_plans"} <= tables
