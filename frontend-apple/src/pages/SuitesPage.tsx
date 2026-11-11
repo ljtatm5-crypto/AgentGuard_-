@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { CheckCircle, Plus, Sparkle, X } from '@phosphor-icons/react'
-import { api, ApiRequestError, USE_MOCK } from '@/api/client'
+import { api, ApiRequestError } from '@/api/client'
 import { AsyncBoundary } from '@/components/AsyncBoundary'
 import { JudgeSourceTag } from '@/components/Tags'
 import { useAsync } from '@/hooks/useAsync'
@@ -175,7 +175,7 @@ export default function SuitesPage() {
               <input type="checkbox" checked={useAi} onChange={(event) => setUseAi(event.target.checked)} />
               <span>
                 <strong>使用自建模型生成 AI 候选</strong>
-                <small>{USE_MOCK ? 'Mock 模式仅演示流程，不伪装真实模型调用' : '需要服务端配置自建模型与凭据环境变量'}</small>
+                <small>AI 候选需人工确认后才会保存</small>
               </span>
             </label>
             <button className="btn btn-primary" type="submit" disabled={generating || agents.state.phase !== 'ready'} data-testid="generate-suite-submit">
@@ -195,7 +195,7 @@ export default function SuitesPage() {
                   <small>{generation.cases.length} 条用例 · {generation.llm_used
                     ? '自建模型候选'
                     : generation.generation_source === 'mock_draft'
-                      ? 'Mock 演示候选（未调用真实模型）'
+                      ? '演示候选（未调用模型）'
                       : '固定规则模板'}</small>
                 </div>
                 {generation.review_required && (

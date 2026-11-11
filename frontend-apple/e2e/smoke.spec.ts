@@ -68,11 +68,13 @@ test('攻击链节点可定位到证据', async ({ page }) => {
   await expect(page.locator('[data-testid="evidence-link"]').first()).toContainText('run-')
 })
 
-test('运行环境标签来自能力接口而非固定本地文案', async ({ page }) => {
+test('客户端界面不展示部署环境与数据库技术信息', async ({ page }) => {
   await page.goto('/overview')
-  const mode = page.getByTestId('runtime-mode-label')
-  await expect(mode).toContainText('Mock 数据模式')
-  await expect(mode).not.toContainText('本地靶场模式')
+  const body = await page.locator('body').innerText()
+  expect(body).not.toContain('Vercel')
+  expect(body).not.toContain('PostgreSQL')
+  expect(body).not.toContain('SQLite')
+  expect(body).not.toContain('公开演示权限')
 })
 
 test('Mock 与真实 API 共用 /api/v2 契约', async ({ page }) => {
