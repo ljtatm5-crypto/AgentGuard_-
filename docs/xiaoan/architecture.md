@@ -29,3 +29,7 @@ React 全局面板（页面感知）
 - 基础教学问题可以匿名提问；携带 `run_id`、`finding_id`、`case_id` 等私有上下文的请求必须通过现有操作员鉴权。
 - 公开演示部署可通过 `AGENTGUARD_ALLOW_ANONYMOUS_WRITES=true` 开放受控测试。
 - 小安与“被测 Agent 连接网关”使用独立的模型和 Embedding 配置。
+
+## 生产数据库保障
+
+`0003_xiaoan_assistant` 是正式 Alembic 迁移。为兼容已经部署、且 `AGENTGUARD_DB_AUTO_CREATE=false` 的旧实例，启动时会仅对六张新增 assistant 表执行幂等 `create_all(checkfirst=True)`；不会修改或删除现有业务表。

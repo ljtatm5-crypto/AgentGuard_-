@@ -13,6 +13,23 @@ from app.services.xiaoan.embedding_provider import embed_text
 from app.services.xiaoan.knowledge import KNOWLEDGE_DOCUMENTS, KNOWLEDGE_VERSION
 
 
+def ensure_assistant_schema(db: Session) -> None:
+    """Create only XiaoAn additive tables when an old deployment skipped 0003."""
+    from app.models.assistant_entities import (
+        AssistantChunk, AssistantDocument, AssistantFeedback, AssistantMessage,
+        AssistantRemediationPlan, AssistantSession,
+    )
+
+    AssistantDocument.metadata.create_all(
+        bind=db.get_bind(),
+        tables=[
+            AssistantDocument.__table__, AssistantChunk.__table__, AssistantSession.__table__,
+            AssistantMessage.__table__, AssistantFeedback.__table__, AssistantRemediationPlan.__table__,
+        ],
+        checkfirst=True,
+    )
+
+
 def ensure_xiaoan_knowledge(db: Session) -> dict:
     version = get_settings().xiaoan_knowledge_version or KNOWLEDGE_VERSION
     indexed = 0
