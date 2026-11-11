@@ -246,3 +246,119 @@ export interface Capabilities {
   rate_limit_scope: string
   public_data_scope: string
 }
+
+/** XiaoAn assistant contracts */
+export interface AssistantContext {
+  page: string
+  agent_id?: string | null
+  run_id?: string | null
+  case_id?: string | null
+  finding_id?: string | null
+  event_ids?: string[]
+}
+
+export interface AssistantStep {
+  title: string
+  detail: string
+  route?: string | null
+  action_label?: string | null
+}
+
+export interface AssistantSource {
+  id: string
+  document_id?: string | null
+  title: string
+  heading: string
+  source_path: string
+  route: string
+  excerpt: string
+  score: number
+  access_level: string
+  tags: string[]
+  embedding_provider?: string | null
+}
+
+export interface AssistantEvidenceCard {
+  type: string
+  label: string
+  detail: string
+  event_ids: string[]
+  status: 'observed' | 'inferred' | 'unavailable'
+  tool?: string | null
+  policy_decision?: string | null
+  timestamp?: string | null
+}
+
+export interface AssistantAnswer {
+  conclusion: string
+  steps: AssistantStep[]
+  evidence: AssistantEvidenceCard[]
+  sources: AssistantSource[]
+  limitations: string[]
+  suggested_questions: string[]
+  mode: 'local_grounded' | 'llm_grounded' | 'mock_grounded'
+  model_used?: string | null
+  confidence: number
+}
+
+export interface AssistantChatResponse {
+  message_id: string
+  session_id: string
+  answer: AssistantAnswer
+  created_at: string
+}
+
+export interface AssistantTutorialSummary {
+  id: string
+  title: string
+  description: string
+  page: string
+  step_count: number
+}
+
+export interface AssistantTutorialStep {
+  title: string
+  detail: string
+  route: string
+  action_label: string
+}
+
+export interface AssistantTutorial extends Omit<AssistantTutorialSummary, 'step_count'> {
+  steps: AssistantTutorialStep[]
+}
+
+export interface AssistantDiagnosis {
+  conclusion: string
+  summary: string
+  status: 'observed' | 'inferred' | 'unavailable'
+  evidence: AssistantEvidenceCard[]
+  observed: string[]
+  limitations: string[]
+  finding?: Record<string, unknown> | null
+  run?: Record<string, unknown> | null
+  case?: Record<string, unknown> | null
+  judge?: Record<string, unknown> | null
+  risk_tag?: string | null
+}
+
+export interface AssistantRemediation {
+  plan_id: string
+  risk_tag: string
+  problem: string
+  observed: string[]
+  causes: string[]
+  impact: string[]
+  recommendations: string[]
+  steps: string[]
+  side_effects: string[]
+  regression_plan: string[]
+  evidence: AssistantEvidenceCard[]
+  sources: AssistantSource[]
+  limitations: string[]
+  requires_human_confirmation: boolean
+}
+
+export interface AssistantFeedbackResponse {
+  id: string
+  accepted: boolean
+}

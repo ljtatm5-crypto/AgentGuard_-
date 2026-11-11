@@ -18,6 +18,7 @@ import { runs } from './fixtures/runs'
 import { traceEvents, traceByRun } from './fixtures/trace'
 import { mockApiPath } from '@/api/contract'
 import { mockJudgeTable, verdictForMockRun } from './fixtures/judgments'
+import { buildMockAnswer, buildMockDiagnosis, buildMockRemediation, mockTutorials, mockTutorialSummaries } from './fixtures/assistant'
 
 /** 可变状态：新任务返回独立的本地合成示例，不发出任何 Agent 请求。 */
 const agentState = new Map<string, Agent>(agents.map((agent) => [agent.id, { ...agent }]))
@@ -349,6 +350,55 @@ export const handlers = [
       rate_limit_scope: 'per_process',
       public_data_scope: 'mock_demo',
     })
+  }),
+
+  // ---------- 小安教学助手 ----------
+  http.post(mockApiPath('/assistant/chat'), async ({ request }) => {
+    await delay(260)
+    const body = (await request.json()) as { session_id?: string; message?: string; context?: Record<string, unknown> }
+    if (!body.message?.trim()) return err('VALIDATION_ERROR', '请输入问题', 422)
+    return HttpResponse.json({
+      message_id: `xiaoan-msg-${Date.now()}`,
+      session_id: body.session_id || `xiaoan-session-${Date.now()}`,
+      answer: buildMockAnswer(body.message, {
+        page: String(body.context?.page || '/overview'),
+        run_id: body.context?.run_id as string | undefined,
+        case_id: body.context?.case_id as string | undefined,
+        finding_id: body.context?.finding_id as string | undefined,
+      }),
+      created_at: new Date().toISOString(),
+    })
+  }),
+
+  http.get(mockApiPath('/assistant/tutorials'), async () => {
+    await delay(130)
+    return HttpResponse.json(mockTutorialSummaries())
+  }),
+
+  http.get(mockApiPath('/assistant/tutorials/:id'), async ({ params }) => {
+    const found = mockTutorials.find(item => item.id === params.id)
+    if (!found) return notFound('教学流程', String(params.id))
+    return HttpResponse.json(found)
+  }),
+
+  http.post(mockApiPath('/assistant/diagnose'), async ({ request }) => {
+    const body = (await request.json()) as Record<string, string | undefined>
+    return HttpResponse.json(buildMockDiagnosis({ page: '/runs', run_id: body.run_id, case_id: body.case_id, finding_id: body.finding_id }))
+  }),
+
+  http.post(mockApiPath('/assistant/remediation'), async ({ request }) => {
+    const body = (await request.json()) as Record<string, string | undefined>
+    return HttpResponse.json(buildMockRemediation({ page: '/findings', run_id: body.run_id, case_id: body.case_id, finding_id: body.finding_id }))
+  }),
+
+  http.post(mockApiPath('/assistant/feedback'), async () => {
+    return HttpResponse.json({ id: `xiaoan-feedback-${Date.now()}`, accepted: true })
+  }),
+
+  http.get(mockApiPath('/assistant/sources/:id'), async ({ params }) => {
+    const source = buildMockAnswer('如何阅读测试轨迹？', { page: '/runs' }).sources.find(item => item.id === params.id)
+    if (!source) return notFound('引用来源', String(params.id))
+    return HttpResponse.json({ ...source, content: source.excerpt, source_version: 'mock' })
   }),
 
   // ---------- 指标聚合 ----------

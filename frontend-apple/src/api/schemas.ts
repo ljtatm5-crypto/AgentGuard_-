@@ -233,6 +233,116 @@ const metricsSchema = z.object({
   risk_computed_from_run_ids: z.array(z.string()).optional(),
 })
 
+const assistantSourceSchema = z.object({
+  id: z.string(),
+  document_id: z.string().nullable().optional(),
+  title: z.string(),
+  heading: z.string(),
+  source_path: z.string(),
+  route: z.string(),
+  excerpt: z.string(),
+  score: z.number(),
+  access_level: z.string(),
+  tags: z.array(z.string()),
+  embedding_provider: z.string().nullable().optional(),
+})
+
+const assistantEvidenceSchema = z.object({
+  type: z.string(),
+  label: z.string(),
+  detail: z.string(),
+  event_ids: z.array(z.string()),
+  status: z.enum(['observed', 'inferred', 'unavailable']),
+  tool: z.string().nullable().optional(),
+  policy_decision: z.string().nullable().optional(),
+  timestamp: z.string().nullable().optional(),
+})
+
+const assistantStepSchema = z.object({
+  title: z.string(),
+  detail: z.string(),
+  route: z.string().nullable().optional(),
+  action_label: z.string().nullable().optional(),
+})
+
+const assistantAnswerSchema = z.object({
+  conclusion: z.string(),
+  steps: z.array(assistantStepSchema),
+  evidence: z.array(assistantEvidenceSchema),
+  sources: z.array(assistantSourceSchema),
+  limitations: z.array(z.string()),
+  suggested_questions: z.array(z.string()),
+  mode: z.enum(['local_grounded', 'llm_grounded', 'mock_grounded']),
+  model_used: z.string().nullable().optional(),
+  confidence: z.number(),
+})
+
+const assistantChatSchema = z.object({
+  message_id: z.string(),
+  session_id: z.string(),
+  answer: assistantAnswerSchema,
+  created_at: z.string(),
+})
+
+const assistantTutorialSummarySchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  description: z.string(),
+  page: z.string(),
+  step_count: z.number(),
+})
+
+const assistantTutorialSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  description: z.string(),
+  page: z.string(),
+  steps: z.array(z.object({
+    title: z.string(),
+    detail: z.string(),
+    route: z.string(),
+    action_label: z.string(),
+  })),
+})
+
+const assistantDiagnosisSchema = z.object({
+  conclusion: z.string(),
+  summary: z.string(),
+  status: z.enum(['observed', 'inferred', 'unavailable']),
+  evidence: z.array(assistantEvidenceSchema),
+  observed: z.array(z.string()),
+  limitations: z.array(z.string()),
+  finding: z.record(z.unknown()).nullable().optional(),
+  run: z.record(z.unknown()).nullable().optional(),
+  case: z.record(z.unknown()).nullable().optional(),
+  judge: z.record(z.unknown()).nullable().optional(),
+  risk_tag: z.string().nullable().optional(),
+})
+
+const assistantRemediationSchema = z.object({
+  plan_id: z.string(),
+  risk_tag: z.string(),
+  problem: z.string(),
+  observed: z.array(z.string()),
+  causes: z.array(z.string()),
+  impact: z.array(z.string()),
+  recommendations: z.array(z.string()),
+  steps: z.array(z.string()),
+  side_effects: z.array(z.string()),
+  regression_plan: z.array(z.string()),
+  evidence: z.array(assistantEvidenceSchema),
+  sources: z.array(assistantSourceSchema),
+  limitations: z.array(z.string()),
+  requires_human_confirmation: z.boolean(),
+})
+
+const assistantSourceDetailSchema = assistantSourceSchema.extend({
+  content: z.string(),
+  source_version: z.string(),
+})
+
+const assistantFeedbackSchema = z.object({ id: z.string(), accepted: z.boolean() })
+
 const capabilitiesSchema = z.object({
   public_read: z.boolean(),
   controlled_writes: z.boolean(),
@@ -266,6 +376,13 @@ export const schemas = {
   suiteGeneration: suiteGenerationSchema,
   metrics: metricsSchema,
   capabilities: capabilitiesSchema,
+  assistantChat: assistantChatSchema,
+  assistantTutorials: z.array(assistantTutorialSummarySchema),
+  assistantTutorial: assistantTutorialSchema,
+  assistantDiagnosis: assistantDiagnosisSchema,
+  assistantRemediation: assistantRemediationSchema,
+  assistantSource: assistantSourceDetailSchema,
+  assistantFeedback: assistantFeedbackSchema,
 } as const
 
 export { RunStatus, Severity }

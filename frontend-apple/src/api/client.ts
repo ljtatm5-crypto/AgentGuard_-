@@ -1,6 +1,14 @@
 import type { ZodType } from 'zod'
 import type {
   Agent,
+  AssistantChatResponse,
+  AssistantContext,
+  AssistantDiagnosis,
+  AssistantFeedbackResponse,
+  AssistantRemediation,
+  AssistantSource,
+  AssistantTutorial,
+  AssistantTutorialSummary,
   Capabilities,
   Finding,
   JudgeResult,
@@ -164,6 +172,34 @@ export const api = {
   listFindings: () => request<Finding[]>('/findings', schemas.findings),
   getFindingChain: (id: string) =>
     request<Finding>(`/findings/${id}/chain`, schemas.finding),
+
+  /* ---------------- 小安教学助手 ---------------- */
+  assistantChat: (payload: { session_id?: string | null; message: string; context: AssistantContext }) =>
+    request<AssistantChatResponse>('/assistant/chat', schemas.assistantChat, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  listAssistantTutorials: () =>
+    request<AssistantTutorialSummary[]>('/assistant/tutorials', schemas.assistantTutorials),
+  getAssistantTutorial: (id: string) =>
+    request<AssistantTutorial>(`/assistant/tutorials/${id}`, schemas.assistantTutorial),
+  diagnoseAssistant: (payload: { run_id?: string | null; case_id?: string | null; finding_id?: string | null; question?: string }) =>
+    request<AssistantDiagnosis>('/assistant/diagnose', schemas.assistantDiagnosis, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  assistantRemediation: (payload: { run_id?: string | null; case_id?: string | null; finding_id?: string | null; question?: string }) =>
+    request<AssistantRemediation>('/assistant/remediation', schemas.assistantRemediation, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  assistantFeedback: (payload: { message_id: string; rating: -1 | 1; comment?: string }) =>
+    request<AssistantFeedbackResponse>('/assistant/feedback', schemas.assistantFeedback, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  getAssistantSource: (id: string) =>
+    request<AssistantSource & { content: string; source_version: string }>(`/assistant/sources/${id}`, schemas.assistantSource),
 
   /* ---------------- 指标聚合 ---------------- */
   getMetrics: () => request<Metrics>('/metrics', schemas.metrics),

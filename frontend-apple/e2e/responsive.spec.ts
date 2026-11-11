@@ -45,3 +45,18 @@ test('深色外观确实生效', async ({ page }) => {
   await page.goto('/overview')
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
 })
+
+
+test('小安在移动端使用全屏面板且不产生横向溢出', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/overview')
+  await page.getByTestId('xiaoan-launcher').click()
+  await expect(page.getByTestId('xiaoan-panel')).toBeVisible()
+  const layout = await page.evaluate(() => {
+    const panel = document.querySelector<HTMLElement>('[data-testid="xiaoan-panel"]')!
+    return { width: Math.round(panel.getBoundingClientRect().width), overflow: document.documentElement.scrollWidth - innerWidth }
+  })
+  expect(layout.width).toBeGreaterThanOrEqual(388)
+  expect(layout.overflow).toBeLessThanOrEqual(1)
+  await page.getByRole('button', { name: '关闭小安' }).click()
+})
