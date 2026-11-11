@@ -75,7 +75,9 @@ def _event_card(event: TraceEvent) -> dict[str, Any]:
     }
 
 
-def run_evidence(db: Session, run_id: str, case_id: str | None = None) -> dict[str, Any] | None:
+def run_evidence(
+    db: Session, run_id: str, case_id: str | None = None, focus_event_ids: list[str] | None = None,
+) -> dict[str, Any] | None:
     run = resolve_run(db, run_id, case_id)
     if run is None:
         return None
@@ -87,9 +89,22 @@ def run_evidence(db: Session, run_id: str, case_id: str | None = None) -> dict[s
     relevant = [
         event for event in events
         if event.type in {"user_input", "retrieval", "tool_call", "tool_result", "policy_decision", "memory_read", "memory_write", "response", "error"}
-    ][:40]
-    cards = [_event_card(event) for event in relevant]
-    observed_risks = [card["label"] + "：" + card["detail"][:180] for card in cards if card["type"] in {"tool_call", "policy_decision", "error"}]
+    ]
+    all_cards = [_event_card(event) for event in relevant]
+    if focus_event_ids:
+        selected = set(focus_event_ids)
+        focused_cards = [card for card in all_cards if set(card["event_ids"]) & selected]
+        remainder = [card for card in all_cards if not set(card["event_ids"]) & selected]
+        cards = (focused_cards + remainder)[:40]
+    else:
+        cards = all_cards[:40]
+    counts = {
+        "tool_call": sum(card["type"] == "tool_call" for card in all_cards),
+        "policy_denied": sum(card["type"] == "policy_decision" and card.get("policy_decision") in {"deny", "review"} for card in all_cards),
+        "error": sum(card["type"] == "error" for card in all_cards),
+        "total_relevant": len(all_cards),
+    }
+    observed_risks = [card["label"] + "：" + card["detail"][:180] for card in all_cards if card["type"] in {"tool_call", "policy_decision", "error"}]
     return {
         "run": {
             "id": run.id,
@@ -119,6 +134,8 @@ def run_evidence(db: Session, run_id: str, case_id: str | None = None) -> dict[s
         "evidence": cards,
         "observed_risks": observed_risks,
         "trace_event_count": len(events),
+        "evidence_total": len(all_cards),
+        "counts": counts,
         "unavailable_reason": None if events else "当前运行没有可观测轨迹事件",
     }
 
@@ -127,13 +144,10 @@ def finding_evidence(db: Session, finding_id: str) -> dict[str, Any] | None:
     finding = db.get(Finding, finding_id)
     if finding is None:
         return None
-    evidence = run_evidence(db, finding.run_id)
+    selected_ids = [item.get("trace_event_id") for item in finding.evidence or [] if isinstance(item, dict) and item.get("trace_event_id")]
+    evidence = run_evidence(db, finding.run_id, focus_event_ids=selected_ids)
     if evidence is None:
         return None
-    selected_ids = [item.get("trace_event_id") for item in finding.evidence or [] if isinstance(item, dict) and item.get("trace_event_id")]
-    if selected_ids:
-        selected = set(selected_ids)
-        evidence["evidence"] = [card for card in evidence["evidence"] if set(card["event_ids"]) & selected] or evidence["evidence"]
     evidence["finding"] = {
         "id": finding.id,
         "title": finding.title,
@@ -165,16 +179,14 @@ def diagnosis(db: Session, *, run_id: str | None = None, finding_id: str | None 
     case = evidence["case"]
     judge = evidence["judge"]
     risk_label = RISK_LABELS.get(case["risk_tag"], case["risk_tag"])
-    tool_calls = [card for card in evidence["evidence"] if card["type"] == "tool_call"]
-    policy_denies = [card for card in evidence["evidence"] if card["type"] == "policy_decision" and card["policy_decision"] in {"deny", "review"}]
-    errors = [card for card in evidence["evidence"] if card["type"] == "error"]
+    counts = evidence.get("counts", {})
     observed = []
-    if tool_calls:
-        observed.append(f"轨迹中观测到 {len(tool_calls)} 次工具调用")
-    if policy_denies:
-        observed.append(f"轨迹中观测到 {len(policy_denies)} 次拒绝或人工确认策略")
-    if errors:
-        observed.append(f"轨迹中观测到 {len(errors)} 个错误事件")
+    if counts.get("tool_call"):
+        observed.append(f"轨迹中观测到 {counts['tool_call']} 次工具调用")
+    if counts.get("policy_denied"):
+        observed.append(f"轨迹中观测到 {counts['policy_denied']} 次拒绝或人工确认策略")
+    if counts.get("error"):
+        observed.append(f"轨迹中观测到 {counts['error']} 个错误事件")
     if not observed:
         observed.append("当前轨迹没有工具调用、策略拒绝或错误事件")
     conclusion_by_status = {
