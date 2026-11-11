@@ -75,6 +75,17 @@ docker compose up --build
 4. 打开 `/runs/:id`，查看轨迹、工具权限判定和攻击链。
 5. 在“报告”页查看通过率、风险检出率和修复前后对比占位。
 
+## 小安教学助手
+
+任意页面右下角点击“小安”，可基于当前页面获得操作教学、测试设计、轨迹解读、缺陷诊断和修复回归指导。小安拥有独立知识库与检索层，不读取被测 Agent 的知识库，也不会自动修改策略或宣称漏洞已经修复。
+
+- 默认使用本地混合检索（关键词 + 本地哈希向量 + RRF），无需外部模型即可演示。
+- 配置 `AGENTGUARD_XIAOAN_LLM_*` 后可启用独立问答模型；模型不可用时回退到本地 grounded 回答并明确标识。
+- 配置 `AGENTGUARD_XIAOAN_EMBEDDING_*` 后可替换为真实 Embedding 服务。
+- 私有 Run / Trace / Finding 诊断继续使用现有鉴权；基础教学聊天支持匿名限流。
+
+设计与使用文档见 `docs/xiaoan/`。
+
 ## 自建 Dify / FastGPT 靶场
 
 Dify 与 FastGPT 都已接入统一适配层。将目标主机加入 `AGENTGUARD_ALLOWED_TARGET_HOSTS`，

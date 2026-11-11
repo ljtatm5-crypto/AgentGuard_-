@@ -1,6 +1,6 @@
 # AgentGuard 传智杯冲刺进度
 
-最后更新：2026-11-11
+最后更新：2026-11-12
 
 状态口径：`PASS` 已实际验证；`IN_PROGRESS` 正在实现；`BLOCKED` 缺外部条件；`NOT_RUN` 尚未执行。
 
@@ -16,6 +16,7 @@
 | 真实 Dify Agent | BLOCKED | 适配器、Runbook、知识与工具 OpenAPI 已准备 | 需要授权 Dify 地址、模型和 API Key |
 | 真实 FastGPT Agent | BLOCKED | 适配器、Runbook、授权/执行契约已准备 | 需要 Docker、模型、Embedding、appId 和 API Key |
 | AI 用例生成 | IN_PROGRESS | `llm_provider.py`、生成/人工接受链路 | 真实模型生成实验需凭据 |
+| 小安教学助手 P0 | IN_PROGRESS | 独立知识库、混合检索、全局面板、教程、证据诊断、修复计划与 API 已实现；自动测试通过 | 需配置真实模型/Embedding 并完成 40+ 人工评测 |
 | 规则优先混合判定 | PASS | 规则优先、LLM 只做补充 | 补 Rule/LLM/Hybrid 对照实验（需模型） |
 | 事件级轨迹 | PASS | `TraceEvent`、生产运行详情、三栏轨迹页 | 保持证据深链 |
 | 攻击链与证据回指 | PASS | 生产复验生成 19 条 Finding，节点保存 run/case/event ids | 补三组真实 Dify 攻击实验 |
@@ -24,7 +25,7 @@
 | 公开/私有读边界 | PASS | 生产复验：匿名摘要 200，运行详情/授权记录匿名 401，错误令牌 403，正确令牌 200 | 保持自动化回归 |
 | 请求限流与审计 | PASS | 写中间件、request id、结构化日志 | 后续迁移到持久化审计表 |
 | 同步任务规模上限 | PASS | `AGENTGUARD_MAX_CASES_PER_RUN=40` | 真实模型需异步 Worker |
-| PostgreSQL 持久化 | PASS | Neon PostgreSQL，Alembic `0002_case_ground_truth (head)`，跨多次重新部署读取 Run 记录 | 保持数据库备份与迁移策略 |
+| PostgreSQL 持久化 | PASS | Neon PostgreSQL，Alembic `0003_xiaoan_assistant (head)`，跨多次重新部署读取 Run 记录 | 保持数据库备份与迁移策略 |
 | 并发冷启动初始化 | PASS | PostgreSQL 事务级 advisory lock，避免重复播种 | CI 持续覆盖 |
 | 异步任务队列 | NOT_RUN | 当前同步执行 | 需持久化 Worker 或托管队列 |
 | 分批执行持久化 | PASS | 执行前持久化全部待执行行，每 5 条提交一次；中断后保持 `pending`，不会伪装成完整成功 | 真实模型场景仍需 Worker |
@@ -45,7 +46,7 @@
 - V1.0 生产 Run：`225dc1e7-8e45-40af-9aec-dfa824cdf6f1`（7 通过 / 19 失败）
 - V2.0 生产 Run：`88e67ed6-972e-4656-b4e7-c17b46a3085f`（26 通过 / 0 失败）
 - 跨部署持久化：`competition/04_运行证据/neon_cross_deployment_persistence.json`，`PASS`
-- Alembic 当前版本：`0002_case_ground_truth (head)`，证据见 `competition/04_运行证据/neon_alembic.json`
+- Alembic 当前版本：`0003_xiaoan_assistant (head)`，证据见 `competition/04_运行证据/neon_alembic.json`
 - 生产鉴权与指标：`competition/04_运行证据/production_access_control_verification.json`，`PASS`
 - 前端 7 路由：`/overview`、`/agents`、`/test-suites`、`/runs`、`/findings`、`/reports`、`/settings` 全部 200，控制台错误 0，截图见 `competition/04_运行证据/页面截图/`。
 
@@ -62,7 +63,7 @@
 ### 阶段二：PostgreSQL 持久化
 
 - 已支持 psycopg 3、Alembic 初始迁移和跨会话持久化检查。
-- 线上 Neon PostgreSQL 已建表，Alembic 当前为 `0002_case_ground_truth (head)`。
+- 线上 Neon PostgreSQL 已建表，Alembic 当前为 `0003_xiaoan_assistant (head)`。
 - 生产环境使用 Neon 外部连接池 + SQLAlchemy `NullPool`，避免 Vercel 冷启动复用已关闭的 TLS 连接。
 - 两个生产 Run 记录在两次重新部署后仍可读取，跨部署持久化为 `PASS`。
 
@@ -114,3 +115,10 @@
 4. 80 条候选用例尚未完成人工审核，不得声称“80 条已通过”。
 5. 演示视频尚未录制，视频地址仍为 TODO。
 6. 异步 Worker 或托管队列尚未实现；当前仅支持受控规模的同步任务。
+### 阶段十：小安教学助手 P0
+
+- 已实现独立教学知识库、按标题切片、本地哈希向量与关键词混合检索、RRF 融合和来源引用。
+- 已新增 `/api/v2/assistant/*` 受控 API、会话/消息/反馈/修复计划数据表和 `0003_xiaoan_assistant` 迁移。
+- 已实现全局小安面板、页面感知快捷问题、教程步骤、真实事件证据卡片、修复与回归计划。
+- 匿名基础教学与私有证据诊断已区分权限；携带 Run/Finding 上下文的请求继续要求操作员鉴权。
+- 当前自动测试、Mock/真实 API 契约和前端构建通过；真实 LLM/Embedding 与 40+ 人工评测尚未执行，不得写成 PASS。

@@ -3,12 +3,13 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import agents, authorizations, desktop, findings, metrics, runs, suites
+from app.api import agents, assistant, authorizations, desktop, findings, metrics, runs, suites
 from app.core.config import get_settings
 from app.db.session import SessionLocal, check_db_connection, init_db
 from app.security.access import WriteAccessMiddleware
 from app.services.seed import ensure_demo_data
 from app.services.desktop_contract import ensure_desktop_data
+from app.services.xiaoan.knowledge_loader import ensure_xiaoan_knowledge
 
 settings = get_settings()
 
@@ -22,6 +23,8 @@ async def lifespan(_: FastAPI):
     try:
         ensure_demo_data(db)
         ensure_desktop_data(db)
+        if settings.xiaoan_enabled:
+            ensure_xiaoan_knowledge(db)
     finally:
         db.close()
     yield
@@ -74,6 +77,9 @@ def capabilities():
         "private_reads_require_auth": not settings.allow_anonymous_writes,
         "rate_limit_scope": "per_process",
         "public_data_scope": "seeded_demo_summary",
+        "xiaoan_enabled": settings.xiaoan_enabled,
+        "xiaoan_llm_enabled": settings.xiaoan_llm_enabled,
+        "xiaoan_retrieval_mode": "hybrid",
     }
 
 
@@ -84,3 +90,4 @@ app.include_router(runs.router, prefix="/api")
 app.include_router(findings.router, prefix="/api")
 app.include_router(metrics.router, prefix="/api")
 app.include_router(desktop.router, prefix="/api/v2")
+app.include_router(assistant.router, prefix="/api/v2")

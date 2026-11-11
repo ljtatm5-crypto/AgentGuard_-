@@ -47,3 +47,26 @@ test('真实 API 模式可收紧权限并接入其他类型智能体', async ({ 
   await page.getByRole('button', { name: new RegExp(agentName) }).click()
   await expect(page.getByRole('heading', { name: agentName })).toBeVisible()
 })
+
+
+test('真实 API 模式的小安返回知识引用且不伪装模型调用', async ({ page }) => {
+  test.skip(process.env.VITE_USE_MOCK !== 'false', '仅在真实 API 门禁中运行')
+  await page.goto('/overview')
+
+  const result = await page.evaluate(async () => {
+    const tutorials = await fetch('/api/v2/assistant/tutorials')
+    const chat = await fetch('/api/v2/assistant/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: '如何接入 Dify？', context: { page: '/agents' } }),
+    })
+    return { tutorialsStatus: tutorials.status, tutorials: await tutorials.json(), chatStatus: chat.status, chat: await chat.json() }
+  })
+
+  expect(result.tutorialsStatus).toBe(200)
+  expect(result.tutorials.length).toBeGreaterThanOrEqual(5)
+  expect(result.chatStatus).toBe(200)
+  expect(result.chat.answer.mode).toBe('local_grounded')
+  expect(result.chat.answer.model_used).toBeNull()
+  expect(result.chat.answer.sources.length).toBeGreaterThan(0)
+})

@@ -7,6 +7,7 @@ import './tokens.css'
 import './aurora.css'
 import './workspaces.css'
 import './trace-controls.css'
+import './xiaoan.css'
 
 const routerBase = import.meta.env.BASE_URL.replace(/\/$/, '') || '/'
 
