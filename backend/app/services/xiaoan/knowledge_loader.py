@@ -36,6 +36,9 @@ def ensure_xiaoan_knowledge(db: Session) -> dict:
     updated = 0
     chunk_count = 0
     for document in KNOWLEDGE_DOCUMENTS:
+        source_path = str(document.get("source_path", ""))
+        if document.get("access_level") != "public" or not source_path.startswith("docs/xiaoan/"):
+            continue
         content_hash = sha256(str(document["content"]).encode("utf-8")).hexdigest()
         row = db.scalar(select(AssistantDocument).where(AssistantDocument.document_id == document["document_id"]))
         if row is None:
