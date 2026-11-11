@@ -24,7 +24,7 @@ import type {
 import { getXiaoAnContext, XIAOAN_CONTEXT_EVENT } from '@/utils/xiaoanContext'
 
 type ChatItem =
-  | { id: string; role: 'assistant'; answer: AssistantAnswer; messageId?: string }
+  | { id: string; role: 'assistant'; answer: AssistantAnswer; messageId?: string; context: AssistantContext }
   | { id: string; role: 'user'; text: string }
 
 const PAGE_QUESTIONS: Record<string, string[]> = {
@@ -91,14 +91,14 @@ export default function XiaoAnPanel() {
   const [tutorial, setTutorial] = useState<AssistantTutorial | null>(null)
   const [tutorialStep, setTutorialStep] = useState(0)
   const [context, setContext] = useState<AssistantContext>(() => compactContext(location.pathname, location.search))
-  const [messages, setMessages] = useState<ChatItem[]>(() => [{ id: 'greeting', role: 'assistant', answer: greeting(context) }])
+  const [messages, setMessages] = useState<ChatItem[]>(() => [{ id: 'greeting', role: 'assistant', answer: greeting(context), context }])
   const [feedback, setFeedback] = useState<Record<string, -1 | 1>>({})
   const endRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const next = compactContext(location.pathname, location.search)
     setContext(next)
-    setMessages(current => current.length === 1 ? [{ id: 'greeting', role: 'assistant', answer: greeting(next) }] : current)
+    setMessages(current => current.length === 1 ? [{ id: 'greeting', role: 'assistant', answer: greeting(next), context: next }] : current)
   }, [location.pathname, location.search])
 
   useEffect(() => {
@@ -131,7 +131,7 @@ export default function XiaoAnPanel() {
     try {
       const response = await api.assistantChat({ session_id: sessionId, message: trimmed, context })
       setSessionId(response.session_id)
-      setMessages(current => [...current, { id: response.message_id, role: 'assistant', answer: response.answer, messageId: response.message_id }])
+      setMessages(current => [...current, { id: response.message_id, role: 'assistant', answer: response.answer, messageId: response.message_id, context: { ...context } }])
     } catch (e) {
       setError(e instanceof ApiRequestError ? e.message : '小安暂时无法回答，请稍后重试')
     } finally {
@@ -212,7 +212,7 @@ export default function XiaoAnPanel() {
                   {messages.map(item => item.role === 'user' ? (
                     <div key={item.id} className="xiaoan-message user"><p>{item.text}</p></div>
                   ) : (
-                    <AssistantMessage key={item.id} answer={item.answer} context={context} messageId={item.messageId} rated={item.messageId ? feedback[item.messageId] : undefined} onRate={rate} onNavigate={go} />
+                    <AssistantMessage key={item.id} answer={item.answer} context={item.context} messageId={item.messageId} rated={item.messageId ? feedback[item.messageId] : undefined} onRate={rate} onNavigate={go} />
                   ))}
                   {loading && <div className="xiaoan-message assistant xiaoan-thinking"><span /><span /><span /><small>小安正在核对知识库与证据…</small></div>}
                   {error && <p className="form-error" role="alert">{error}</p>}

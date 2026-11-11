@@ -149,3 +149,35 @@ def test_diagnosis_keeps_non_final_status_and_normalizes_legacy_risk_alias():
             assert remediation.status_code == 200
             assert remediation.json()["risk_tag"] == "indirect_injection"
             assert "RAG" in remediation.json()["problem"] or "检索" in remediation.json()["problem"]
+
+
+def test_diagnosis_counts_events_beyond_presentation_cutoff():
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        ensure_xiaoan_knowledge(db)
+        seed_evidence(db)
+        long_run = TestRun(
+            id="run-long", task_id="task-long", agent_id="agent-xiaoan", suite_id="suite-xiaoan",
+            case_id="case-xiaoan", agent_version="v1.0", status="failed",
+            result={"judge": {"status": "failed", "reason": "后段工具调用违规", "confidence": 1}},
+        )
+        db.add(long_run)
+        db.flush()
+        for index in range(55):
+            db.add(TraceEvent(run_id=long_run.id, type="retrieval", output=f"检索片段 {index}"))
+        late_event = TraceEvent(run_id=long_run.id, type="tool_call", tool="protected_write", params={})
+        db.add(late_event)
+        db.flush()
+        db.add(Finding(
+            id="finding-long", run_id=long_run.id, severity="high", title="后段工具调用",
+            evidence=[{"trace_event_id": late_event.id}], impact="越权", recommendation="校验权限", status="open", chain=[],
+        ))
+        db.commit()
+        with TestClient(build_app(db, allow_anonymous=True)) as client:
+            diagnosis = client.post("/api/v2/assistant/diagnose", json={"run_id": "task-long"})
+            assert diagnosis.status_code == 200
+            assert any("1 次工具调用" in item for item in diagnosis.json()["observed"])
+            remediation = client.post("/api/v2/assistant/remediation", json={"finding_id": "finding-long"})
+            assert remediation.status_code == 200
+            assert any(item["type"] == "tool_call" for item in remediation.json()["evidence"])

@@ -65,7 +65,7 @@ export default function RunsPage() {
     if (!active) return
     setXiaoAnContext({
       page: '/runs', run_id: detail.state.data.run.id, case_id: active.case_id,
-      event_ids: active.evidence.event_ids,
+      finding_id: null, event_ids: active.evidence.event_ids,
     })
   }, [detail.state, selectedCaseId, focusedCase])
 
