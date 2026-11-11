@@ -128,3 +128,24 @@ test('报告页显示逐用例修复差异', async ({ page }) => {
   await expect(page.getByRole('region', { name: '逐用例修复差异' })).toContainText('用例')
   await expect(page.locator('.diff-badge').first()).toBeVisible()
 })
+
+
+test('小安可基于当前页面教学并解释真实缺陷证据', async ({ page }) => {
+  await page.goto('/overview')
+  await page.getByTestId('xiaoan-launcher').click()
+  await expect(page.getByTestId('xiaoan-panel')).toBeVisible()
+  await page.getByRole('button', { name: '第一次使用应该做什么？' }).click()
+  await expect(page.getByTestId('xiaoan-messages')).toContainText('小安 · 示例回答')
+  await expect(page.getByTestId('xiaoan-messages')).toContainText('引用来源')
+
+  await page.getByRole('button', { name: /完成第一次智能体安全测试/ }).click()
+  await expect(page.getByTestId('xiaoan-tutorial')).toContainText('第 1 / 4 步')
+
+  await page.getByRole('button', { name: '关闭小安' }).click()
+  await page.goto('/findings')
+  await page.getByRole('button', { name: '攻击链', exact: true }).first().click()
+  await page.getByTestId('xiaoan-launcher').click()
+  await page.getByRole('button', { name: '这条攻击链是否实际发生？' }).click()
+  await expect(page.getByTestId('xiaoan-messages')).toContainText('真实证据')
+  await expect(page.getByTestId('xiaoan-panel')).toContainText('证据感知')
+})

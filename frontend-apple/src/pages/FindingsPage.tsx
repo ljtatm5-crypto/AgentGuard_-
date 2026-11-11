@@ -6,6 +6,8 @@ import { AsyncBoundary } from '@/components/AsyncBoundary'
 import { FindingStatusTag, SeverityTag } from '@/components/Tags'
 import { useAsync } from '@/hooks/useAsync'
 import { RISK_TAG_LABELS } from '@/types/enums'
+import { setXiaoAnContext } from '@/utils/xiaoanContext'
+import type { Finding } from '@/types/api'
 
 const KIND_LABEL: Record<string, string> = {
   entry: '入口',
@@ -22,6 +24,15 @@ export default function FindingsPage() {
     () => (selected ? api.getFindingChain(selected) : Promise.resolve(null)),
     [selected],
   )
+
+  function openFinding(finding: Finding) {
+    setSelected(finding.id)
+    setSelectedNodeId('')
+    setXiaoAnContext({
+      page: '/findings', finding_id: finding.id, run_id: finding.evidence.run_id,
+      case_id: finding.evidence.case_id, event_ids: finding.evidence.event_ids,
+    })
+  }
 
   return (
     <div className="findings-page">
@@ -65,7 +76,7 @@ export default function FindingsPage() {
                       {f.agent_version} / {f.suite_version}
                     </td>
                     <td>
-                      <button className="btn" onClick={() => { setSelected(f.id); setSelectedNodeId('') }} aria-expanded={selected === f.id} aria-controls="finding-details">
+                      <button className="btn" onClick={() => openFinding(f)} aria-expanded={selected === f.id} aria-controls="finding-details">
                         攻击链
                       </button>
                     </td>

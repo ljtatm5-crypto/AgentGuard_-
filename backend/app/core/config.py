@@ -30,6 +30,19 @@ class Settings(BaseSettings):
     db_pool_size: int = 5
     db_max_overflow: int = 5
     db_pool_recycle_seconds: int = 300
+    # 小安与“被测 Agent”完全独立配置，避免复用目标网关授权。
+    xiaoan_enabled: bool = True
+    xiaoan_llm_enabled: bool = False
+    xiaoan_llm_url: str = ""
+    xiaoan_llm_model: str = ""
+    xiaoan_llm_api_key_env: str = ""
+    xiaoan_embedding_url: str = ""
+    xiaoan_embedding_model: str = ""
+    xiaoan_embedding_api_key_env: str = ""
+    xiaoan_embedding_dimensions: int = 256
+    xiaoan_max_context_chars: int = 12000
+    xiaoan_rate_limit_per_minute: int = 20
+    xiaoan_knowledge_version: str = "2026.11-p0"
 
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -47,6 +47,14 @@ test('生成演示截图', async ({ page }, testInfo) => {
   await page.waitForTimeout(500)
   await page.screenshot({ path: 'docs/screenshots/04b-执行任务-轨迹.png', fullPage: true })
 
+  // 小安教学面板
+  await page.goto('/overview')
+  await page.waitForLoadState('networkidle')
+  await page.getByTestId('xiaoan-launcher').click()
+  await page.getByRole('button', { name: '第一次使用应该做什么？' }).click()
+  await page.waitForTimeout(500)
+  await page.screenshot({ path: 'docs/screenshots/10-小安教学助手.png', fullPage: true })
+
   // 攻击链展开
   await page.goto('/findings')
   await page.getByRole('button', { name: '攻击链' }).first().click()

@@ -184,6 +184,46 @@ class WriteAccessMiddleware(BaseHTTPMiddleware):
             except ValueError:
                 return _error(400, "invalid_content_length", "Content-Length 非法", {"X-Request-ID": request_id})
 
+        if (
+            principal is None
+            and request.method == "POST"
+            and request.url.path == "/api/v2/assistant/chat"
+            and settings.xiaoan_enabled
+        ):
+            # Basic teaching questions can be answered without a token, but
+            # any request carrying a run/finding/case context remains private.
+            # The body is cached so FastAPI can parse it again downstream.
+            if not await _read_limited_body(request, settings.max_request_bytes):
+                response = _error(413, "request_too_large", "请求体超过允许大小", {"X-Request-ID": request_id})
+                self._audit(request_id, request, None, 413, "rejected")
+                return response
+            try:
+                payload = json.loads((await request.body()).decode("utf-8") or "{}")
+                context = payload.get("context") if isinstance(payload, dict) else None
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                response = _error(400, "invalid_json", "请求体不是合法 JSON", {"X-Request-ID": request_id})
+                self._audit(request_id, request, None, 400, "rejected")
+                return response
+            private_context = isinstance(context, dict) and any(
+                context.get(key) for key in ("agent_id", "run_id", "case_id", "finding_id", "event_ids")
+            )
+            if not private_context:
+                bucket_key = f"xiaoan-public:{request.client.host if request.client else 'unknown'}"
+                allowed, retry_after = self.rate_limiter.allow(bucket_key, settings.xiaoan_rate_limit_per_minute)
+                if not allowed:
+                    response = _error(
+                        429, "assistant_rate_limited", "小安提问过于频繁，请稍后重试",
+                        {"Retry-After": str(retry_after), "X-Request-ID": request_id},
+                    )
+                    self._audit(request_id, request, None, 429, "rate_limited")
+                    return response
+                started = time.perf_counter()
+                response = await call_next(request)
+                elapsed_ms = round((time.perf_counter() - started) * 1000, 2)
+                response.headers["X-Request-ID"] = request_id
+                self._audit(request_id, request, None, response.status_code, "public_assistant", elapsed_ms)
+                return response
+
         if principal is None:
             supplied = _bearer_token(request)
             if not settings.write_token.strip() and not settings.allow_anonymous_writes:
