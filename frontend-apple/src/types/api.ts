@@ -172,6 +172,10 @@ export interface Finding {
 export interface JudgeResult {
   run_id: string
   case_id: string
+  case_title: string
+  risk_tag: RiskTag
+  expected: string
+  conclusion: string
   status: RunStatus
   judge_source: JudgeSource
   reason: string

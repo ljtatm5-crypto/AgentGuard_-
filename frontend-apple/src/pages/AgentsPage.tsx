@@ -153,7 +153,7 @@ export default function AgentsPage() {
                 : connectionMode === 'fastgpt_authorized' ? '接入授权 FastGPT 智能体' : '接入授权 Dify 智能体'}</h2>
               <p>{connectionMode === 'local_sandbox'
                 ? '在本地安全沙盒完成资产校验，再为它选择测试集和执行任务。'
-                : `通过服务端授权网关连接自建 ${connectionMode === 'fastgpt_authorized' ? 'FastGPT' : 'Dify'}；凭据只从服务器环境变量读取，并明确标注可观测能力。`}</p>
+                : `接入已授权的内部 ${connectionMode === 'fastgpt_authorized' ? 'FastGPT' : 'Dify'} 智能体，凭据由服务端安全保管。`}</p>
             </div>
           </div>
 
@@ -164,7 +164,7 @@ export default function AgentsPage() {
               onClick={() => { setConnectionMode('local_sandbox'); setConnectError(null) }}
             >
               <strong>本地安全沙盒</strong>
-              <small>无需凭据，可立即验证</small>
+              <small>即时可用</small>
             </button>
             <button
               type="button"
@@ -173,7 +173,7 @@ export default function AgentsPage() {
               data-testid="connect-mode-dify"
             >
               <strong>授权自建 Dify</strong>
-              <small>{USE_MOCK ? '需 API 模式与服务端凭据' : 'RAG / 多轮 / 会话 ID'}</small>
+              <small>内部授权接入</small>
             </button>
             <button
               type="button"
@@ -182,7 +182,7 @@ export default function AgentsPage() {
               data-testid="connect-mode-fastgpt"
             >
               <strong>授权自建 FastGPT</strong>
-              <small>{USE_MOCK ? '需 API 模式与服务端凭据' : 'appId / chatId / detail'}</small>
+              <small>内部授权接入</small>
             </button>
           </div>
 
@@ -280,7 +280,7 @@ export default function AgentsPage() {
             <ShieldCheck size={18} weight="duotone" />
             <span>{connectionMode === 'local_sandbox'
               ? '当前连接目标为本地安全沙盒；真实外部网站不可接入。'
-              : 'API Key 不会传给浏览器或写入数据库，只由服务端按环境变量名读取；不可观测事件不会被伪造。'}</span>
+              : '凭据由服务端安全保管，页面不会保存明文。'}</span>
           </div>
           {connectError && <p className="form-error" role="alert" data-testid="connect-agent-error">{connectError}</p>}
         </section>
