@@ -8,6 +8,7 @@ import { JudgeSourceTag, PolicyTag, StatusTag } from '@/components/Tags'
 import { useAsync } from '@/hooks/useAsync'
 import { RISK_TAG_LABELS, TRACE_TYPE_LABELS, TRACE_TYPE_ORDER } from '@/types/enums'
 import { buildTraceView } from '@/utils/trace'
+import { setXiaoAnContext } from '@/utils/xiaoanContext'
 import type { TraceEventType } from '@/types/enums'
 import type { JudgeResult, TestRun, TraceEvent } from '@/types/api'
 
@@ -53,6 +54,20 @@ export default function RunsPage() {
     const requestedAgent = searchParams.get('agent')
     if (requestedAgent) setAgentId(requestedAgent)
   }, [searchParams])
+
+  useEffect(() => {
+    if (detail.state.phase !== 'ready' || !detail.state.data) return
+    const results = detail.state.data.results
+    const requestedCase = selectedCaseId || focusedCase
+    const active = results.find((result) => result.case_id === requestedCase)
+      ?? results.find((result) => result.status === 'failed')
+      ?? results[0]
+    if (!active) return
+    setXiaoAnContext({
+      page: '/runs', run_id: detail.state.data.run.id, case_id: active.case_id,
+      event_ids: active.evidence.event_ids,
+    })
+  }, [detail.state, selectedCaseId, focusedCase])
 
   useEffect(() => {
     if (trace.state.phase !== 'ready' || !opened || (!focusedCase && !focusedEvents)) return

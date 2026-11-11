@@ -149,3 +149,14 @@ test('小安可基于当前页面教学并解释真实缺陷证据', async ({ pa
   await expect(page.getByTestId('xiaoan-messages')).toContainText('真实证据')
   await expect(page.getByTestId('xiaoan-panel')).toContainText('证据感知')
 })
+
+
+test('小安读取运行页当前选中的用例证据', async ({ page }) => {
+  await page.goto('/runs/run-001')
+  await page.getByRole('button', { name: '详情与轨迹' }).first().click()
+  await page.locator('[data-case-id="tc-p0-005"]').click()
+  await page.getByTestId('xiaoan-launcher').click()
+  await page.getByRole('button', { name: '解释这次测试为什么失败' }).click()
+  await expect(page.getByTestId('xiaoan-messages')).toContainText('工具越权')
+  await expect(page.getByTestId('xiaoan-panel')).toContainText('证据感知')
+})

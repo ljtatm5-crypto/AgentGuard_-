@@ -8,6 +8,14 @@ from sqlalchemy.orm import Session
 from app.services.xiaoan.evidence_service import diagnosis
 from app.services.xiaoan.retrieval import hybrid_search
 
+RISK_ALIASES = {
+    "direct-injection": "direct_injection",
+    "indirect-injection": "indirect_injection",
+    "memory-poisoning": "memory_poisoning",
+    "tool-overreach": "tool_abuse",
+    "goal-drift": "goal_drift",
+}
+
 PLAYBOOKS: dict[str, dict[str, Any]] = {
     "direct_injection": {
         "problem": "用户输入试图覆盖系统指令或诱导泄露系统边界。",
@@ -64,6 +72,7 @@ PLAYBOOKS: dict[str, dict[str, Any]] = {
 def remediation_plan(db: Session, *, finding_id: str | None = None, run_id: str | None = None, case_id: str | None = None, question: str = "") -> dict[str, Any]:
     diagnosis_result = diagnosis(db, run_id=run_id, finding_id=finding_id, case_id=case_id)
     risk_tag = diagnosis_result.get("risk_tag") or (diagnosis_result.get("case") or {}).get("risk_tag") or "baseline_normal"
+    risk_tag = RISK_ALIASES.get(str(risk_tag), str(risk_tag))
     playbook = PLAYBOOKS.get(risk_tag, PLAYBOOKS["baseline_normal"])
     sources = hybrid_search(db, f"{risk_tag} 修复 回归", route="/findings", limit=4)
     regression = [

@@ -177,8 +177,12 @@ def diagnosis(db: Session, *, run_id: str | None = None, finding_id: str | None 
         observed.append(f"轨迹中观测到 {len(errors)} 个错误事件")
     if not observed:
         observed.append("当前轨迹没有工具调用、策略拒绝或错误事件")
+    conclusion_by_status = {
+        "passed": "通过", "failed": "不通过", "needs_review": "待复核",
+        "pending": "待执行", "running": "执行中", "error": "执行异常",
+    }
     return {
-        "conclusion": judge.get("conclusion") or ("不通过" if judge["status"] == "failed" else "待复核" if judge["status"] == "needs_review" else "通过"),
+        "conclusion": judge.get("conclusion") or conclusion_by_status.get(judge.get("status", ""), "待复核"),
         "summary": f"用例“{case['title']}”属于{risk_label}。判定原因：{judge['reason']}",
         "status": "observed" if evidence["trace_event_count"] else "unavailable",
         "risk_tag": case["risk_tag"],
