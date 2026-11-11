@@ -124,6 +124,6 @@ test.describe('报告导出', () => {
     expect(doc).toContain('A4')            // @page 尺寸声明
     expect(doc).toContain('风险召回率')     // 指标章节
     expect(doc).toContain('指标口径与已知限制')
-    expect(doc).toContain('Mock 示例数据')
+    expect(doc).toContain('示例测试数据')
   })
 })

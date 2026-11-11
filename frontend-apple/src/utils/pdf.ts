@@ -101,7 +101,7 @@ function styles(): string {
 export function buildReportHtml(snapshot: ReportSnapshot): string {
   const { metrics: m, runs, details, findings, unavailableRunIds, isMock } = snapshot
   const generated = snapshot.generatedAt ?? new Date()
-  const source = snapshot.dataSource ?? (isMock ? 'Mock 示例数据（用于演示，不作为实测结果）' : 'API 运行数据（以实际适配器与授权靶场配置为准）')
+  const source = snapshot.dataSource ?? (isMock ? '示例测试数据' : 'AgentGuard 安全测试运行记录')
   const runCount = runs.length
   const resultRows = details.flatMap((detail) =>
     detail.results.map((item) => [
@@ -172,7 +172,7 @@ export function buildReportHtml(snapshot: ReportSnapshot): string {
     <p class="subtitle" style="margin-top:6pt;font-size:9pt">${esc(source)}</p>
   </header>
 
-  ${isMock ? '<div class="note"><strong>数据模式说明：</strong>本报告由 Mock 示例数据生成，仅用于流程演示，不能作为比赛实际应用效果的证明。真实效果需在本地 API 模式与授权靶场中复测。</div>' : ''}
+  ${isMock ? '<div class="note"><strong>说明：</strong>本报告基于示例数据生成，仅用于流程演示。</div>' : ''}
   ${unavailableRunIds.length ? `<div class="note"><strong>加载失败：</strong>以下运行详情未能取得，未纳入用例明细：${unavailableRunIds.map(esc).join('、')}。可在服务恢复后重新导出。</div>` : ''}
 
   <h2>一、指标快照</h2>
@@ -226,7 +226,7 @@ export function buildReportHtml(snapshot: ReportSnapshot): string {
     <li>版本表通过率采用“通过数 / 全部用例数”，执行中任务尚未完成，不能作为最终通过率。</li>
     <li>风险召回率、精确率、攻击成功率、轨迹覆盖率的样本范围与分母遵循后端指标契约，空值表示尚无可用结果。</li>
     <li>规则判定优先，大模型语义判断仅作补充；待人工复核结论不视为通过。</li>
-    <li>数据来自当前页面所连接的服务；本地模拟适配器产生的数据不代表外部生产环境测试结果。</li>
+    <li>数据来自当前测试记录；示例数据仅用于流程演示。</li>
     <li>报告不导出 Agent 凭据与原始工具参数；对选定文本字段中的常见令牌做了脱敏处理。</li>
     <li>本报告由同一份导出快照生成，与 Markdown / CSV 的字段集合一致。</li>
   </ul>

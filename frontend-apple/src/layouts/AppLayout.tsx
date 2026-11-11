@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, useLocation, useNavigate, useOutlet } from 'react-router-dom'
 import { AnimatePresence, motion, MotionConfig, useReducedMotion } from 'motion/react'
-import { SquaresFour, Stack, PlayCircle, CirclesThreePlus, ChartPieSlice, Graph, GearSix, MagnifyingGlass, CaretRight, Sun, Moon, Command, X, ArrowUpRight, CheckCircle } from '@phosphor-icons/react'
-import { api, USE_MOCK } from '@/api/client'
-import { useAsync } from '@/hooks/useAsync'
+import { SquaresFour, Stack, PlayCircle, CirclesThreePlus, ChartPieSlice, Graph, GearSix, MagnifyingGlass, CaretRight, Sun, Moon, Command, X } from '@phosphor-icons/react'
 
 const NAV = [
   { to: '/overview', label: '总览', shortLabel: '总览', icon: SquaresFour, hint: '查看测试进展' },
@@ -12,7 +10,7 @@ const NAV = [
   { to: '/runs', label: '执行任务', shortLabel: '执行', icon: PlayCircle, hint: '启动测试与查看轨迹' },
   { to: '/findings', label: '攻击链与缺陷', shortLabel: '缺陷', icon: Graph, hint: '定位问题与回溯证据' },
   { to: '/reports', label: '报告与回归', shortLabel: '报告', icon: ChartPieSlice, hint: '对比版本并导出报告' },
-  { to: '/settings', label: '设置', shortLabel: '设置', icon: GearSix, hint: '团队约束与联调模式' },
+  { to: '/settings', label: '设置', shortLabel: '设置', icon: GearSix, hint: '偏好与安全范围' },
 ]
 
 export default function AppLayout() {
@@ -20,18 +18,6 @@ export default function AppLayout() {
   const navigate = useNavigate()
   const outlet = useOutlet()
   const reduce = useReducedMotion()
-  const capabilities = useAsync(() => api.getCapabilities(), [])
-  const caps = capabilities.state.phase === 'ready' ? capabilities.state.data : null
-  const runtimeModeLabel = USE_MOCK
-    ? 'Mock 数据模式'
-    : caps?.environment === 'production'
-      ? 'Vercel 生产环境'
-      : '本地/开发环境'
-  const runtimeModeDetail = USE_MOCK
-    ? '示例数据，仅用于演示'
-    : caps
-      ? `${caps.database === 'postgresql' ? 'PostgreSQL' : 'SQLite'} · ${caps.anonymous_writes ? '公开演示权限' : '受控写权限'}`
-      : '正在读取运行能力…'
   const [searchOpen, setSearchOpen] = useState(false)
   const [query, setQuery] = useState('')
   const searchTrigger = useRef<HTMLButtonElement>(null)
@@ -82,7 +68,7 @@ export default function AppLayout() {
             <div className="brand-sub">每一次测试，都有据可循</div>
           </div>
         </div>
-        <div className="workspace-switch"><span className="workspace-avatar">A</span><div><strong>智能体测试工作空间</strong><small>多类型 Agent</small></div><CaretRight size={14} /></div>
+        <div className="workspace-switch"><span className="workspace-avatar">A</span><div><strong>智能体安全测试</strong><small>客户工作空间</small></div><CaretRight size={14} /></div>
         <span className="nav-caption">工作空间</span>
         <nav aria-label="主要导航">
           {NAV.map((n) => (
@@ -101,12 +87,9 @@ export default function AppLayout() {
             </NavLink>
           ))}
         </nav>
-        <div className="sidebar-bottom"><div className="workspace-note"><CheckCircle size={22} weight="duotone" /><strong>专注验证，安心探索。</strong><p>在授权环境中，让问题可见，让改进可验证。</p><NavLink to="/runs">开始一次测试 <ArrowUpRight size={15} /></NavLink></div>
-        <div className="sidebar-foot" data-testid="runtime-mode-label"><span className={`dot ${USE_MOCK ? 'dot-mock' : 'dot-live'}`} /><div><strong>{runtimeModeLabel}</strong><small>{runtimeModeDetail}</small></div></div></div>
       </aside>
       <main className="main">
         <header className="app-topbar"><div className="breadcrumb">工作空间 <CaretRight size={13} /><span>{active.label}</span></div><div className="topbar-actions"><button className="search-trigger" ref={searchTrigger} onClick={openSearch} aria-label="搜索页面"><MagnifyingGlass size={17} /><span>快速前往</span><kbd><Command size={12} /> K</kbd></button><div className="appearance-switch" aria-label="外观"><button aria-label="浅色外观" aria-pressed={theme === 'light'} onClick={() => setTheme('light')}>{theme === 'light' && <motion.span layoutId="appearance" />}<Sun size={17} /></button><button aria-label="深色外观" aria-pressed={theme === 'dark'} onClick={() => setTheme('dark')}>{theme === 'dark' && <motion.span layoutId="appearance" />}<Moon size={17} /></button></div><span className="team-avatar" title="三人协作团队">AG</span></div></header>
-        <div className="source-note"><span className={`dot ${USE_MOCK ? 'dot-mock' : 'dot-live'}`} />{USE_MOCK ? '演示工作空间：当前指标来自 Mock 样例。' : '在线工作空间：当前指标来自已保存的 API 运行记录。'}<NavLink to="/reports">查看报告 <ArrowUpRight size={13} /></NavLink></div>
         <AnimatePresence mode="wait" initial={false}><motion.div className="route-view" id="page-content" key={location.pathname} initial={{ opacity: 0, y: reduce ? 0 : 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: reduce ? 0 : -6 }} transition={{ duration: reduce ? 0 : .22 }}>{outlet}</motion.div></AnimatePresence>
         <footer className="app-footer"><span>AgentGuard 智测盾</span><span>测试有依据，改进有方向。</span></footer>
       </main>

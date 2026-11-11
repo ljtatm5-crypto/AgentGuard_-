@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { ArrowClockwise, ArrowRight, Crosshair, FunnelSimple, MagnifyingGlass, Play, X } from '@phosphor-icons/react'
+import { ArrowClockwise, ArrowRight, ClockCountdown, Crosshair, FunnelSimple, MagnifyingGlass, Play, ShieldCheck, ShieldWarning, WarningCircle, X } from '@phosphor-icons/react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api, ApiRequestError } from '@/api/client'
 import { AsyncBoundary } from '@/components/AsyncBoundary'
 import { JudgeSourceTag, PolicyTag, StatusTag } from '@/components/Tags'
 import { useAsync } from '@/hooks/useAsync'
-import { TRACE_TYPE_LABELS, TRACE_TYPE_ORDER } from '@/types/enums'
+import { RISK_TAG_LABELS, TRACE_TYPE_LABELS, TRACE_TYPE_ORDER } from '@/types/enums'
 import { buildTraceView } from '@/utils/trace'
 import type { TraceEventType } from '@/types/enums'
-import type { TraceEvent } from '@/types/api'
+import type { JudgeResult, TestRun, TraceEvent } from '@/types/api'
 
 /**
  * 单次渲染的轨迹事件条数。
@@ -204,6 +204,8 @@ export default function RunsPage() {
               }
               return (
                 <>
+                  <RunConclusion run={d.run} results={d.results} onSelectCase={selectCase} />
+
                   {(focusedCase || eventIds.length > 0) && (
                     <div className="trace-focus-banner" data-testid="evidence-focus-banner">
                       <Crosshair size={18} aria-hidden="true" />
@@ -225,13 +227,14 @@ export default function RunsPage() {
                           <button
                             type="button"
                             key={result.case_id}
+                            data-case-id={result.case_id}
                             className={`run-case-item ${activeResult.case_id === result.case_id ? 'active' : ''} ${focusedCase === result.case_id ? 'trace-case-focused' : ''}`}
                             onClick={() => selectCase(result.case_id)}
                           >
                             <span className="run-case-index">{String(index + 1).padStart(2, '0')}</span>
                             <span>
-                              <strong>{result.case_id}</strong>
-                              <small>{result.reason}</small>
+                              <strong>{result.case_title}</strong>
+                              <small><span className="run-case-risk">{RISK_TAG_LABELS[result.risk_tag]}</span>{result.reason}</small>
                             </span>
                             <StatusTag v={result.status} />
                           </button>
@@ -241,8 +244,9 @@ export default function RunsPage() {
 
                     <section className="run-behavior-panel" aria-label="Agent 行为轨迹">
                       <div className="workspace-section-head">
-                        <div><span className="detail-label">Agent 行为</span><h3>{activeResult.case_id}</h3></div>
+                        <div><span className="detail-label">{RISK_TAG_LABELS[activeResult.risk_tag]}</span><h3>{activeResult.case_title}</h3></div>
                         <div className="trace-header-meta">
+                          <span className="mono">{activeResult.case_id}</span>
                           <span>点击节点聚焦证据</span>
                           <TraceTag type="policy" />
                         </div>
@@ -280,7 +284,8 @@ export default function RunsPage() {
                     <aside className={`run-verdict-panel verdict-${activeResult.status}`} aria-label="判定与证据">
                       <span className="detail-label">判定与证据</span>
                       <div className="verdict-status"><StatusTag v={activeResult.status} /><JudgeSourceTag v={activeResult.judge_source} /></div>
-                      <h3>{(activeResult.confidence * 100).toFixed(0)}% 置信度</h3>
+                      <h3>{activeResult.conclusion}</h3>
+                      <p className="verdict-confidence">{(activeResult.confidence * 100).toFixed(0)}% 判定置信度 · {RISK_TAG_LABELS[activeResult.risk_tag]}</p>
                       <p>{activeResult.reason}</p>
                       {(() => {
                         const selectedEvent = trace.state.phase === 'ready'
@@ -317,6 +322,118 @@ export default function RunsPage() {
         </section>
       )}
     </div>
+  )
+}
+
+function RunConclusion({
+  run,
+  results,
+  onSelectCase,
+}: {
+  run: TestRun
+  results: JudgeResult[]
+  onSelectCase: (caseId: string) => void
+}) {
+  const finalResults = results.filter((result) => ['passed', 'failed', 'needs_review'].includes(result.status))
+  const failedResults = finalResults.filter((result) => result.status === 'failed')
+  const reviewResults = finalResults.filter((result) => result.status === 'needs_review')
+  const passed = finalResults.filter((result) => result.status === 'passed').length
+  const completed = finalResults.length
+  const passRate = completed ? Math.round((passed / completed) * 100) : 0
+  const riskLabels = Array.from(new Set(
+    failedResults
+      .filter((result) => result.risk_tag !== 'baseline_normal')
+      .map((result) => RISK_TAG_LABELS[result.risk_tag]),
+  ))
+  const priorityResults = [...failedResults, ...reviewResults].slice(0, 3)
+  const isRunning = run.status === 'running' || run.status === 'pending'
+
+  const tone = run.status === 'failed'
+    ? 'failed'
+    : run.status === 'passed'
+      ? 'passed'
+      : run.status === 'needs_review'
+        ? 'review'
+        : 'running'
+  const Icon = isRunning
+    ? ClockCountdown
+    : run.status === 'passed'
+      ? ShieldCheck
+      : run.status === 'needs_review'
+        ? WarningCircle
+        : ShieldWarning
+
+  const headline = isRunning
+    ? '安全测试执行中'
+    : run.status === 'failed'
+      ? '未通过本次安全测试'
+      : run.status === 'needs_review'
+        ? '安全结论待人工确认'
+        : '通过本次安全测试'
+
+  const description = isRunning
+    ? `已完成 ${completed} / ${run.total} 项用例；任务结束前不能视为通过。`
+    : run.status === 'failed'
+      ? `共 ${run.total} 项用例，已完成 ${completed} 项；${failedResults.length} 项命中明确违规规则${riskLabels.length ? `，涉及${riskLabels.join('、')}` : ''}。${reviewResults.length ? `另有 ${reviewResults.length} 项证据不足，仍需人工复核。` : ''}`
+      : run.status === 'needs_review'
+        ? `已判定 ${completed} 项中，${reviewResults.length} 项证据不足或规则未覆盖；当前只能判定为待确认，不能视为通过。`
+        : `全部 ${completed} 项已判定用例满足固定规则。该结论仅覆盖本次测试集，不代表不存在其他安全风险。`
+
+  const nextAction = isRunning
+    ? '等待任务完成后查看最终结论；执行中的部分结果不能作为验收依据。'
+    : run.status === 'failed'
+      ? '先处理下列违规项，再使用同一测试集与规则版本复测，并保留本次证据。'
+      : run.status === 'needs_review'
+        ? '请人工核对待复核用例的回答与轨迹，确认后才能形成最终验收结论。'
+        : '建议将该版本纳入回归基线；后续版本变更后重跑同一测试集。'
+
+  return (
+    <section className={`run-conclusion conclusion-${tone}`} data-testid="run-conclusion" aria-label="本次安全测试总结论">
+      <div className="run-conclusion-main">
+        <div className="run-conclusion-title">
+          <span className="run-conclusion-icon" aria-hidden="true"><Icon size={25} weight="duotone" /></span>
+          <div>
+            <span className="detail-label">本次安全测试结论</span>
+            <div className="run-conclusion-headline">
+              <h3>{headline}</h3>
+              <StatusTag v={run.status} />
+            </div>
+            <p>{description}</p>
+          </div>
+        </div>
+        <div className="run-conclusion-metrics">
+          <div><span>通过率</span><strong>{passRate}%</strong></div>
+          <div><span>明确失败</span><strong>{failedResults.length}</strong></div>
+          <div><span>待人工复核</span><strong>{reviewResults.length}</strong></div>
+          <div><span>执行进度</span><strong>{completed}/{run.total}</strong></div>
+        </div>
+      </div>
+      <aside className="run-conclusion-aside">
+        <div className="run-conclusion-aside-head">
+          <span className="detail-label">{priorityResults.length ? '需优先处理' : '结论说明'}</span>
+          <span className="run-conclusion-rule">规则优先</span>
+        </div>
+        {priorityResults.length > 0 ? (
+          <div className="run-conclusion-issues">
+            {priorityResults.map((result) => (
+              <button key={result.case_id} type="button" className="run-conclusion-issue" onClick={() => onSelectCase(result.case_id)}>
+                <span className={`issue-dot issue-${result.status}`} aria-hidden="true" />
+                <span>
+                  <strong>{result.case_title}</strong>
+                  <small>{result.status === 'failed' ? '明确违规' : '待人工复核'} · {RISK_TAG_LABELS[result.risk_tag]}</small>
+                </span>
+                <ArrowRight size={14} aria-hidden="true" />
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="run-conclusion-empty">
+            {isRunning ? '已完成用例暂未发现明确违规，任务仍在执行。' : '已判定用例中未发现需优先处理的问题。'}
+          </p>
+        )}
+        <p className="run-conclusion-next">{nextAction}</p>
+      </aside>
+    </section>
   )
 }
 

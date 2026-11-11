@@ -52,6 +52,10 @@ const buildJudgeResults = (run: TestRun): JudgeResult[] =>
       return {
         run_id: run.id,
         case_id: c.id,
+        case_title: c.title,
+        risk_tag: c.risk_tag,
+        expected: c.expected,
+        conclusion: j.status === RunStatus.PASSED ? '通过' : j.status === RunStatus.FAILED ? '不通过' : '待复核',
         status: j.status,
         judge_source: j.source,
         reason: j.reason,

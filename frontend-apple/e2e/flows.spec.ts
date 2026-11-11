@@ -23,6 +23,8 @@ test('先校验选择，再创建任务并展开详情', async ({ page }) => {
   await expect(page).toHaveURL(/\/runs\/run-.+/)
   await expect(page.getByTestId('runs-table').locator('tbody tr')).toHaveCount(rowCount + 1)
   await expect(page.locator('#run-details')).toBeVisible()
+  await expect(page.getByTestId('run-conclusion')).toContainText('本次安全测试结论')
+  await expect(page.getByTestId('run-conclusion')).toContainText(/未通过|通过|待人工确认/)
   await expect(page.getByTestId('launch-error')).toHaveCount(0)
 })
 
@@ -40,7 +42,7 @@ test('攻击链证据跳转、事件高亮与刷新后定位均可用', async ({
   await expect(page.getByTestId('evidence-focus-banner')).toContainText(caseId)
   await expect(page.locator('.trace-focused').first()).toBeVisible()
   await expect(page.locator('.trace-focused').first()).toHaveAttribute('data-event-id', eventId)
-  await expect(page.locator('.trace-case-focused')).toContainText(caseId)
+  await expect(page.locator('.trace-case-focused')).toHaveAttribute('data-case-id', caseId)
   await page.reload()
   await expect(page.locator('.trace-focused').first()).toBeVisible()
   await page.getByRole('button', { name: '清除定位' }).click()
@@ -48,26 +50,26 @@ test('攻击链证据跳转、事件高亮与刷新后定位均可用', async ({
   await expect(page.locator('.trace-focused')).toHaveCount(0)
 })
 
-test('报告导出实际 Markdown 与 CSV 文件并保留 Mock 标识', async ({ page }) => {
+test('报告导出实际 Markdown 与 CSV 文件并保留示例数据标识', async ({ page }) => {
   const downloads: Download[] = []
   page.on('download', (download) => downloads.push(download))
   await page.goto('/reports')
   await page.getByTestId('export-btn').click()
-  await expect(page.getByTestId('export-status')).toContainText('已生成 Markdown 与 CSV')
+  await expect(page.getByTestId('export-status')).toContainText('报告已生成')
   await expect.poll(() => downloads.length).toBe(2)
   const markdown = downloads.find((download) => download.suggestedFilename().endsWith('.md'))!
   const csv = downloads.find((download) => download.suggestedFilename().endsWith('.csv'))!
   const markdownText = await readFile((await markdown.path())!, 'utf8')
   const csvText = await readFile((await csv.path())!, 'utf8')
   expect(markdown.suggestedFilename()).toContain('Mock_')
-  expect(markdownText).toContain('Mock 示例数据')
+  expect(markdownText).toContain('示例测试数据')
   expect(markdownText).toContain('不作为实测结果')
   expect(markdownText).toContain('规则判定')
   expect(markdownText).toContain('用例判定与人工复核')
   expect(csvText.startsWith('\uFEFF')).toBeTruthy()
   expect(csvText).toContain('运行汇总')
   expect(csvText).toContain('用例明细')
-  expect(csvText).toContain('Mock 示例数据')
+  expect(csvText).toContain('示例测试数据')
   await expect(page.getByTestId('export-markdown-btn')).toBeVisible()
   await expect(page.getByTestId('export-csv-btn')).toBeVisible()
 })
@@ -107,12 +109,12 @@ test('可以从测试集页面生成并打开新测试集', async ({ page }) => 
   await expect(page.getByTestId('case-list')).toBeVisible()
 })
 
-test('Mock AI 候选明确标注模拟并支持编辑后保存', async ({ page }) => {
+test('AI 候选明确标注为演示数据并支持编辑后保存', async ({ page }) => {
   await page.goto('/test-suites')
   await page.getByTestId('generate-suite-btn').click()
   await page.locator('.generator-ai-toggle input').check()
   await page.getByTestId('generate-suite-submit').click()
-  await expect(page.getByTestId('generation-result')).toContainText('Mock 演示候选（未调用真实模型）')
+  await expect(page.getByTestId('generation-result')).toContainText('演示候选（未调用模型）')
   await page.getByTestId('studio-case-title').fill('人工修改后的测试用例')
   await expect(page.getByText('人工修改后的测试用例').first()).toBeVisible()
   await page.getByTestId('accept-generated-suite').click()

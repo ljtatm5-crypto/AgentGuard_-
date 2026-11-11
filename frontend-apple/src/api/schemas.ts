@@ -171,6 +171,10 @@ const findingSchema = z.object({
 const judgeResultSchema = z.object({
   run_id: z.string(),
   case_id: z.string(),
+  case_title: z.string(),
+  risk_tag: riskTag,
+  expected: z.string(),
+  conclusion: z.string(),
   status: runStatus,
   judge_source: judgeSource,
   reason: z.string(),

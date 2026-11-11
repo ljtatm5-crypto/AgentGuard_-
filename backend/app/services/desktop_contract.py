@@ -218,11 +218,23 @@ def evidence_ref(run: TestRun, events: list[TraceEvent], selected_ids: list[str]
 
 def judge_view(run: TestRun, events: list[TraceEvent]) -> dict:
     judge = (run.result or {}).get("judge", {})
+    snapshot = (run.result or {}).get("case_snapshot") or {}
     source = judge.get("source", judge.get("judge_mode", "rule"))
     source = "semantic" if "llm" in source else source
     if source not in {"rule", "metric", "semantic", "human"}:
         source = "rule"
+    conclusion = judge.get("conclusion") or {
+        "passed": "通过",
+        "failed": "不通过",
+        "needs_review": "待复核",
+        "running": "执行中",
+        "pending": "待执行",
+    }.get(run.status, "待复核")
     return {"run_id": run.task_id, "case_id": run.case_id,
+            "case_title": str(snapshot.get("name") or run.case_id),
+            "risk_tag": risk_tag(str(snapshot.get("risk_tag") or "baseline_normal")),
+            "expected": str(snapshot.get("expected") or ""),
+            "conclusion": str(conclusion),
             "status": run.status if run.status in FINAL_STATUSES | {"pending", "running"} else "needs_review",
             "judge_source": source, "reason": judge.get("reason", "尚无判定记录"),
             "confidence": float(judge.get("confidence", 0)), "evidence": evidence_ref(run, events, judge.get("event_ids")),

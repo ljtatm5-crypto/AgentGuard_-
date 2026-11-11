@@ -14,7 +14,6 @@ export default function ReportsPage() {
   const metrics = useAsync(() => api.getMetrics(), [])
   const runs = useAsync(() => api.listRuns(), [])
   const capabilities = useAsync(() => api.getCapabilities(), [])
-  const isProduction = capabilities.state.phase === 'ready' && capabilities.state.data.environment === 'production'
   const [exporting, setExporting] = useState(false)
   const [pdfLoading, setPdfLoading] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
@@ -31,11 +30,7 @@ export default function ReportsPage() {
       api.listFindings(),
       api.getCapabilities(),
     ])
-    const dataSource = USE_MOCK
-      ? 'Mock 示例数据（用于演示，不作为实测结果）'
-      : caps.environment === 'production'
-        ? `Vercel 生产 API / ${caps.database === 'postgresql' ? 'PostgreSQL' : 'SQLite'}`
-        : `本地或开发 API / ${caps.database === 'postgresql' ? 'PostgreSQL' : 'SQLite'}`
+    const dataSource = USE_MOCK ? '示例测试数据' : 'AgentGuard 安全测试运行记录'
     const details: Awaited<ReturnType<typeof api.getRunDetail>>[] = []
     const unavailableRunIds: string[] = []
     if (USE_MOCK || caps.anonymous_writes || getControlKey()) {
@@ -61,8 +56,8 @@ export default function ReportsPage() {
       downloadReportFile(generated.markdown)
       downloadReportFile(generated.csv)
       setExportStatus(
-        '已生成 Markdown 与 CSV，共 ' + snapshot.runs.length + ' 条运行记录。' +
-          (snapshot.unavailableRunIds.length ? snapshot.unavailableRunIds.length + ' 条详情暂不可用，已在报告中注明。' : ''),
+        '报告已生成，共包含 ' + snapshot.runs.length + ' 条测试记录。' +
+          (snapshot.unavailableRunIds.length ? snapshot.unavailableRunIds.length + ' 条记录详情暂不可用，已在报告中注明。' : ''),
       )
     } catch (error) {
       setExportError(error instanceof ApiRequestError ? error.message : '报告生成失败，请检查服务后重新导出')
@@ -93,7 +88,7 @@ export default function ReportsPage() {
       <header className="page-head">
         <h1>报告与回归</h1>
         <p className="page-desc">
-          将版本变化、判定依据与修复效果留在同一份报告中。每个指标都可回溯到运行记录。
+          查看版本结论、修复效果，并导出客户可读的测试报告。
         </p>
       </header>
 
@@ -106,7 +101,7 @@ export default function ReportsPage() {
                 <thead>
                   <tr>
                     <th>版本</th>
-                    <th>状态</th>
+                    <th>安全结论</th>
                     <th>通过率</th>
                     <th>失败数</th>
                     <th>待复核</th>
@@ -115,12 +110,14 @@ export default function ReportsPage() {
                 </thead>
                 <tbody>
                   {data.map((r) => {
-                    const rate = r.total ? r.passed / r.total : 0
+                    const rate = r.completed ? r.passed / r.completed : 0
+                    const conclusion = conclusionForRun(r)
                     return (
                       <tr key={r.id}>
                         <td className="mono">{r.agent_version}</td>
                         <td>
-                          <StatusTag v={r.status} />
+                          <strong className={`report-run-conclusion report-conclusion-${conclusion.tone}`}>{conclusion.label}</strong>
+                          <small className="muted block small">{conclusion.note}</small>
                         </td>
                         <td>{(rate * 100).toFixed(1)}%{(r.status === 'running' || r.status === 'pending') && <span className="muted block small">任务未完成</span>}</td>
                         <td>{r.failed}</td>
@@ -154,7 +151,7 @@ export default function ReportsPage() {
             </div>
           )}
         </AsyncBoundary>
-        <p className="muted small">仅比较同测试集、同用例的修复前后记录；没有成对记录时显示暂无数据。运行 ID 列表表示全部聚合范围，不代表单次修复对照。</p>
+        <p className="muted small">仅对比同测试集、同用例的修复前后记录。</p>
       </section>
 
       <section className="panel">
@@ -165,31 +162,41 @@ export default function ReportsPage() {
       </section>
 
       <section className="panel export-panel">
-        <div className="panel-toolbar"><h2>导出报告</h2><span className={`tag ${USE_MOCK ? 'tag-warning' : 'tag-info'}`}>{USE_MOCK ? 'Mock 示例数据' : isProduction ? 'Vercel 生产 API 数据' : '本地/开发 API 数据'}</span></div>
+        <div className="panel-toolbar"><h2>导出报告</h2>{USE_MOCK && <span className="tag tag-warning">示例数据</span>}</div>
         <p className="page-desc">
-          包含测试集版本、运行记录、用例判定、人工复核记录及指标口径。文本字段中的常见令牌自动脱敏。
-          {USE_MOCK && ' 当前为示例模式，报告会明确标注数据来源。'}
+          报告包含测试结论、用例判定、证据与修复建议。
         </p>
         <div className="export-actions">
           <button className="btn btn-primary" data-testid="export-btn" onClick={() => void exportReport()} disabled={exporting}>
-            <DownloadSimple size={18} aria-hidden="true" />{exporting ? '正在整理报告…' : '导出报告（Markdown + CSV）'}
+            <DownloadSimple size={18} aria-hidden="true" />{exporting ? '正在生成报告…' : '导出测试报告'}
           </button>
           <button className="btn" data-testid="export-pdf-btn" onClick={() => void exportPdf()} disabled={pdfLoading}>
-            <FilePdf size={18} aria-hidden="true" />{pdfLoading ? '正在排版…' : '导出 PDF（A4 打印）'}
+            <FilePdf size={18} aria-hidden="true" />{pdfLoading ? '正在准备…' : '导出 PDF'}
           </button>
           {files && <>
-            <button className="btn" onClick={() => downloadReportFile(files.markdown)} data-testid="export-markdown-btn"><FileText size={17} aria-hidden="true" />单独下载 Markdown</button>
-            <button className="btn" onClick={() => downloadReportFile(files.csv)} data-testid="export-csv-btn"><FileCsv size={17} aria-hidden="true" />单独下载 CSV</button>
+            <button className="btn" onClick={() => downloadReportFile(files.markdown)} data-testid="export-markdown-btn"><FileText size={17} aria-hidden="true" />下载文本报告</button>
+            <button className="btn" onClick={() => downloadReportFile(files.csv)} data-testid="export-csv-btn"><FileCsv size={17} aria-hidden="true" />下载明细表</button>
           </>}
         </div>
-        <p className="muted small export-hint">
-          PDF 由浏览器打印引擎按 A4 排版输出，在打印对话框中选择「另存为 PDF」保存；中文不依赖额外字体包，与 Markdown / CSV 使用同一份数据快照。
-        </p>
+        <p className="muted small export-hint">导出 PDF 时，请在打印窗口中选择“另存为 PDF”。</p>
         {exportStatus && <p className="export-status" role="status" aria-live="polite" data-testid="export-status"><CheckCircle size={18} aria-hidden="true" />{exportStatus}</p>}
         {exportError && <p className="form-error" role="alert" data-testid="export-error">{exportError}</p>}
       </section>
     </div>
   )
+}
+
+function conclusionForRun(run: TestRun): { label: string; note: string; tone: string } {
+  if (run.status === 'running' || run.status === 'pending') {
+    return { label: '仍在执行', note: `已完成 ${run.completed} / ${run.total} 项`, tone: 'running' }
+  }
+  if (run.status === 'failed') {
+    return { label: '未通过', note: `命中 ${run.failed} 项明确违规`, tone: 'failed' }
+  }
+  if (run.status === 'needs_review') {
+    return { label: '待确认', note: `${run.needs_review} 项需要人工复核`, tone: 'review' }
+  }
+  return { label: '通过', note: '已测范围未发现违规', tone: 'passed' }
 }
 
 function RunComparison({ runs, canReadPrivate }: { runs: TestRun[]; canReadPrivate: boolean }) {
