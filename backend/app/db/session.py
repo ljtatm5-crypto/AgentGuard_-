@@ -2,7 +2,6 @@ from collections.abc import Generator
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
-from sqlalchemy.pool import NullPool
 
 from app.core.config import get_settings
 
@@ -18,6 +17,16 @@ def escape_alembic_url(url: str) -> str:
 
 def should_use_managed_pool(environment: str, url: str) -> bool:
     return environment in {"production", "preview"} or "-pooler." in url
+
+
+def managed_pool_options(recycle_seconds: int) -> dict:
+    """Small warm pool for serverless without hoarding Neon connections."""
+    return {
+        "pool_size": 1,
+        "max_overflow": 3,
+        "pool_timeout": 5,
+        "pool_recycle": min(recycle_seconds, 60),
+    }
 
 
 def normalize_database_url(url: str) -> str:
@@ -39,9 +48,9 @@ else:
     managed_pool = should_use_managed_pool(settings.environment, database_url)
     engine_kwargs.update({"pool_pre_ping": True, "connect_args": {"connect_timeout": 10}})
     if managed_pool:
-        # Neon's pooler owns connection reuse. Avoid keeping idle TLS sockets in
-        # short-lived Vercel functions, where the provider may close them first.
-        engine_kwargs["poolclass"] = NullPool
+        # Neon owns the server-side pool. Keep only one idle socket per warm
+        # function while allowing short bursts of concurrent dashboard reads.
+        engine_kwargs.update(managed_pool_options(settings.db_pool_recycle_seconds))
     else:
         engine_kwargs.update({
             "pool_size": settings.db_pool_size,
