@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
-from app.db.session import Base, acquire_bootstrap_lock, escape_alembic_url, normalize_database_url, should_use_managed_pool
+from app.db.session import Base, acquire_bootstrap_lock, escape_alembic_url, managed_pool_options, normalize_database_url, should_use_managed_pool
 from app.models.entities import Agent
 
 
@@ -36,10 +36,18 @@ def test_bootstrap_lock_is_a_sqlite_noop(tmp_path):
         assert session.scalar(select(1)) == 1
     engine.dispose()
 
-def test_managed_neon_pool_uses_null_pool_mode():
+def test_managed_neon_pool_is_detected():
     assert should_use_managed_pool("production", "postgresql+psycopg://u:p@direct.example/db")
     assert should_use_managed_pool("test", "postgresql+psycopg://u:p@db.example-pooler.example/db")
     assert not should_use_managed_pool("test", "postgresql+psycopg://u:p@direct.example/db")
+
+
+def test_managed_pool_keeps_one_warm_connection_and_recycles_early():
+    options = managed_pool_options(300)
+    assert options["pool_size"] == 1
+    assert options["max_overflow"] == 3
+    assert options["pool_timeout"] == 5
+    assert options["pool_recycle"] == 60
 
 
 def test_alembic_url_escapes_percent_encoded_credentials():
