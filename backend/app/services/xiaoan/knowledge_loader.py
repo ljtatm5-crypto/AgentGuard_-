@@ -59,7 +59,8 @@ def ensure_xiaoan_knowledge(db: Session) -> dict:
                 tags=list(document.get("tags", [])), content_hash=content_hash, status="indexed",
             )
             db.add(row)
-        elif row.content_hash != content_hash or row.source_version != version:
+        elif (row.content_hash != content_hash or row.source_version != version
+              or row.status != "indexed" or row.access_level != "public"):
             row.title = document["title"]
             row.source_path = document["source_path"]
             row.source_version = version
@@ -90,9 +91,15 @@ def ensure_xiaoan_knowledge(db: Session) -> dict:
     grouped = defaultdict(list)
     for passage in curated:
         grouped[passage.document].append(passage)
+    processed_curated_ids: set[str] = set()
     for source_path, passages in grouped.items():
         document_id = "curated-" + sha256(source_path.encode("utf-8")).hexdigest()[:16]
-        content_hash = sha256("\n".join(passage.content_hash for passage in passages).encode("utf-8")).hexdigest()
+        processed_curated_ids.add(document_id)
+        metadata_signature = "\n".join(
+            f"{passage.content_hash}|{passage.title}|{passage.heading}|{passage.route}"
+            for passage in passages
+        )
+        content_hash = sha256(metadata_signature.encode("utf-8")).hexdigest()
         row = db.scalar(select(AssistantDocument).where(AssistantDocument.document_id == document_id))
         if row is None:
             row = AssistantDocument(
@@ -101,7 +108,8 @@ def ensure_xiaoan_knowledge(db: Session) -> dict:
                 tags=["curated", "public"], content_hash=content_hash, status="indexed",
             )
             db.add(row)
-        elif row.content_hash != content_hash or row.source_version != version:
+        elif (row.content_hash != content_hash or row.source_version != version
+              or row.status != "indexed" or row.access_level != "public"):
             row.title = passages[0].title
             row.source_path = source_path
             row.source_version = version
@@ -127,6 +135,14 @@ def ensure_xiaoan_knowledge(db: Session) -> dict:
                 embedding=embedding, embedding_provider=provider, token_count=len(tokens(passage.text)),
             ))
             chunk_count += 1
+    retired = 0
+    for row in db.scalars(select(AssistantDocument).where(AssistantDocument.document_id.like("curated-%"))).all():
+        if row.document_id in processed_curated_ids:
+            continue
+        db.execute(delete(AssistantChunk).where(AssistantChunk.document_id == row.document_id))
+        row.status = "revoked"
+        row.access_level = "private"
+        retired += 1
     db.commit()
     return {
         "version": version,
@@ -134,4 +150,5 @@ def ensure_xiaoan_knowledge(db: Session) -> dict:
         "chunks": chunk_count,
         "updated": updated,
         "unchanged": indexed,
+        "retired": retired,
     }
