@@ -59,7 +59,8 @@ def ensure_xiaoan_knowledge(db: Session) -> dict:
                 tags=list(document.get("tags", [])), content_hash=content_hash, status="indexed",
             )
             db.add(row)
-        elif row.content_hash != content_hash or row.source_version != version:
+        elif (row.content_hash != content_hash or row.source_version != version
+              or row.status != "indexed" or row.access_level != "public"):
             row.title = document["title"]
             row.source_path = document["source_path"]
             row.source_version = version
@@ -107,7 +108,8 @@ def ensure_xiaoan_knowledge(db: Session) -> dict:
                 tags=["curated", "public"], content_hash=content_hash, status="indexed",
             )
             db.add(row)
-        elif row.content_hash != content_hash or row.source_version != version:
+        elif (row.content_hash != content_hash or row.source_version != version
+              or row.status != "indexed" or row.access_level != "public"):
             row.title = passages[0].title
             row.source_path = source_path
             row.source_version = version

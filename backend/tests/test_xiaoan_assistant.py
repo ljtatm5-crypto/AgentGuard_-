@@ -223,3 +223,9 @@ def test_curated_index_reconciles_title_route_and_retirement(monkeypatch):
         assert row.status == "revoked"
         assert row.access_level == "private"
         assert db.query(AssistantChunk).filter(AssistantChunk.document_id == document_id).count() == 0
+        monkeypatch.setattr(knowledge_loader, "load_curated_passages", lambda _: [changed])
+        ensure_xiaoan_knowledge(db)
+        db.refresh(row)
+        assert row.status == "indexed"
+        assert row.access_level == "public"
+        assert db.query(AssistantChunk).filter(AssistantChunk.document_id == document_id).count() == 1
