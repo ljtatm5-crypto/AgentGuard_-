@@ -98,6 +98,10 @@ def task_rows(db: Session, task_id: str) -> list[TestRun]:
 
 def events_for(db: Session, row: TestRun) -> list[TraceEvent]:
     events = list(db.scalars(select(TraceEvent).where(TraceEvent.run_id == row.id).order_by(TraceEvent.timestamp, TraceEvent.id)).all())
+    return in_trace_order(events)
+
+
+def in_trace_order(events: list[TraceEvent]) -> list[TraceEvent]:
     return sorted(events, key=lambda event: (event.params or {}).get("desktop_sequence", len(events)))
 
 
@@ -500,12 +504,20 @@ def sync_finding(db: Session, run: TestRun, case: TestCase) -> None:
 
 @router.get("/runs")
 def runs(request: Request, db: Session = Depends(get_db)):
+    query = (
+        select(TestRun, TestSuite)
+        .outerjoin(TestSuite, TestSuite.id == TestRun.suite_id)
+        .order_by(TestRun.created_at.desc(), TestRun.id)
+    )
+    if not is_operator_request(request):
+        query = query.where(TestRun.agent_id.in_(SEED_AGENT_IDS.values()))
+
     grouped = defaultdict(list)
-    for row in db.scalars(select(TestRun).order_by(TestRun.created_at.desc(), TestRun.id)).all():
-        if not is_operator_request(request) and row.agent_id not in SEED_AGENT_IDS.values():
-            continue
+    suites = {}
+    for row, suite in db.execute(query):
         grouped[row.task_id].append(row)
-    return [run_view(rows, db.get(TestSuite, rows[0].suite_id)) for rows in grouped.values()]
+        suites.setdefault(row.task_id, suite)
+    return [run_view(rows, suites[task_id]) for task_id, rows in grouped.items()]
 
 
 @router.post("/runs")
@@ -669,17 +681,37 @@ def finding_response(db: Session, finding: Finding) -> dict:
 @router.get("/findings")
 def findings(request: Request, db: Session = Depends(get_db)):
     operator = is_operator_request(request)
+    query = (
+        select(Finding, TestRun, TestSuite, TestCase)
+        .join(TestRun, TestRun.id == Finding.run_id)
+        .join(TestSuite, TestSuite.id == TestRun.suite_id)
+        .outerjoin(TestCase, TestCase.id == TestRun.case_id)
+        .order_by(Finding.created_at.desc())
+    )
+    if not operator:
+        query = query.where(TestRun.agent_id.in_(SEED_AGENT_IDS.values()))
+
+    rows = db.execute(query).all()
+    events_by_run = defaultdict(list)
+    if operator and rows:
+        events = (
+            select(TraceEvent)
+            .where(TraceEvent.run_id.in_(select(Finding.run_id)))
+            .order_by(TraceEvent.timestamp, TraceEvent.id)
+        )
+        for event in db.scalars(events):
+            events_by_run[event.run_id].append(event)
+
     items = []
-    for finding in db.scalars(select(Finding).order_by(Finding.created_at.desc())).all():
-        run = db.get(TestRun, finding.run_id)
-        if run is None or (not operator and run.agent_id not in SEED_AGENT_IDS.values()):
-            continue
+    for finding, run, suite, saved_case in rows:
         snapshot = (run.result or {}).get("case_snapshot")
-        case = SimpleNamespace(**snapshot) if snapshot else db.get(TestCase, run.case_id)
-        suite = db.get(TestSuite, run.suite_id)
-        if case is None or suite is None:
+        case = SimpleNamespace(**snapshot) if snapshot else saved_case
+        if case is None:
             continue
-        items.append(finding_response(db, finding) if operator else public_finding_view(finding, run, case, suite))
+        if operator:
+            items.append(finding_view(finding, run, case, suite, in_trace_order(events_by_run[run.id])))
+        else:
+            items.append(public_finding_view(finding, run, case, suite))
     return items
 
 

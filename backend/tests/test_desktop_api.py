@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, func, select
+from sqlalchemy import create_engine, event, func, select
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
@@ -90,6 +90,35 @@ def test_seed_assets_are_complete_but_have_no_invented_results(desktop):
     assert metrics["risk_ground_truth_cases"] == 0
     assert metrics["risk_confusion_matrix"] == {"tp": 0, "fp": 0, "fn": 0, "tn": 0}
     assert metrics["target_benchmarks"]
+
+
+def test_dashboard_reads_keep_database_round_trips_bounded(desktop):
+    client, db = desktop
+    execute(client, "v1.0")
+    execute(client, "v2.0")
+    engine = db.get_bind()
+    statements = []
+
+    def record_query(_conn, _cursor, statement, _params, _context, _executemany):
+        statements.append(statement)
+
+    event.listen(engine, "before_cursor_execute", record_query)
+    try:
+        with TestClient(build_desktop_app(db, allow_anonymous=False, token="operator-secret")) as dashboard:
+            for endpoint, headers, expected_queries in (
+                ("runs", {}, 1),
+                ("metrics", {}, 1),
+                ("findings", {}, 1),
+                ("findings", {"Authorization": "Bearer operator-secret"}, 2),
+            ):
+                db.expunge_all()
+                statements.clear()
+                response = dashboard.get(f"/api/v2/{endpoint}", headers=headers)
+                assert response.status_code == 200
+                assert response.json()
+                assert len(statements) == expected_queries, endpoint
+    finally:
+        event.remove(engine, "before_cursor_execute", record_query)
 
 
 def test_real_execution_aggregate_evidence_rejudge_and_paired_metrics(desktop):
