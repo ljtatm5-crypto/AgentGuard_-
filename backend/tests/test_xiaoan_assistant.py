@@ -9,9 +9,11 @@ from sqlalchemy.pool import StaticPool
 from app.api.assistant import router as assistant_router
 from app.core.config import Settings
 from app.db.session import Base, get_db
+from app.models.assistant_entities import AssistantDocument
 from app.models.entities import Agent, Finding, TestCase, TestRun, TestSuite, TraceEvent
 from app.security.access import SlidingWindowRateLimiter, WriteAccessMiddleware
 from app.services.xiaoan.knowledge_loader import ensure_assistant_schema, ensure_xiaoan_knowledge
+from app.services.xiaoan.retrieval import hybrid_search
 
 
 def build_app(db: Session, *, allow_anonymous: bool = False, token: str = "operator-secret") -> FastAPI:
@@ -67,8 +69,13 @@ def test_knowledge_index_and_public_tutorial_answer():
     Base.metadata.create_all(engine)
     with Session(engine) as db:
         summary = ensure_xiaoan_knowledge(db)
-        assert summary["documents"] >= 7
-        assert summary["chunks"] >= 20
+        assert summary["documents"] >= 13
+        assert summary["chunks"] >= 50
+        curated_paths = {row.source_path for row in db.query(AssistantDocument).all()}
+        assert "docs/xiaoan/quickstart.md" in curated_paths
+        assert "frontend-apple/docs/API_CONTRACT.md" in curated_paths
+        hits = hybrid_search(db, "Dify API Key 授权", route="/agents", limit=5)
+        assert any(hit["source_path"] in curated_paths for hit in hits)
         with TestClient(build_app(db)) as client:
             tutorials = client.get("/api/v2/assistant/tutorials")
             assert tutorials.status_code == 200
