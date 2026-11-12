@@ -5,7 +5,7 @@ from collections import Counter
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db.session import acquire_bootstrap_lock
@@ -406,17 +406,32 @@ def save_chain_review(db: Session, finding: Finding, *, node_id: str, status: st
 
 
 def metrics_view(db: Session, agent_ids: set[str] | None = None) -> dict:
-    rows = list(db.scalars(select(TestRun)).all())
+    finding_counts = (
+        select(
+            Finding.run_id,
+            func.count().label("total"),
+            func.count().filter(Finding.status == "mitigated").label("mitigated"),
+        )
+        .group_by(Finding.run_id)
+        .subquery()
+    )
+    has_trace = select(TraceEvent.id).where(TraceEvent.run_id == TestRun.id).exists()
+    query = (
+        select(TestRun, TestCase.ground_truth, finding_counts.c.total, finding_counts.c.mitigated, has_trace)
+        .outerjoin(TestCase, TestCase.id == TestRun.case_id)
+        .outerjoin(finding_counts, finding_counts.c.run_id == TestRun.id)
+    )
     if agent_ids is not None:
-        rows = [row for row in rows if row.agent_id in agent_ids]
-    run_ids = {row.id for row in rows}
-    findings = list(db.scalars(select(Finding).where(Finding.run_id.in_(run_ids))).all()) if run_ids else []
-    events = list(db.scalars(select(TraceEvent).where(TraceEvent.run_id.in_(run_ids))).all()) if run_ids else []
+        query = query.where(TestRun.agent_id.in_(agent_ids))
+    records = db.execute(query).all()
+    rows = [row for row, *_ in records]
+    findings_total = sum(total or 0 for _, _, total, _, _ in records)
+    findings_mitigated = sum(mitigated or 0 for _, _, _, mitigated, _ in records)
+    traced = {row.id for row, _, _, _, has_events in records if has_events}
+    case_truth_by_id = {row.case_id: truth or {} for row, truth, _, _, _ in records}
     counts = Counter(row.status for row in rows)
     done = [row for row in rows if row.status in FINAL_STATUSES]
     sources = [(row.result or {}).get("judge", {}).get("source", "rule") for row in done]
-    traced = {e.run_id for e in events}
-    cases_by_id = {case.id: case for case in db.scalars(select(TestCase)).all()}
     confusion = {"tp": 0, "fp": 0, "fn": 0, "tn": 0}
     labelled_cases = 0
     reviewed_run_ids: list[str] = []
@@ -425,8 +440,7 @@ def metrics_view(db: Session, agent_ids: set[str] | None = None) -> dict:
     for row in done:
         result = row.result or {}
         snapshot = result.get("case_snapshot") or {}
-        case = cases_by_id.get(row.case_id)
-        case_truth = (case.ground_truth if case else {}) or {}
+        case_truth = case_truth_by_id[row.case_id]
         ground_truth = dict(snapshot.get("ground_truth") or case_truth or {})
         if ground_truth.get("review_status") != "reviewed":
             continue
@@ -487,8 +501,8 @@ def metrics_view(db: Session, agent_ids: set[str] | None = None) -> dict:
             "needs_review_cases": counts["needs_review"], "rule_judged_cases": sum(source == "rule" for source in sources),
             "semantic_judged_cases": sum("llm" in source or source == "semantic" for source in sources),
             "avg_latency_ms": round(sum(row.latency or 0 for row in done) / len(done), 2) if done else 0,
-            "findings_total": len(findings), "findings_open": sum(f.status != "mitigated" for f in findings),
-            "findings_mitigated": sum(f.status == "mitigated" for f in findings),
+            "findings_total": findings_total, "findings_open": findings_total - findings_mitigated,
+            "findings_mitigated": findings_mitigated,
             "risk_detection_rate": recall,
             "risk_precision": precision,
             "risk_f1": f1,
