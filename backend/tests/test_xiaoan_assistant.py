@@ -9,9 +9,12 @@ from sqlalchemy.pool import StaticPool
 from app.api.assistant import router as assistant_router
 from app.core.config import Settings
 from app.db.session import Base, get_db
+from app.models.assistant_entities import AssistantChunk, AssistantDocument
 from app.models.entities import Agent, Finding, TestCase, TestRun, TestSuite, TraceEvent
 from app.security.access import SlidingWindowRateLimiter, WriteAccessMiddleware
-from app.services.xiaoan.knowledge_loader import ensure_xiaoan_knowledge
+from app.services.xiaoan.knowledge_loader import ensure_assistant_schema, ensure_xiaoan_knowledge
+from app.services.xiaoan.retrieval import Passage, hybrid_search
+from app.services.xiaoan import knowledge_loader
 
 
 def build_app(db: Session, *, allow_anonymous: bool = False, token: str = "operator-secret") -> FastAPI:
@@ -67,8 +70,13 @@ def test_knowledge_index_and_public_tutorial_answer():
     Base.metadata.create_all(engine)
     with Session(engine) as db:
         summary = ensure_xiaoan_knowledge(db)
-        assert summary["documents"] >= 7
-        assert summary["chunks"] >= 20
+        assert summary["documents"] >= 13
+        assert summary["chunks"] >= 50
+        curated_paths = {row.source_path for row in db.query(AssistantDocument).all()}
+        assert "docs/xiaoan/quickstart.md" in curated_paths
+        assert "frontend-apple/docs/API_CONTRACT.md" in curated_paths
+        hits = hybrid_search(db, "Dify API Key 授权", route="/agents", limit=5)
+        assert any(hit["source_path"] in curated_paths for hit in hits)
         with TestClient(build_app(db)) as client:
             tutorials = client.get("/api/v2/assistant/tutorials")
             assert tutorials.status_code == 200
@@ -181,3 +189,43 @@ def test_diagnosis_counts_events_beyond_presentation_cutoff():
             remediation = client.post("/api/v2/assistant/remediation", json={"finding_id": "finding-long"})
             assert remediation.status_code == 200
             assert any(item["type"] == "tool_call" for item in remediation.json()["evidence"])
+
+
+def test_assistant_schema_bootstrap_is_additive_and_idempotent():
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    with Session(engine) as db:
+        ensure_assistant_schema(db)
+        ensure_assistant_schema(db)
+        tables = set(__import__("sqlalchemy").inspect(engine).get_table_names())
+        assert {"assistant_documents", "assistant_chunks", "assistant_sessions", "assistant_messages", "assistant_feedback", "assistant_remediation_plans"} <= tables
+
+
+def test_curated_index_reconciles_title_route_and_retirement(monkeypatch):
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        ensure_xiaoan_knowledge(db)
+        row = db.query(AssistantDocument).filter(AssistantDocument.source_path == "docs/xiaoan/quickstart.md").one()
+        document_id = row.document_id
+        changed = Passage(
+            id="changed-passage", document="docs/xiaoan/quickstart.md", title="更新后的入门指南",
+            heading="第一次使用", text="更新后的教学正文", route="/settings", content_hash="stable-hash",
+        )
+        monkeypatch.setattr(knowledge_loader, "load_curated_passages", lambda _: [changed])
+        ensure_xiaoan_knowledge(db)
+        db.refresh(row)
+        assert row.title == "更新后的入门指南"
+        assert row.route == "/settings"
+        assert db.query(AssistantChunk).filter(AssistantChunk.document_id == document_id).count() == 1
+        monkeypatch.setattr(knowledge_loader, "load_curated_passages", lambda _: [])
+        ensure_xiaoan_knowledge(db)
+        db.refresh(row)
+        assert row.status == "revoked"
+        assert row.access_level == "private"
+        assert db.query(AssistantChunk).filter(AssistantChunk.document_id == document_id).count() == 0
+        monkeypatch.setattr(knowledge_loader, "load_curated_passages", lambda _: [changed])
+        ensure_xiaoan_knowledge(db)
+        db.refresh(row)
+        assert row.status == "indexed"
+        assert row.access_level == "public"
+        assert db.query(AssistantChunk).filter(AssistantChunk.document_id == document_id).count() == 1

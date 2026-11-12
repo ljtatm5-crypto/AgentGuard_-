@@ -1,0 +1,8 @@
+[
+  {"path":"docs/xiaoan/quickstart.md","title":"小安入门指南","route":"/overview","access_level":"public"},
+  {"path":"frontend-apple/docs/DEMO_RUNBOOK.md","title":"AgentGuard 演示操作手册","route":"/runs","access_level":"public"},
+  {"path":"frontend-apple/docs/API_CONTRACT.md","title":"AgentGuard 接口契约","route":"/settings","access_level":"public"},
+  {"path":"docs/dify-target-runbook.md","title":"Dify 授权接入手册","route":"/agents","access_level":"public"},
+  {"path":"docs/fastgpt-target-runbook.md","title":"FastGPT 授权接入手册","route":"/agents","access_level":"public"},
+  {"path":"docs/security-test-playbook.md","title":"AgentGuard 安全测试指南","route":"/test-suites","access_level":"public"}
+]

@@ -9,7 +9,7 @@ from app.db.session import SessionLocal, check_db_connection, init_db
 from app.security.access import WriteAccessMiddleware
 from app.services.seed import ensure_demo_data
 from app.services.desktop_contract import ensure_desktop_data
-from app.services.xiaoan.knowledge_loader import ensure_xiaoan_knowledge
+from app.services.xiaoan.knowledge_loader import ensure_assistant_schema, ensure_xiaoan_knowledge
 
 settings = get_settings()
 
@@ -24,6 +24,7 @@ async def lifespan(_: FastAPI):
         ensure_demo_data(db)
         ensure_desktop_data(db)
         if settings.xiaoan_enabled:
+            ensure_assistant_schema(db)
             ensure_xiaoan_knowledge(db)
     finally:
         db.close()
