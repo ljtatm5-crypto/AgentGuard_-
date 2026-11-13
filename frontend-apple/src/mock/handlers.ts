@@ -401,6 +401,17 @@ export const handlers = [
     return HttpResponse.json({ ...source, content: source.excerpt, source_version: 'mock' })
   }),
 
+  // ---------- 总览聚合 ----------
+  http.get(mockApiPath('/dashboard'), async () => {
+    await delay(220)
+    return HttpResponse.json({
+      agents: [...agentState.values()],
+      runs: Array.from(runState.values()),
+      findings: findings.map((finding) => ({ id: finding.id, severity: finding.severity, status: finding.status })),
+      metrics: buildMockMetrics(Array.from(runState.values())),
+    })
+  }),
+
   // ---------- 指标聚合 ----------
   http.get(mockApiPath('/metrics'), async () => {
     await delay(240)

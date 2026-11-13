@@ -229,6 +229,15 @@ export interface Metrics {
   risk_computed_from_run_ids?: string[]
 }
 
+export type DashboardFinding = Pick<Finding, 'id' | 'severity' | 'status'>
+
+export interface DashboardData {
+  agents: Agent[]
+  runs: TestRun[]
+  findings: DashboardFinding[]
+  metrics: Metrics
+}
+
 export interface Capabilities {
   public_read: boolean
   controlled_writes: boolean

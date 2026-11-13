@@ -12,7 +12,7 @@ from types import SimpleNamespace
 from typing import Any
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
@@ -111,13 +111,17 @@ def suite_cases(db: Session, suite: TestSuite) -> list[TestCase]:
     return sorted(rows, key=lambda row: (order.get(row.id, len(order)), row.id))
 
 
-@router.get("/agents")
-def agents(request: Request, db: Session = Depends(get_db)):
+def list_agent_items(request: Request, db: Session, public_only: bool = False) -> list[dict]:
     rows = list(db.scalars(select(Agent).order_by(Agent.created_at.desc())).all())
-    if not is_operator_request(request):
+    if public_only or not is_operator_request(request):
         rows = [agent for agent in rows if agent.id in SEED_AGENT_IDS.values()]
     rows.sort(key=lambda a: a.id != "desktop-campus-v2")
     return [agent_view(a) for a in rows]
+
+
+@router.get("/agents")
+def agents(request: Request, db: Session = Depends(get_db)):
+    return list_agent_items(request, db)
 
 
 @router.get("/agents/{agent_id}")
@@ -502,14 +506,13 @@ def sync_finding(db: Session, run: TestRun, case: TestCase) -> None:
         db.add(Finding(run_id=run.id, chain=[], **data))
 
 
-@router.get("/runs")
-def runs(request: Request, db: Session = Depends(get_db)):
+def list_run_items(request: Request, db: Session, public_only: bool = False) -> list[dict]:
     query = (
         select(TestRun, TestSuite)
         .outerjoin(TestSuite, TestSuite.id == TestRun.suite_id)
         .order_by(TestRun.created_at.desc(), TestRun.id)
     )
-    if not is_operator_request(request):
+    if public_only or not is_operator_request(request):
         query = query.where(TestRun.agent_id.in_(SEED_AGENT_IDS.values()))
 
     grouped = defaultdict(list)
@@ -518,6 +521,11 @@ def runs(request: Request, db: Session = Depends(get_db)):
         grouped[row.task_id].append(row)
         suites.setdefault(row.task_id, suite)
     return [run_view(rows, suites[task_id]) for task_id, rows in grouped.items()]
+
+
+@router.get("/runs")
+def runs(request: Request, db: Session = Depends(get_db)):
+    return list_run_items(request, db)
 
 
 @router.post("/runs")
@@ -746,3 +754,25 @@ def review_chain_node(finding_id: str, node_id: str, payload: ChainReviewIn,
 def metrics(request: Request, db: Session = Depends(get_db)):
     agent_ids = None if is_operator_request(request) else set(SEED_AGENT_IDS.values())
     return metrics_view(db, agent_ids=agent_ids)
+
+
+@router.get("/dashboard")
+def dashboard(request: Request, response: Response, db: Session = Depends(get_db)):
+    """Cacheable overview payload; one invocation replaces four parallel cold starts."""
+    response.headers["Cache-Control"] = "public, max-age=0, s-maxage=20, stale-while-revalidate=90"
+    seed_agent_ids = set(SEED_AGENT_IDS.values())
+    finding_rows = db.execute(
+        select(Finding.id, Finding.severity, Finding.status)
+        .join(TestRun, TestRun.id == Finding.run_id)
+        .where(TestRun.agent_id.in_(seed_agent_ids))
+        .order_by(Finding.created_at.desc())
+    ).all()
+    return {
+        "agents": list_agent_items(request, db, public_only=True),
+        "runs": list_run_items(request, db, public_only=True),
+        "findings": [
+            {"id": finding_id, "severity": severity, "status": status}
+            for finding_id, severity, status in finding_rows
+        ],
+        "metrics": metrics_view(db, agent_ids=seed_agent_ids),
+    }

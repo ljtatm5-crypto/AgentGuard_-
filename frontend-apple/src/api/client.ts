@@ -10,6 +10,7 @@ import type {
   AssistantTutorial,
   AssistantTutorialSummary,
   Capabilities,
+  DashboardData,
   Finding,
   JudgeResult,
   Metrics,
@@ -36,6 +37,10 @@ export { ApiRequestError }
 export const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false'
 const BASE = (import.meta.env.VITE_API_BASE ?? '').replace(/\/$/, '')
 const CONTROL_KEY_STORAGE = 'agentguard.controlKey'
+const DASHBOARD_CACHE_STORAGE = 'agentguard.dashboardSnapshot.v1'
+const GET_CACHE_TTL_MS = 15_000
+const getCache = new Map<string, { expiresAt: number; data: unknown }>()
+const inflightGets = new Map<string, Promise<unknown>>()
 
 export function getControlKey(): string {
   if (typeof window === 'undefined') return ''
@@ -57,8 +62,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 async function request<T>(path: string, schema: ZodType<T>, init?: RequestInit): Promise<T> {
   const url = USE_MOCK ? mockApiPath(path) : `${BASE}${apiPath(path)}`
-
-  let lastError: unknown
+  const method = (init?.method ?? 'GET').toUpperCase()
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(init?.headers as Record<string, string> | undefined),
@@ -68,6 +72,16 @@ async function request<T>(path: string, schema: ZodType<T>, init?: RequestInit):
     headers.Authorization = `Bearer ${controlKey}`
   }
 
+  const cacheKey = `${method}:${url}:${controlKey}`
+  if (method === 'GET') {
+    const cached = getCache.get(cacheKey)
+    if (cached && cached.expiresAt > Date.now()) return cached.data as T
+    const pending = inflightGets.get(cacheKey)
+    if (pending) return pending as Promise<T>
+  }
+
+  const execute = async (): Promise<T> => {
+  let lastError: unknown
   for (let attempt = 0; attempt <= RETRY_LIMIT; attempt++) {
     try {
       const res = await fetch(url, {
@@ -103,6 +117,11 @@ async function request<T>(path: string, schema: ZodType<T>, init?: RequestInit):
           res.status,
         )
       }
+      if (method === 'GET') {
+        getCache.set(cacheKey, { expiresAt: Date.now() + GET_CACHE_TTL_MS, data: parsed.data })
+      } else {
+        getCache.clear()
+      }
       return parsed.data
     } catch (e) {
       lastError = e
@@ -122,11 +141,26 @@ async function request<T>(path: string, schema: ZodType<T>, init?: RequestInit):
     }
   }
   throw lastError
+  }
+
+  if (method !== 'GET') return execute()
+  const pending = execute()
+  inflightGets.set(cacheKey, pending)
+  try {
+    return await pending
+  } finally {
+    inflightGets.delete(cacheKey)
+  }
 }
 
 /* ---------------- Agent 资产（B 提供） ---------------- */
 export const api = {
   getCapabilities: () => request<Capabilities>('/capabilities', schemas.capabilities),
+  getDashboard: async () => {
+    const data = await request<DashboardData>('/dashboard', schemas.dashboard)
+    rememberDashboardSnapshot(data)
+    return data
+  },
   listAgents: () => request<Agent[]>('/agents', schemas.agents),
   getAgent: (id: string) => request<Agent>(`/agents/${id}`, schemas.agent),
   validateAgent: (payload: Record<string, unknown>) =>
@@ -203,6 +237,27 @@ export const api = {
 
   /* ---------------- 指标聚合 ---------------- */
   getMetrics: () => request<Metrics>('/metrics', schemas.metrics),
+}
+
+export function readDashboardSnapshot(): DashboardData | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.localStorage.getItem(DASHBOARD_CACHE_STORAGE)
+    if (!raw) return null
+    const parsed = schemas.dashboard.safeParse(JSON.parse(raw))
+    return parsed.success ? parsed.data : null
+  } catch {
+    return null
+  }
+}
+
+export function rememberDashboardSnapshot(data: DashboardData): void {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(DASHBOARD_CACHE_STORAGE, JSON.stringify(data))
+  } catch {
+    // Storage can be disabled in privacy mode; the live request still succeeds.
+  }
 }
 
 export type Api = typeof api

@@ -362,6 +362,12 @@ const capabilitiesSchema = z.object({
 })
 
 export const schemas = {
+  dashboard: z.object({
+    agents: z.array(agentSchema),
+    runs: z.array(runSchema),
+    findings: z.array(findingSchema.pick({ id: true, severity: true, status: true })),
+    metrics: metricsSchema,
+  }),
   agents: z.array(agentSchema),
   agent: agentSchema,
   suites: z.array(suiteSchema),

@@ -10,8 +10,10 @@ export type AsyncState<T> =
  * 统一异步数据 Hook —— 页面四态（loading / ready / empty / error）
  * 由页面根据 data 是否为空派生 empty 态，此处只负责取数与重试。
  */
-export function useAsync<T>(fetcher: () => Promise<T>, deps: unknown[] = []) {
-  const [state, setState] = useState<AsyncState<T>>({ phase: 'loading' })
+export function useAsync<T>(fetcher: () => Promise<T>, deps: unknown[] = [], initialData: T | null = null) {
+  const [state, setState] = useState<AsyncState<T>>(() => initialData === null
+    ? { phase: 'loading' }
+    : { phase: 'ready', data: initialData })
   const [reloadToken, setReloadToken] = useState(0)
   const alive = useRef(true)
 
@@ -24,7 +26,7 @@ export function useAsync<T>(fetcher: () => Promise<T>, deps: unknown[] = []) {
 
   useEffect(() => {
     let cancelled = false
-    setState({ phase: 'loading' })
+    setState((current) => current.phase === 'ready' ? current : { phase: 'loading' })
     fetcher()
       .then((data) => {
         if (!cancelled && alive.current) setState({ phase: 'ready', data })
@@ -35,7 +37,7 @@ export function useAsync<T>(fetcher: () => Promise<T>, deps: unknown[] = []) {
           e instanceof ApiRequestError
             ? e
             : new ApiRequestError({ error_code: 'UNKNOWN', message: '未知错误' }, 0)
-        setState({ phase: 'error', error: err })
+        setState((current) => current.phase === 'ready' ? current : { phase: 'error', error: err })
       })
     return () => {
       cancelled = true

@@ -799,3 +799,16 @@ def test_create_run_accepts_fastgpt_adapter(desktop, monkeypatch):
     assert response.status_code == 200, response.text
     assert response.json()["adapter"] == "fastgpt"
     assert response.json()["evidence_level"] == "partial"
+
+
+def test_dashboard_aggregate_returns_one_cacheable_payload(desktop):
+    client, _ = desktop
+    response = client.get("/api/v2/dashboard")
+    assert response.status_code == 200, response.text
+    assert "s-maxage=" in response.headers["cache-control"]
+    payload = response.json()
+    assert set(payload) == {"agents", "runs", "findings", "metrics"}
+    assert payload["agents"][0]["id"] == SEED_AGENT_IDS["v2.0"]
+    assert payload["runs"] == []
+    assert payload["findings"] == []
+    assert payload["metrics"]["total_cases"] == 0

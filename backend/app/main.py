@@ -2,10 +2,12 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import select
 
 from app.api import agents, assistant, authorizations, desktop, findings, metrics, runs, suites
 from app.core.config import get_settings
 from app.db.session import SessionLocal, check_db_connection, init_db
+from app.models.entities import TestRun
 from app.security.access import WriteAccessMiddleware
 from app.services.seed import ensure_demo_data
 from app.services.desktop_contract import ensure_desktop_data
@@ -21,11 +23,19 @@ async def lifespan(_: FastAPI):
         init_db()
     db = SessionLocal()
     try:
-        ensure_demo_data(db)
-        ensure_desktop_data(db)
-        if settings.xiaoan_enabled:
-            ensure_assistant_schema(db)
-            ensure_xiaoan_knowledge(db)
+        # Production is already migrated and seeded. Skip expensive idempotent
+        # bootstrap work when the first run record exists, so cold starts reach
+        # the dashboard request without extra Neon round trips.
+        warm_database = (
+            settings.environment in {"production", "preview"}
+            and db.scalar(select(TestRun.id).limit(1)) is not None
+        )
+        if not warm_database:
+            ensure_demo_data(db)
+            ensure_desktop_data(db)
+            if settings.xiaoan_enabled:
+                ensure_assistant_schema(db)
+                ensure_xiaoan_knowledge(db)
     finally:
         db.close()
     yield
