@@ -13,19 +13,26 @@ import {
   Timer,
   WarningCircle,
 } from '@phosphor-icons/react'
-import { api } from '@/api/client'
+import { api, readDashboardSnapshot } from '@/api/client'
 import { AsyncBoundary } from '@/components/AsyncBoundary'
 import { SeverityTag, StatusTag } from '@/components/Tags'
 import { MotionSurface, CountUp } from '@/components/MotionSurface'
 import { useAsync } from '@/hooks/useAsync'
+import type { AsyncState } from '@/hooks/useAsync'
 import { SEVERITY_ORDER } from '@/types/enums'
 import type { Severity } from '@/types/enums'
+import type { DashboardData } from '@/types/api'
+
+function selectState<T>(state: AsyncState<DashboardData>, select: (data: DashboardData) => T): AsyncState<T> {
+  return state.phase === 'ready' ? { phase: 'ready', data: select(state.data) } : state
+}
 
 export default function DashboardPage() {
-  const runs = useAsync(() => api.listRuns(), [])
-  const findings = useAsync(() => api.listFindings(), [])
-  const metrics = useAsync(() => api.getMetrics(), [])
-  const agents = useAsync(() => api.listAgents(), [])
+  const dashboard = useAsync(() => api.getDashboard(), [], readDashboardSnapshot())
+  const runs = { state: selectState(dashboard.state, (data) => data.runs), retry: dashboard.retry }
+  const findings = { state: selectState(dashboard.state, (data) => data.findings), retry: dashboard.retry }
+  const metrics = { state: selectState(dashboard.state, (data) => data.metrics), retry: dashboard.retry }
+  const agents = { state: selectState(dashboard.state, (data) => data.agents), retry: dashboard.retry }
   const reduce = useReducedMotion()
   const currentAgent = agents.state.phase === 'ready' ? agents.state.data[0] : null
   return <div className="dashboard-page">
