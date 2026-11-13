@@ -6,7 +6,7 @@ from sqlalchemy import select
 
 from app.api import agents, assistant, authorizations, desktop, findings, metrics, runs, suites
 from app.core.config import get_settings
-from app.db.session import SessionLocal, check_db_connection, init_db
+from app.db.session import SessionLocal, init_db
 from app.models.entities import TestRun
 from app.security.access import WriteAccessMiddleware
 from app.services.seed import ensure_demo_data
@@ -18,7 +18,6 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    check_db_connection()
     if settings.db_auto_create:
         init_db()
     db = SessionLocal()

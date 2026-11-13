@@ -759,7 +759,7 @@ def metrics(request: Request, db: Session = Depends(get_db)):
 @router.get("/dashboard")
 def dashboard(request: Request, response: Response, db: Session = Depends(get_db)):
     """Cacheable overview payload; one invocation replaces four parallel cold starts."""
-    response.headers["Cache-Control"] = "public, max-age=0, s-maxage=20, stale-while-revalidate=90"
+    response.headers["Cache-Control"] = "public, max-age=0, s-maxage=60, stale-while-revalidate=300"
     seed_agent_ids = set(SEED_AGENT_IDS.values())
     finding_rows = db.execute(
         select(Finding.id, Finding.severity, Finding.status)
