@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { NavLink, useLocation, useNavigate, useOutlet } from 'react-router-dom'
+import { Link, NavLink, useLocation, useNavigate, useOutlet } from 'react-router-dom'
 import { AnimatePresence, motion, MotionConfig, useReducedMotion } from 'motion/react'
-import { SquaresFour, Stack, PlayCircle, CirclesThreePlus, ChartPieSlice, Graph, GearSix, MagnifyingGlass, CaretRight, Sun, Moon, Command, X } from '@phosphor-icons/react'
+import { SquaresFour, Stack, PlayCircle, CirclesThreePlus, ChartPieSlice, Graph, GearSix, MagnifyingGlass, CaretRight, Sun, Moon, Command, FingerprintSimple, X } from '@phosphor-icons/react'
 import XiaoAnPanel from '@/components/xiaoan/XiaoAnPanel'
 
 const NAV = [
@@ -59,17 +59,14 @@ export default function AppLayout() {
     <MotionConfig reducedMotion="user">
     <div className="app">
       <a className="skip-link" href="#page-content">跳到页面内容</a>
-      <div className="ambient-light ambient-one" aria-hidden="true" />
-      <div className="ambient-light ambient-two" aria-hidden="true" />
       <aside className="sidebar">
-        <div className="brand">
-          <span className="brand-mark">AG</span>
+        <Link className="brand" to="/overview" aria-label="AgentGuard 智测盾总览">
+          <span className="brand-mark"><FingerprintSimple size={25} weight="bold" aria-hidden="true" /></span>
           <div>
-            <div className="brand-name">AgentGuard 智测盾</div>
-            <div className="brand-sub">每一次测试，都有据可循</div>
+            <div className="brand-name">AgentGuard</div>
+            <div className="brand-sub">智测盾</div>
           </div>
-        </div>
-        <div className="workspace-switch"><span className="workspace-avatar">A</span><div><strong>智能体安全测试</strong><small>客户工作空间</small></div><CaretRight size={14} /></div>
+        </Link>
         <span className="nav-caption">工作空间</span>
         <nav aria-label="主要导航">
           {NAV.map((n) => (
@@ -90,9 +87,9 @@ export default function AppLayout() {
         </nav>
       </aside>
       <main className="main">
-        <header className="app-topbar"><div className="breadcrumb">工作空间 <CaretRight size={13} /><span>{active.label}</span></div><div className="topbar-actions"><button className="search-trigger" ref={searchTrigger} onClick={openSearch} aria-label="搜索页面"><MagnifyingGlass size={17} /><span>快速前往</span><kbd><Command size={12} /> K</kbd></button><div className="appearance-switch" aria-label="外观"><button aria-label="浅色外观" aria-pressed={theme === 'light'} onClick={() => setTheme('light')}>{theme === 'light' && <motion.span layoutId="appearance" />}<Sun size={17} /></button><button aria-label="深色外观" aria-pressed={theme === 'dark'} onClick={() => setTheme('dark')}>{theme === 'dark' && <motion.span layoutId="appearance" />}<Moon size={17} /></button></div><span className="team-avatar" title="三人协作团队">AG</span></div></header>
-        <AnimatePresence mode="wait" initial={false}><motion.div className="route-view" id="page-content" key={location.pathname} initial={{ opacity: 0, y: reduce ? 0 : 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: reduce ? 0 : -6 }} transition={{ duration: reduce ? 0 : .22 }}>{outlet}</motion.div></AnimatePresence>
-        <footer className="app-footer"><span>AgentGuard 智测盾</span><span>测试有依据，改进有方向。</span></footer>
+        <header className="app-topbar"><div className="breadcrumb"><span className="breadcrumb-root">AgentGuard</span><CaretRight size={12} aria-hidden="true" /><span>{active.label}</span></div><div className="topbar-actions"><button className="search-trigger" ref={searchTrigger} onClick={openSearch} aria-label="搜索页面"><MagnifyingGlass size={17} /><span>快速前往</span><kbd><Command size={12} /> K</kbd></button><div className="appearance-switch" aria-label="外观"><button aria-label="浅色外观" aria-pressed={theme === 'light'} onClick={() => setTheme('light')}>{theme === 'light' && <motion.span layoutId="appearance" />}<Sun size={17} /></button><button aria-label="深色外观" aria-pressed={theme === 'dark'} onClick={() => setTheme('dark')}>{theme === 'dark' && <motion.span layoutId="appearance" />}<Moon size={17} /></button></div></div></header>
+        <div className="route-view" id="page-content" key={location.pathname} tabIndex={-1}>{outlet}</div>
+        <footer className="app-footer"><span>AgentGuard 智测盾</span></footer>
       </main>
       <XiaoAnPanel />
     </div>

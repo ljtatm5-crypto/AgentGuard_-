@@ -7,11 +7,13 @@ export function AsyncBoundary<T>({
   state,
   isEmpty,
   onRetry,
+  loadingLabel = '正在获取最新记录',
   children,
 }: {
   state: AsyncState<T>
   isEmpty?: (data: T) => boolean
   onRetry?: () => void
+  loadingLabel?: string
   children: (data: T) => ReactNode
 }) {
   if (state.phase === 'loading') {
@@ -22,7 +24,7 @@ export function AsyncBoundary<T>({
           <span className="skeleton-line skeleton-wide" />
           <span className="skeleton-line" />
         </div>
-        <p className="muted">正在获取最新记录…</p>
+        <p className="muted">{loadingLabel}…</p>
       </div>
     )
   }
