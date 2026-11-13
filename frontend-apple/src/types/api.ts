@@ -181,6 +181,9 @@ export interface JudgeResult {
   reason: string
   confidence: number
   evidence: EvidenceRef
+  evidence_complete?: boolean | null
+  unobservable_evidence?: string[]
+  evidence_requirements?: Record<string, string>
   reviewed_by: string | null
   reviewed_at: string | null
 }

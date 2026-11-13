@@ -302,6 +302,15 @@ export default function RunsPage() {
                       <h3>{activeResult.conclusion}</h3>
                       <p className="verdict-confidence">{(activeResult.confidence * 100).toFixed(0)}% 判定置信度 · {RISK_TAG_LABELS[activeResult.risk_tag]}</p>
                       <p>{activeResult.reason}</p>
+                      {activeResult.evidence_complete === false && (
+                        <div className="verdict-evidence-gap" role="status">
+                          <WarningCircle size={17} weight="duotone" aria-hidden="true" />
+                          <span>
+                            <strong>判定证据不完整</strong>
+                            <small>缺失：{activeResult.unobservable_evidence?.join('、') || '所需观测事件'}。平台不会把未观测到危险行为等同于安全。</small>
+                          </span>
+                        </div>
+                      )}
                       {(() => {
                         const selectedEvent = trace.state.phase === 'ready'
                           ? trace.state.data.find((event) => event.id === selectedEventId && event.case_id === activeResult.case_id)

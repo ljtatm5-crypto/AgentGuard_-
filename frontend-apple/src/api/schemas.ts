@@ -180,6 +180,9 @@ const judgeResultSchema = z.object({
   reason: z.string(),
   confidence: z.number(),
   evidence: evidenceRef,
+  evidence_complete: z.boolean().nullable().optional(),
+  unobservable_evidence: z.array(z.string()).optional(),
+  evidence_requirements: z.record(z.string()).optional(),
   reviewed_by: z.string().nullable(),
   reviewed_at: z.string().nullable(),
 })

@@ -64,7 +64,7 @@ export default function SettingsPage() {
           <p>统一管理测试任务、风险结论与报告证据。</p>
         </div>
         <div className="settings-facts">
-          <span><small>测试状态</small><strong>可正常使用</strong></span>
+          <span><small>测试状态</small><strong>{caps?.anonymous_writes ? '公开演示（受控）' : '操作员模式'}</strong></span>
           <span><small>证据留存</small><strong>自动保存</strong></span>
           <span><small>测试范围</small><strong>授权环境</strong></span>
         </div>

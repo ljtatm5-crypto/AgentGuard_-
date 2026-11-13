@@ -122,3 +122,14 @@
 - 已实现全局小安面板、页面感知快捷问题、教程步骤、真实事件证据卡片、修复与回归计划。
 - 匿名基础教学与私有证据诊断已区分权限；携带 Run/Finding 上下文的请求继续要求操作员鉴权。
 - 当前自动测试、Mock/真实 API 契约和前端构建通过；真实 LLM/Embedding 与 40+ 人工评测尚未执行，不得写成 PASS。
+
+## 第二轮专项审计修复（2026-11-14）
+
+- `PASS` 证据感知判定：工具、记忆和行为类“未发现问题”规则必须具备完整可观测证据，否则强制 `needs_review`，不得将未观测等同于安全。
+- `PASS` 不可观测结果会在运行详情中显示缺失证据类型，规则结果保留 `evidence_complete`、`unobservable_evidence` 和 `evidence_requirements`。
+- `PASS` 本地确定性模拟器显式声明 `simulated` 工具、RAG 与记忆能力；远程 Dify/FastGPT 只在响应实际返回事件时声明 `observable`。
+- `PASS` 自建 LLM、小安 LLM 与 Embedding 统一改用固定 IP 出站传输，复用 DNS 固定、连接后复验、禁止代理和禁止重定向门禁。
+- `PASS` 测试集列表移除逐测试集用例 N+1 查询；公共摘要接口增加边缘缓存。
+- `PASS` 生产前端环境已确认 `VITE_USE_MOCK=false`，线上调用真实 FastAPI/PostgreSQL；真实 Dify/FastGPT 模型验证仍为 `BLOCKED`。
+- `PASS` 后端全量测试 161 项通过；新增 T01“工具轨迹缺失必须待复核”、未观测记忆、写入缺少策略决策、LLM 固定 IP 传输等回归测试。
+- `NOT_RUN` 真实 Dify/FastGPT 端到端模型实验、80 条人工 Ground Truth 冻结、异步 Worker 与演示视频仍需外部条件。
