@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 
@@ -55,6 +55,31 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+_CACHEABLE_SUMMARIES = {
+    "/api/v2/capabilities",
+    "/api/v2/agents",
+    "/api/v2/test-suites",
+    "/api/v2/runs",
+    "/api/v2/findings",
+    "/api/v2/metrics",
+    "/api/v2/dashboard",
+}
+
+
+@app.middleware("http")
+async def cache_public_summaries(request: Request, call_next):
+    response = await call_next(request)
+    if (
+        request.method == "GET"
+        and request.url.path in _CACHEABLE_SUMMARIES
+        and not request.headers.get("authorization")
+    ):
+        response.headers.setdefault(
+            "Cache-Control",
+            "public, max-age=0, s-maxage=60, stale-while-revalidate=300",
+        )
+    return response
 
 
 @app.get("/healthz", tags=["system"])

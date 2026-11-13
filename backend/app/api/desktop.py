@@ -277,7 +277,9 @@ def suites(request: Request, db: Session = Depends(get_db)):
     operator = is_operator_request(request)
     if not operator:
         rows = [suite for suite in rows if suite.id == SEED_SUITE_ID]
-    return [suite_view(s, suite_cases(db, s) if operator else []) for s in rows]
+    # case_ids are persisted on the suite row. Loading every suite's cases here
+    # creates an N+1 query and made the list slower as generated suites accrued.
+    return [suite_view(s, []) for s in rows]
 
 
 @router.get("/test-suites/{suite_id}/cases")
