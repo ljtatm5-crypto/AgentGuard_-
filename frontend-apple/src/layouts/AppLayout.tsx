@@ -88,7 +88,7 @@ export default function AppLayout() {
       </aside>
       <main className="main">
         <header className="app-topbar"><div className="breadcrumb"><span className="breadcrumb-root">AgentGuard</span><CaretRight size={12} aria-hidden="true" /><span>{active.label}</span></div><div className="topbar-actions"><button className="search-trigger" ref={searchTrigger} onClick={openSearch} aria-label="搜索页面"><MagnifyingGlass size={17} /><span>快速前往</span><kbd><Command size={12} /> K</kbd></button><div className="appearance-switch" aria-label="外观"><button aria-label="浅色外观" aria-pressed={theme === 'light'} onClick={() => setTheme('light')}>{theme === 'light' && <motion.span layoutId="appearance" />}<Sun size={17} /></button><button aria-label="深色外观" aria-pressed={theme === 'dark'} onClick={() => setTheme('dark')}>{theme === 'dark' && <motion.span layoutId="appearance" />}<Moon size={17} /></button></div></div></header>
-        <div className="route-view" id="page-content" tabIndex={-1}>{outlet}</div>
+        <div className="route-view" id="page-content" key={location.pathname} tabIndex={-1}>{outlet}</div>
         <footer className="app-footer"><span>AgentGuard 智测盾</span></footer>
       </main>
       <XiaoAnPanel />
