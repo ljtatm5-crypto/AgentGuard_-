@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { NavLink, useLocation, useNavigate, useOutlet } from 'react-router-dom'
 import { AnimatePresence, motion, MotionConfig, useReducedMotion } from 'motion/react'
 import { SquaresFour, Stack, PlayCircle, CirclesThreePlus, ChartPieSlice, Graph, GearSix, MagnifyingGlass, CaretRight, Sun, Moon, Command, X } from '@phosphor-icons/react'
-import XiaoAnPanel from '@/components/xiaoan/XiaoAnPanel'
+const XiaoAnPanel = lazy(() => import('@/components/xiaoan/XiaoAnPanel'))
 
 const NAV = [
   { to: '/overview', label: '总览', shortLabel: '总览', icon: SquaresFour, hint: '查看测试进展' },
@@ -20,6 +20,7 @@ export default function AppLayout() {
   const outlet = useOutlet()
   const reduce = useReducedMotion()
   const [searchOpen, setSearchOpen] = useState(false)
+  const [assistantReady, setAssistantReady] = useState(false)
   const [query, setQuery] = useState('')
   const searchTrigger = useRef<HTMLButtonElement>(null)
   const dialog = useRef<HTMLDivElement>(null)
@@ -31,6 +32,12 @@ export default function AppLayout() {
       ?? { ...NAV[0], label: '页面未找到', shortLabel: '未找到', hint: '该地址不在导航范围内' }
   useEffect(() => { document.documentElement.dataset.theme = theme; localStorage.setItem('agentguard-appearance', theme) }, [theme])
   useEffect(() => { document.title = `${active.label} · AgentGuard 智测盾` }, [active.label])
+  useEffect(() => {
+    // Keep the assistant out of the critical entry bundle. It loads after the
+    // workspace shell and first data request have had a chance to paint.
+    const timer = window.setTimeout(() => setAssistantReady(true), 700)
+    return () => window.clearTimeout(timer)
+  }, [])
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); setSearchOpen(v => !v) }
@@ -94,7 +101,7 @@ export default function AppLayout() {
         <AnimatePresence mode="wait" initial={false}><motion.div className="route-view" id="page-content" key={location.pathname} initial={{ opacity: 0, y: reduce ? 0 : 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: reduce ? 0 : -6 }} transition={{ duration: reduce ? 0 : .22 }}>{outlet}</motion.div></AnimatePresence>
         <footer className="app-footer"><span>AgentGuard 智测盾</span><span>测试有依据，改进有方向。</span></footer>
       </main>
-      <XiaoAnPanel />
+      {assistantReady && <Suspense fallback={null}><XiaoAnPanel /></Suspense>}
     </div>
     <AnimatePresence>{searchOpen && <motion.div className="command-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSearchOpen(false)}><motion.div ref={dialog} className="command-panel" role="dialog" aria-modal="true" aria-labelledby="search-title" initial={{ opacity: 0, y: reduce ? 0 : -12, scale: reduce ? 1 : .97 }} animate={{ opacity: 1, y: 0, scale: 1 }} onClick={e => e.stopPropagation()}><div className="command-search"><MagnifyingGlass size={23} /><label className="sr-only" id="search-title" htmlFor="command-query">搜索页面</label><input id="command-query" value={query} onChange={e => setQuery(e.target.value)} placeholder="你想前往哪里？" /><button className="icon-button" aria-label="关闭搜索" onClick={() => setSearchOpen(false)}><X size={18} /></button></div><div className="command-results">{NAV.filter(n => `${n.label}${n.hint}`.toLowerCase().includes(query.toLowerCase())).map(n => <button key={n.to} onClick={() => { navigate(n.to); setSearchOpen(false) }}><n.icon size={21} /><span><strong>{n.label}</strong><small>{n.hint}</small></span><CaretRight size={15} /></button>)}{!NAV.some(n => `${n.label}${n.hint}`.toLowerCase().includes(query.toLowerCase())) && <p className="state-desc">没有匹配页面，请试试“测试”或“报告”。</p>}</div><div className="command-foot"><span>Tab 选择，Enter 打开</span><span>Esc 关闭</span></div></motion.div></motion.div>}</AnimatePresence>
     </MotionConfig>

@@ -9,9 +9,50 @@
     <meta property="og:description" content="每一次测试，都有据可循。" />
     <link rel="icon" type="image/svg+xml" href="%BASE_URL%favicon.svg" />
     <title>AgentGuard 智测盾</title>
+    <style>
+      html, body { min-height: 100%; margin: 0; }
+      body { background: #eef2f1; }
+      .boot-shell {
+        min-height: 100dvh;
+        display: grid;
+        place-content: center;
+        justify-items: center;
+        gap: 18px;
+        color: #253832;
+        font-family: "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif;
+        background:
+          radial-gradient(circle at 22% 18%, rgba(216, 240, 239, .82), transparent 34%),
+          radial-gradient(circle at 82% 78%, rgba(236, 234, 247, .78), transparent 32%),
+          #f3f6f3;
+      }
+      .boot-brand { display: flex; align-items: center; gap: 12px; }
+      .boot-mark {
+        display: grid; width: 44px; height: 44px; place-items: center;
+        border-radius: 13px; color: #fff; background: linear-gradient(145deg, #4d8c9f, #326f86 54%, #385b8a);
+        box-shadow: 0 8px 20px rgba(44, 96, 111, .2); font-size: 13px; font-weight: 750;
+      }
+      .boot-copy strong { display: block; font-size: 16px; letter-spacing: -.02em; }
+      .boot-copy small { display: block; margin-top: 3px; color: #71827b; font-size: 12px; }
+      .boot-progress { width: 184px; height: 3px; overflow: hidden; border-radius: 99px; background: rgba(54, 88, 76, .1); }
+      .boot-progress::after {
+        display: block; width: 44%; height: 100%; content: "";
+        border-radius: inherit; background: #2d806a;
+        animation: boot-slide 1.15s cubic-bezier(.22, 1, .36, 1) infinite alternate;
+      }
+      @keyframes boot-slide { from { transform: translateX(-15%); } to { transform: translateX(145%); } }
+      @media (prefers-reduced-motion: reduce) { .boot-progress::after { animation: none; width: 100%; } }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="boot-shell" role="status" aria-live="polite">
+        <div class="boot-brand">
+          <span class="boot-mark">AG</span>
+          <span class="boot-copy"><strong>AgentGuard 智测盾</strong><small>正在载入安全工作台…</small></span>
+        </div>
+        <span class="boot-progress" aria-hidden="true"></span>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
