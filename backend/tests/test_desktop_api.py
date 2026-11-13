@@ -92,6 +92,43 @@ def test_seed_assets_are_complete_but_have_no_invented_results(desktop):
     assert metrics["target_benchmarks"]
 
 
+def test_delete_unused_agent_removes_it_from_the_active_list(desktop):
+    client, db = desktop
+    created = client.post("/api/v2/agents/validate", json={
+        "name": "待删除重复资产",
+        "endpoint": "local://duplicate-asset",
+        "version": "v2.0",
+        "agent_type": "tool",
+    })
+    assert created.status_code == 200
+    agent_id = created.json()["id"]
+    assert agent_id in {item["id"] for item in client.get("/api/v2/agents").json()}
+
+    removed = client.delete(f"/api/v2/agents/{agent_id}")
+    assert removed.status_code == 200
+    assert removed.json()["action"] == "deleted"
+    assert removed.json()["runs_preserved"] is False
+    assert db.get(AgentRecord, agent_id) is None
+    assert agent_id not in {item["id"] for item in client.get("/api/v2/agents").json()}
+
+
+def test_delete_agent_with_history_archives_without_breaking_runs(desktop):
+    client, db = desktop
+    run = execute(client, "v1.0")
+    agent_id = SEED_AGENT_IDS["v1.0"]
+
+    removed = client.delete(f"/api/v2/agents/{agent_id}")
+    assert removed.status_code == 200
+    assert removed.json()["action"] == "archived"
+    assert removed.json()["runs_preserved"] is True
+    assert db.get(AgentRecord, agent_id).status == "archived"
+    assert agent_id not in {item["id"] for item in client.get("/api/v2/agents").json()}
+    assert client.get(f"/api/v2/runs/{run['id']}").status_code == 200
+
+    blocked = client.post("/api/v2/runs", json={"agent_id": agent_id, "suite_id": SEED_SUITE_ID})
+    assert blocked.status_code == 409
+    assert blocked.json()["error_code"] == "agent_not_validated"
+
 def test_dashboard_reads_keep_database_round_trips_bounded(desktop):
     client, db = desktop
     execute(client, "v1.0")

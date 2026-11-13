@@ -33,13 +33,13 @@ def assert_agent_scope(payload: AgentCreate, db: Session | None = None,
 
 @router.get("")
 def list_agents(db: Session = Depends(get_db)):
-    return [agent_dict(item) for item in db.scalars(select(Agent).order_by(Agent.created_at)).all()]
+    return [agent_dict(item) for item in db.scalars(select(Agent).where(Agent.status != "archived").order_by(Agent.created_at)).all()]
 
 
 @router.get("/{agent_id}")
 def get_agent(agent_id: str, db: Session = Depends(get_db)):
     agent = db.get(Agent, agent_id)
-    if not agent:
+    if not agent or agent.status == "archived":
         raise HTTPException(404, "Agent 不存在")
     return agent_dict(agent)
 
@@ -67,7 +67,7 @@ def validate_agent(payload: AgentCreate, db: Session = Depends(get_db)):
 @router.post("/{agent_id}/invoke")
 def invoke_agent(agent_id: str, payload: InvokeRequest, db: Session = Depends(get_db)):
     agent = db.get(Agent, agent_id)
-    if not agent:
+    if not agent or agent.status == "archived":
         raise HTTPException(404, "Agent 不存在")
     if agent.adapter != "mock":
         permissions = agent.permissions or {}

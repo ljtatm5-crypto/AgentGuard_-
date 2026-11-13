@@ -126,7 +126,13 @@ def suite_cases(db: Session, suite: TestSuite) -> list[TestCase]:
 
 
 def list_agent_items(request: Request, db: Session, public_only: bool = False) -> list[dict]:
-    rows = list(db.scalars(select(Agent).order_by(Agent.created_at.desc())).all())
+    rows = list(
+        db.scalars(
+            select(Agent)
+            .where(Agent.status != "archived")
+            .order_by(Agent.created_at.desc())
+        ).all()
+    )
     if public_only or not is_operator_request(request):
         rows = [agent for agent in rows if agent.id in SEED_AGENT_IDS.values()]
     rows.sort(key=lambda a: a.id != "desktop-campus-v2")
@@ -136,6 +142,37 @@ def list_agent_items(request: Request, db: Session, public_only: bool = False) -
 @router.get("/agents")
 def agents(request: Request, db: Session = Depends(get_db)):
     return list_agent_items(request, db)
+
+
+@router.delete("/agents/{agent_id}")
+def delete_agent(agent_id: str, db: Session = Depends(get_db)):
+    """Remove an unused asset, or archive one that historical runs still reference."""
+    row = require(db, Agent, agent_id, "agent_not_found", "智能体")
+    if row.status == "archived":
+        return {"id": row.id, "action": "archived", "already_archived": True}
+
+    has_runs = db.scalar(
+        select(TestRun.id).where(TestRun.agent_id == agent_id).limit(1)
+    ) is not None
+    if has_runs:
+        row.status = "archived"
+        db.commit()
+        return {
+            "id": agent_id,
+            "action": "archived",
+            "already_archived": False,
+            "runs_preserved": True,
+            "reason": "historical_runs_preserved",
+        }
+
+    db.delete(row)
+    db.commit()
+    return {
+        "id": agent_id,
+        "action": "deleted",
+        "already_archived": False,
+        "runs_preserved": False,
+    }
 
 
 @router.get("/agents/{agent_id}")
