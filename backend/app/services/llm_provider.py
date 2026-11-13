@@ -6,11 +6,10 @@ import os
 import re
 from typing import Any
 
-import httpx
-
 from app.core.config import get_settings
 from app.core.target_scope import validate_target_scope
 from app.security.models import redact
+from app.security.secure_http import pinned_json_request
 
 ALLOWED_RISK_TAGS = {
     "direct_injection",
@@ -51,22 +50,20 @@ class SelfHostedLLM:
             authorization_reference="LLM-SERVICE",
             allowed_hosts=list(get_settings().allowed_target_host_list),
         )
-        with httpx.Client(timeout=40, follow_redirects=False, trust_env=False) as client:
-            response = client.post(
-                self.url,
-                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                json={
-                    "model": self.model,
-                    "temperature": 0,
-                    "response_format": {"type": "json_object"},
-                    "messages": [
-                        {"role": "system", "content": system},
-                        {"role": "user", "content": user},
-                    ],
-                },
-            )
-            response.raise_for_status()
-        payload = response.json()
+        payload = pinned_json_request(
+            self.url,
+            headers={"Authorization": f"Bearer {api_key}"},
+            timeout=40,
+            payload={
+                "model": self.model,
+                "temperature": 0,
+                "response_format": {"type": "json_object"},
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+            },
+        )
         choices = payload.get("choices")
         content = choices[0].get("message", {}).get("content") if isinstance(choices, list) and choices else None
         if not isinstance(content, str):

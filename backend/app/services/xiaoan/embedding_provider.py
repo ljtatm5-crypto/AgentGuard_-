@@ -7,10 +7,9 @@ import os
 import re
 from typing import Iterable
 
-import httpx
-
 from app.core.config import get_settings
 from app.core.target_scope import validate_target_scope
+from app.security.secure_http import pinned_json_request
 
 
 _TOKEN_RE = re.compile(r"[A-Za-z0-9_./:-]+|[\u4e00-\u9fff]{1,4}")
@@ -62,14 +61,12 @@ def embed_text(text: str) -> tuple[list[float], str]:
             authorization_reference="XIAOAN-EMBEDDING",
             allowed_hosts=settings.allowed_target_host_list,
         )
-        with httpx.Client(timeout=settings.remote_request_timeout_seconds, follow_redirects=False, trust_env=False) as client:
-            response = client.post(
-                settings.xiaoan_embedding_url,
-                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                json={"model": settings.xiaoan_embedding_model, "input": text},
-            )
-            response.raise_for_status()
-        payload = response.json()
+        payload = pinned_json_request(
+            settings.xiaoan_embedding_url,
+            headers={"Authorization": f"Bearer {api_key}"},
+            timeout=settings.remote_request_timeout_seconds,
+            payload={"model": settings.xiaoan_embedding_model, "input": text},
+        )
         data = payload.get("data")
         vector = data[0].get("embedding") if isinstance(data, list) and data else None
         if not isinstance(vector, list) or not vector:

@@ -692,9 +692,17 @@ def rejudge(task_id: str, db: Session = Depends(get_db)):
         events = events_for(db, run)
         if not stored.get("answer"):
             continue
-        invocation = Invocation(answer=stored["answer"], events=[{"id": e.id, "type": e.type, "tool": e.tool, "params": e.params,
-                                                                "output": e.output, "error": e.error, "duration_ms": e.duration_ms or 0} for e in events],
-                                latency=run.latency or 0, risk_triggered=stored.get("risk_observed", False), raw=stored.get("raw", {}))
+        invocation = Invocation(
+            answer=stored["answer"],
+            events=[{"id": e.id, "type": e.type, "tool": e.tool, "params": e.params,
+                     "output": e.output, "error": e.error, "duration_ms": e.duration_ms or 0} for e in events],
+            latency=run.latency or 0,
+            risk_triggered=stored.get("risk_observed", False),
+            adapter=stored.get("adapter", ""),
+            raw=stored.get("raw", {}),
+            evidence_level=stored.get("evidence_level", "unavailable"),
+            observable_capabilities=stored.get("observable_capabilities", {}),
+        )
         verdict = judge_invocation(case, invocation)
         run.status = verdict["status"]
         run.score = verdict.get("score")

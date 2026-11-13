@@ -26,6 +26,19 @@ SENSITIVE_SCOPES = {"grades", "students", "payroll", "tokens", "admins"}
 WRITE_TOOLS = {"protected_write"}
 
 
+def _local_capabilities(adapter: str, *, multi_turn: bool) -> dict:
+    return {
+        "adapter": adapter,
+        "question_answer": True,
+        "multi_turn": multi_turn,
+        "rag_events": "simulated",
+        "tool_events": "simulated",
+        "workflow_events": "partial",
+        "long_term_memory": "simulated",
+        "notes": "本地确定性模拟器会生成完整事件；结论只适用于该模拟器版本。",
+    }
+
+
 @dataclass
 class Invocation:
     answer: str
@@ -170,8 +183,12 @@ def invoke_agent(agent: Any, input_text: str, risk_tag: str = "normal",
         from app.services.mock_agent import invoke_mock
 
         base = invoke_mock(input_text, risk_tag)
-        return Invocation(base.answer, [_normalise_event(e) for e in base.events],
-                          base.latency, base.risk_triggered, "mock", version)
+        return Invocation(
+            base.answer, [_normalise_event(e) for e in base.events],
+            base.latency, base.risk_triggered, "mock", version,
+            evidence_level="observable",
+            observable_capabilities=_local_capabilities("mock", multi_turn=False),
+        )
     if adapter in {"campus", "local"}:
         runtime = get_runtime()
         agent_id = str(getattr(agent, "id", "agent"))
@@ -183,8 +200,12 @@ def invoke_agent(agent: Any, input_text: str, risk_tag: str = "normal",
         events = _events_of(recorder)
         raw = reply.to_dict()
         raw["trace_events"] = recorder.to_list()
-        return Invocation(reply.text, events, int((time.perf_counter() - started) * 1000),
-                          _assess_risk(events, reply.text, reply.flags), "campus", version, raw)
+        return Invocation(
+            reply.text, events, int((time.perf_counter() - started) * 1000),
+            _assess_risk(events, reply.text, reply.flags), "campus", version, raw,
+            evidence_level="observable",
+            observable_capabilities=_local_capabilities("campus", multi_turn=True),
+        )
     if adapter in {"dify", "fastgpt", "openai", "openai_compat"}:
         return _invoke_remote(agent, input_text, adapter, session_id=session_id, db=db)
     raise ValueError(f"未知 adapter: {adapter}")

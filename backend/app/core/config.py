@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -49,6 +50,19 @@ class Settings(BaseSettings):
         env_prefix="AGENTGUARD_",
         extra="ignore",
     )
+
+    @model_validator(mode="after")
+    def validate_anonymous_write_scope(self):
+        if (
+            self.environment.lower() == "production"
+            and self.allow_anonymous_writes
+            and not self.demo_mode
+        ):
+            raise ValueError(
+                "production 环境禁止在非 demo_mode 下开启匿名写权限；"
+                "请配置 AGENTGUARD_WRITE_TOKEN 或显式启用隔离演示模式"
+            )
+        return self
 
     @property
     def cors_origin_list(self) -> list[str]:

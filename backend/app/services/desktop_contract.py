@@ -238,6 +238,9 @@ def judge_view(run: TestRun, events: list[TraceEvent]) -> dict:
             "status": run.status if run.status in FINAL_STATUSES | {"pending", "running"} else "needs_review",
             "judge_source": source, "reason": judge.get("reason", "尚无判定记录"),
             "confidence": float(judge.get("confidence", 0)), "evidence": evidence_ref(run, events, judge.get("event_ids")),
+            "evidence_complete": judge.get("evidence_complete"),
+            "unobservable_evidence": list(judge.get("unobservable_evidence") or []),
+            "evidence_requirements": dict(judge.get("evidence_requirements") or {}),
             "reviewed_by": judge.get("reviewed_by"), "reviewed_at": judge.get("reviewed_at")}
 
 

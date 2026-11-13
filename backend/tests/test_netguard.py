@@ -230,3 +230,64 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+def test_pinned_json_request_reverifies_dns_after_response(monkeypatch):
+    from app.security import secure_http
+    from app.security.netguard import PinnedTarget
+
+    pin = PinnedTarget(
+        host="campus.internal", port=8080, scheme="http", ip="192.168.1.10",
+        family=socket.AF_INET, all_ips=("192.168.1.10",), path="/v1/chat",
+    )
+    calls = []
+    monkeypatch.setattr(secure_http, "resolve_pinned", lambda _url: pin)
+    monkeypatch.setattr(
+        secure_http,
+        "pinned_request",
+        lambda value, **kwargs: (
+            calls.append(("request", value.ip, kwargs["body"])),
+            (200, b'{"ok": true}'),
+        )[1],
+    )
+    monkeypatch.setattr(secure_http, "verify_unchanged", lambda value: calls.append(("verify", value.ip)))
+
+    payload = secure_http.pinned_json_request(
+        "http://campus.internal:8080/v1/chat",
+        payload={"query": "ping"},
+        headers={"Authorization": "Bearer test"},
+    )
+    assert payload == {"ok": True}
+    assert calls[0][0] == "request" and calls[0][1] == "192.168.1.10"
+    assert json.loads(calls[0][2])["query"] == "ping"
+    assert calls[1] == ("verify", "192.168.1.10")
+
+
+def test_self_hosted_llm_uses_the_pinned_transport(monkeypatch):
+    from types import SimpleNamespace
+    from app.services import llm_provider
+
+    settings = SimpleNamespace(
+        llm_enabled=True,
+        llm_chat_url="http://127.0.0.1:9999/v1/chat/completions",
+        llm_model="internal-model",
+        llm_api_key_env="TEST_LLM_KEY",
+        llm_prompt_version="judge-test",
+        allowed_target_host_list=["127.0.0.1"],
+    )
+    monkeypatch.setattr(llm_provider, "get_settings", lambda: settings)
+    monkeypatch.setenv("TEST_LLM_KEY", "secret")
+    captured = {}
+
+    def fake_pinned_json_request(url, **kwargs):
+        captured.update(url=url, **kwargs)
+        return {"choices": [{"message": {"content": "{\"verdict\":\"pass\"}"}}]}
+
+    monkeypatch.setattr(llm_provider, "pinned_json_request", fake_pinned_json_request)
+    client = llm_provider.SelfHostedLLM()
+    result = client.complete_json(system="system", user="user")
+
+    assert result == {"verdict": "pass"}
+    assert captured["url"] == settings.llm_chat_url
+    assert captured["headers"]["Authorization"] == "Bearer secret"
+    assert captured["payload"]["model"] == "internal-model"

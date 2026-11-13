@@ -5,10 +5,9 @@ import json
 import os
 import re
 
-import httpx
-
 from app.core.config import get_settings
 from app.core.target_scope import validate_target_scope
+from app.security.secure_http import pinned_json_request
 
 
 class XiaoAnLLMUnavailable(RuntimeError):
@@ -38,22 +37,20 @@ class XiaoAnLLM:
             authorization_reference="XIAOAN-LLM",
             allowed_hosts=settings.allowed_target_host_list,
         )
-        with httpx.Client(timeout=settings.remote_request_timeout_seconds, follow_redirects=False, trust_env=False) as client:
-            response = client.post(
-                self.url,
-                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                json={
-                    "model": self.model,
-                    "temperature": 0.1,
-                    "response_format": {"type": "json_object"},
-                    "messages": [
-                        {"role": "system", "content": system},
-                        {"role": "user", "content": user},
-                    ],
-                },
-            )
-            response.raise_for_status()
-        payload = response.json()
+        payload = pinned_json_request(
+            self.url,
+            headers={"Authorization": f"Bearer {api_key}"},
+            timeout=settings.remote_request_timeout_seconds,
+            payload={
+                "model": self.model,
+                "temperature": 0.1,
+                "response_format": {"type": "json_object"},
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+            },
+        )
         choices = payload.get("choices")
         content = choices[0].get("message", {}).get("content") if isinstance(choices, list) and choices else None
         if not isinstance(content, str):

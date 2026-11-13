@@ -50,3 +50,24 @@ def test_agent_api_rejects_public_target_outside_allowlist():
         )
         assert response.status_code == 422
         assert "不在 AGENTGUARD_ALLOWED_TARGET_HOSTS" in response.json()["detail"]
+
+
+def test_production_anonymous_writes_require_isolated_demo_mode():
+    import pytest
+    from app.core.config import Settings
+
+    with pytest.raises(ValueError, match="demo_mode"):
+        Settings(
+            environment="production",
+            allow_anonymous_writes=True,
+            demo_mode=False,
+            audit_log_enabled=False,
+        )
+
+    settings = Settings(
+        environment="production",
+        allow_anonymous_writes=True,
+        demo_mode=True,
+        audit_log_enabled=False,
+    )
+    assert settings.allow_anonymous_writes is True
