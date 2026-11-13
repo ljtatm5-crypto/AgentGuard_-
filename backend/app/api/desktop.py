@@ -101,6 +101,20 @@ def events_for(db: Session, row: TestRun) -> list[TraceEvent]:
     return in_trace_order(events)
 
 
+def events_by_run(db: Session, run_ids: list[str]) -> dict[str, list[TraceEvent]]:
+    if not run_ids:
+        return {}
+    grouped: dict[str, list[TraceEvent]] = defaultdict(list)
+    events = db.scalars(
+        select(TraceEvent)
+        .where(TraceEvent.run_id.in_(run_ids))
+        .order_by(TraceEvent.timestamp, TraceEvent.id)
+    )
+    for event in events:
+        grouped[event.run_id].append(event)
+    return {run_id: in_trace_order(items) for run_id, items in grouped.items()}
+
+
 def in_trace_order(events: list[TraceEvent]) -> list[TraceEvent]:
     return sorted(events, key=lambda event: (event.params or {}).get("desktop_sequence", len(events)))
 
@@ -648,12 +662,22 @@ def create_run(payload: RunCreate, db: Session = Depends(get_db)):
 @router.get("/runs/{task_id}")
 def run_detail(task_id: str, db: Session = Depends(get_db)):
     rows = task_rows(db, task_id)
-    return {"run": run_view(rows, db.get(TestSuite, rows[0].suite_id)), "results": [judge_view(r, events_for(db, r)) for r in rows]}
+    event_map = events_by_run(db, [row.id for row in rows])
+    return {
+        "run": run_view(rows, db.get(TestSuite, rows[0].suite_id)),
+        "results": [judge_view(row, event_map.get(row.id, [])) for row in rows],
+    }
 
 
 @router.get("/runs/{task_id}/trace")
 def trace(task_id: str, db: Session = Depends(get_db)):
-    return [event_view(event, row) for row in task_rows(db, task_id) for event in events_for(db, row)]
+    rows = task_rows(db, task_id)
+    event_map = events_by_run(db, [row.id for row in rows])
+    return [
+        event_view(event, row)
+        for row in rows
+        for event in event_map.get(row.id, [])
+    ]
 
 
 @router.post("/runs/{task_id}/judge")
