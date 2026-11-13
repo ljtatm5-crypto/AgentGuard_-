@@ -4,6 +4,16 @@ import { AnimatePresence, motion, MotionConfig, useReducedMotion } from 'motion/
 import { SquaresFour, Stack, PlayCircle, CirclesThreePlus, ChartPieSlice, Graph, GearSix, MagnifyingGlass, CaretRight, Sun, Moon, Command, X } from '@phosphor-icons/react'
 const XiaoAnPanel = lazy(() => import('@/components/xiaoan/XiaoAnPanel'))
 
+const PAGE_PREFETCH: Record<string, () => Promise<unknown>> = {
+  '/overview': () => import('@/pages/DashboardPage'),
+  '/agents': () => import('@/pages/AgentsPage'),
+  '/test-suites': () => import('@/pages/SuitesPage'),
+  '/runs': () => import('@/pages/RunsPage'),
+  '/findings': () => import('@/pages/FindingsPage'),
+  '/reports': () => import('@/pages/ReportsPage'),
+  '/settings': () => import('@/pages/SettingsPage'),
+}
+
 const NAV = [
   { to: '/overview', label: '总览', shortLabel: '总览', icon: SquaresFour, hint: '查看测试进展' },
   { to: '/agents', label: 'Agent 资产', shortLabel: '资产', icon: CirclesThreePlus, hint: '知识库与工具权限' },
@@ -33,10 +43,15 @@ export default function AppLayout() {
   useEffect(() => { document.documentElement.dataset.theme = theme; localStorage.setItem('agentguard-appearance', theme) }, [theme])
   useEffect(() => { document.title = `${active.label} · AgentGuard 智测盾` }, [active.label])
   useEffect(() => {
-    // Keep the assistant out of the critical entry bundle. It loads after the
-    // workspace shell and first data request have had a chance to paint.
-    const timer = window.setTimeout(() => setAssistantReady(true), 700)
-    return () => window.clearTimeout(timer)
+    // Keep the assistant and secondary routes out of the critical entry bundle.
+    const assistantTimer = window.setTimeout(() => setAssistantReady(true), 700)
+    const routeTimer = window.setTimeout(() => {
+      Object.values(PAGE_PREFETCH).forEach((load) => { void load() })
+    }, 2500)
+    return () => {
+      window.clearTimeout(assistantTimer)
+      window.clearTimeout(routeTimer)
+    }
   }, [])
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
@@ -84,6 +99,8 @@ export default function AppLayout() {
               key={n.to}
               to={n.to}
               className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}
+              onMouseEnter={() => { void PAGE_PREFETCH[n.to]?.() }}
+              onFocus={() => { void PAGE_PREFETCH[n.to]?.() }}
               data-testid={`nav-${n.label}`}
             >
               {({ isActive }) => <>
