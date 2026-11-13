@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import AppLayout from '@/layouts/AppLayout'
 
+const WelcomePage = lazy(() => import('@/pages/WelcomePage'))
 const DashboardPage = lazy(() => import('@/pages/DashboardPage'))
 const AgentsPage = lazy(() => import('@/pages/AgentsPage'))
 const SuitesPage = lazy(() => import('@/pages/SuitesPage'))
@@ -11,6 +12,14 @@ const FindingsPage = lazy(() => import('@/pages/FindingsPage'))
 const ReportsPage = lazy(() => import('@/pages/ReportsPage'))
 const SettingsPage = lazy(() => import('@/pages/SettingsPage'))
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'))
+
+function welcomePage(node: ReactNode) {
+  return (
+    <Suspense fallback={<div style={{ minHeight: '100dvh', background: '#05070b' }} aria-hidden="true" />}>
+      {node}
+    </Suspense>
+  )
+}
 
 function page(node: ReactNode) {
   return (
@@ -23,8 +32,9 @@ function page(node: ReactNode) {
 export default function App() {
   return (
     <Routes>
+      <Route path="/" element={welcomePage(<WelcomePage />)} />
+      <Route path="/welcome" element={welcomePage(<WelcomePage />)} />
       <Route element={<AppLayout />}>
-        <Route path="/" element={<Navigate to="/overview" replace />} />
         <Route path="/overview" element={page(<DashboardPage />)} />
         <Route path="/agents" element={page(<AgentsPage />)} />
         <Route path="/test-suites" element={page(<SuitesPage />)} />
