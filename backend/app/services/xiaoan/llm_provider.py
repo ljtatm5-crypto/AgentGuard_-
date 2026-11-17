@@ -51,7 +51,9 @@ class XiaoAnLLM:
                     ],
                 },
             )
-            response.raise_for_status()
+            if response.status_code >= 400:
+                detail = response.text[:800].replace("\n", " ")
+                raise XiaoAnLLMUnavailable(f"在线模型返回 HTTP {response.status_code}: {detail}")
         payload = response.json()
         choices = payload.get("choices")
         content = choices[0].get("message", {}).get("content") if isinstance(choices, list) and choices else None
