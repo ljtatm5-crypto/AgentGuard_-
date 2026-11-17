@@ -232,33 +232,36 @@ def _snapshot_answer(snapshot: dict[str, Any], page: str) -> dict[str, Any]:
 
 def _general_answer(*, llm, question: str, page: str, snapshot: dict[str, Any], auth_token: str | None) -> dict[str, Any] | None:
     try:
-        result = llm.complete_json(
+        text = llm.complete_text(
             system=(
                 "你是小安，AgentGuard 智测盾的教学助手。当前问题超出 AgentGuard 产品知识库范围。"
-                "你可以使用通用知识给出简洁、准确的回答，但你没有实时网页浏览、天气、新闻或实时价格数据源，"
-                "不得声称已经浏览网页或获取实时信息；涉及时效性信息时必须明确说明无法实时核实。"
-                "输出 JSON：conclusion、steps(数组，每项 title/detail)、limitations、suggested_questions。"
+                "请使用通用知识给出简洁、准确的中文回答，分 2-4 段，不要使用 Markdown 标题或代码块。"
+                "你没有实时网页浏览、天气、新闻或实时价格数据源，不得声称已经浏览网页或获取实时信息；"
+                "涉及时效性信息时必须明确说明无法实时核实，不要编造具体数据。"
             ),
             user=json.dumps({
                 "question": redact(question, 4000),
                 "current_page": page,
                 "current_time": snapshot["generated_at"],
-                "workspace_brief": snapshot["counts"],
             }, ensure_ascii=False),
             auth_token=auth_token,
         )
-        normalized = _normalize_llm_answer(result, [], [], page, require_steps=False)
-        if normalized is None:
+        if not text.strip():
             return None
-        normalized["mode"] = "llm_general"
-        normalized["model_used"] = llm.model
-        normalized["confidence"] = 0.58
-        normalized["sources"] = []
-        normalized["limitations"] = [
-            "这是通用知识回答，不属于 AgentGuard 产品知识库。",
-            "小安当前没有实时网页浏览能力；天气、新闻、价格等时效信息需要人工核验。",
-        ]
-        return normalized
+        return {
+            "conclusion": redact(text, 2400),
+            "steps": [],
+            "evidence": [],
+            "sources": [],
+            "limitations": [
+                "这是通用知识回答，不属于 AgentGuard 产品知识库。",
+                "小安当前没有实时网页浏览能力；天气、新闻、价格等时效信息需要人工核验。",
+            ],
+            "suggested_questions": quick_questions(page),
+            "mode": "llm_general",
+            "model_used": llm.model,
+            "confidence": 0.58,
+        }
     except Exception as exc:
         logger.warning("xiaoan_general_answer_failed: %s", exc)
         return None
@@ -337,6 +340,11 @@ def answer_question(
         evidence_result = diagnosis(db, run_id=run_id, finding_id=finding_id, case_id=case_id)
     local = _local_answer(question, page, sources, evidence_result)
     if not llm.enabled:
+        return local
+    # Product and evidence answers stay grounded locally unless the configured
+    # online model supports strict JSON output. Keyless demo providers are used
+    # only for general questions, never for authoritative security conclusions.
+    if not llm.json_mode:
         return local
     if not sources and not evidence_result and not _snapshot_has_data(snapshot):
         return local

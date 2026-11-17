@@ -24,7 +24,7 @@ class XiaoAnLLM:
         self.api_key_env = settings.xiaoan_llm_api_key_env
         self.json_mode = settings.xiaoan_llm_json_mode
 
-    def complete_json(self, *, system: str, user: str, auth_token: str | None = None) -> dict:
+    def _post(self, payload: dict, auth_token: str | None) -> str:
         if not self.enabled:
             raise XiaoAnLLMUnavailable("小安模型未启用")
         api_key = (os.getenv(self.api_key_env, "") if self.api_key_env else "") or (auth_token or "").strip()
@@ -41,11 +41,33 @@ class XiaoAnLLM:
         headers = {"Content-Type": "application/json"}
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
+        payload = {**payload, "model": self.model, "stream": False}
+        with httpx.Client(timeout=settings.remote_request_timeout_seconds, follow_redirects=False, trust_env=False) as client:
+            response = client.post(self.url, headers=headers, json=payload)
+            if response.status_code >= 400:
+                detail = response.text[:800].replace("\n", " ")
+                raise XiaoAnLLMUnavailable(f"在线模型返回 HTTP {response.status_code}: {detail}")
+        body = response.json()
+        choices = body.get("choices")
+        content = choices[0].get("message", {}).get("content") if isinstance(choices, list) and choices else None
+        if not isinstance(content, str):
+            raise XiaoAnLLMUnavailable("小安模型响应缺少 message.content")
+        return content
+
+    def complete_text(self, *, system: str, user: str, auth_token: str | None = None) -> str:
+        return self._post({
+            "temperature": 0.25,
+            "max_tokens": 1000,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+        }, auth_token).strip()
+
+    def complete_json(self, *, system: str, user: str, auth_token: str | None = None) -> dict:
         payload = {
-            "model": self.model,
             "temperature": 0.1,
             "max_tokens": 1400,
-            "stream": False,
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
@@ -53,16 +75,7 @@ class XiaoAnLLM:
         }
         if self.json_mode:
             payload["response_format"] = {"type": "json_object"}
-        with httpx.Client(timeout=settings.remote_request_timeout_seconds, follow_redirects=False, trust_env=False) as client:
-            response = client.post(self.url, headers=headers, json=payload)
-            if response.status_code >= 400:
-                detail = response.text[:800].replace("\n", " ")
-                raise XiaoAnLLMUnavailable(f"在线模型返回 HTTP {response.status_code}: {detail}")
-        payload = response.json()
-        choices = payload.get("choices")
-        content = choices[0].get("message", {}).get("content") if isinstance(choices, list) and choices else None
-        if not isinstance(content, str):
-            raise XiaoAnLLMUnavailable("小安模型响应缺少 message.content")
+        content = self._post(payload, auth_token)
         cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", content.strip(), flags=re.IGNORECASE)
         try:
             parsed = json.loads(cleaned)

@@ -277,15 +277,11 @@ def test_general_question_uses_online_model_when_enabled(monkeypatch):
     class FakeLLM:
         enabled = True
         model = "fake-online-model"
+        json_mode = False
 
-        def complete_json(self, *, system: str, user: str, auth_token: str | None = None) -> dict:
+        def complete_text(self, *, system: str, user: str, auth_token: str | None = None) -> str:
             assert auth_token == "oidc-test-token"
-            return {
-                "conclusion": "这是一个通用知识回答。",
-                "steps": [{"title": "说明", "detail": "问题不属于 AgentGuard 产品知识库。"}],
-                "limitations": [],
-                "suggested_questions": [],
-            }
+            return "这是一个通用知识回答。\n\n问题不属于 AgentGuard 产品知识库。"
 
     monkeypatch.setattr(answer_service, "get_xiaoan_llm", lambda: FakeLLM())
     engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
@@ -310,6 +306,7 @@ def test_online_model_failure_falls_back_to_grounded_local_answer(monkeypatch):
     class FailingLLM:
         enabled = True
         model = "unavailable-model"
+        json_mode = True
 
         def complete_json(self, *, system: str, user: str, auth_token: str | None = None) -> dict:
             raise RuntimeError("provider unavailable")
