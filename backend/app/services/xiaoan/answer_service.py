@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from datetime import datetime, timezone
 from typing import Any
@@ -14,6 +15,8 @@ from app.security.models import redact
 from app.services.xiaoan.evidence_service import diagnosis
 from app.services.xiaoan.llm_provider import XiaoAnLLMUnavailable, get_xiaoan_llm
 from app.services.xiaoan.retrieval import hybrid_search, source_by_id
+
+logger = logging.getLogger("agentguard.xiaoan")
 
 ALLOWED_ROUTES = {"/overview", "/agents", "/test-suites", "/runs", "/findings", "/reports", "/settings"}
 _SCOPE_RE = re.compile(r"(agentguard|智测盾|小安|测试|用例|执行|任务|轨迹|事件|证据|判定|缺陷|攻击|注入|越权|权限|授权|接入|dify|fastgpt|rag|报告|precision|recall|f1|回归|修复|令牌|数据|安全|智能体|模型|页面|设置|总览|指标|规则|审计|api|key|入门|新手|第一次使用|开始使用|操作步骤|失败|通过率|异常|风险)", re.I)
@@ -256,7 +259,8 @@ def _general_answer(*, llm, question: str, page: str, snapshot: dict[str, Any], 
             "小安当前没有实时网页浏览能力；天气、新闻、价格等时效信息需要人工核验。",
         ]
         return normalized
-    except Exception:
+    except Exception as exc:
+        logger.warning("xiaoan_general_answer_failed: %s", exc)
         return None
 
 
@@ -363,7 +367,8 @@ def answer_question(
         )
         normalized = _normalize_llm_answer(result, sources, local["evidence"], page)
         return normalized or local
-    except Exception:
+    except Exception as exc:
+        logger.warning("xiaoan_grounded_answer_failed: %s", exc)
         return local
 
 

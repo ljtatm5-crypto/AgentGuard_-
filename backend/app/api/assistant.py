@@ -1,6 +1,7 @@
 """Controlled XiaoAn teaching and evidence API."""
 from __future__ import annotations
 
+import logging
 import os
 from datetime import datetime, timezone
 
@@ -35,6 +36,7 @@ from app.services.xiaoan.remediation_service import remediation_plan
 from app.services.xiaoan.tutorials import tutorial_by_id, tutorial_list
 
 router = APIRouter(prefix="/assistant", tags=["xiaoan"])
+logger = logging.getLogger("agentguard.xiaoan")
 
 
 def principal_name(request: Request) -> str:
@@ -69,6 +71,11 @@ def chat(payload: AssistantChatRequest, request: Request, db: Session = Depends(
     db.add(user_message)
     db.flush()
     oidc_token = request.headers.get("x-vercel-oidc-token") or os.getenv("VERCEL_OIDC_TOKEN")
+    logger.info(
+        "xiaoan_chat_credentials header_oidc=%s env_oidc=%s",
+        bool(request.headers.get("x-vercel-oidc-token")),
+        bool(os.getenv("VERCEL_OIDC_TOKEN")),
+    )
     result = answer_question(
         db,
         question=payload.message,
