@@ -1,6 +1,8 @@
 """Controlled XiaoAn teaching and evidence API."""
 from __future__ import annotations
 
+import logging
+import os
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -34,6 +36,7 @@ from app.services.xiaoan.remediation_service import remediation_plan
 from app.services.xiaoan.tutorials import tutorial_by_id, tutorial_list
 
 router = APIRouter(prefix="/assistant", tags=["xiaoan"])
+logger = logging.getLogger("agentguard.xiaoan")
 
 
 def principal_name(request: Request) -> str:
@@ -67,7 +70,19 @@ def chat(payload: AssistantChatRequest, request: Request, db: Session = Depends(
     user_message = AssistantMessage(session_id=session.id, role="user", content=payload.message, structured={}, sources=[])
     db.add(user_message)
     db.flush()
-    result = answer_question(db, question=payload.message, context=payload.context.model_dump(), principal=session.principal)
+    oidc_token = request.headers.get("x-vercel-oidc-token") or os.getenv("VERCEL_OIDC_TOKEN")
+    logger.info(
+        "xiaoan_chat_credentials header_oidc=%s env_oidc=%s",
+        bool(request.headers.get("x-vercel-oidc-token")),
+        bool(os.getenv("VERCEL_OIDC_TOKEN")),
+    )
+    result = answer_question(
+        db,
+        question=payload.message,
+        context=payload.context.model_dump(),
+        principal=session.principal,
+        auth_token=oidc_token,
+    )
     answer = AssistantAnswer.model_validate(result)
     assistant_message = AssistantMessage(
         session_id=session.id, role="assistant", content=answer.conclusion,

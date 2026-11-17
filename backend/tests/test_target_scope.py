@@ -1,6 +1,6 @@
 import pytest
 
-from app.core.target_scope import TargetScopeError, validate_target_scope
+from app.core.target_scope import TargetScopeError, validate_assistant_provider, validate_target_scope
 
 
 def test_local_mock_target_is_allowed():
@@ -37,3 +37,31 @@ def test_non_mock_target_requires_authorization_record():
             authorization_reference=None,
             allowed_hosts=["localhost"],
         )
+
+def test_assistant_provider_allows_explicit_public_llm_host():
+    decision = validate_assistant_provider(
+        endpoint="https://api.deepseek.com/chat/completions",
+        provider="小安在线模型",
+        allowed_hosts=["api.deepseek.com"],
+    )
+    assert decision.allowed is True
+    assert decision.host == "api.deepseek.com"
+
+
+def test_assistant_provider_rejects_unlisted_host():
+    with pytest.raises(TargetScopeError, match="不在显式白名单"):
+        validate_assistant_provider(
+            endpoint="https://api.deepseek.com/chat/completions",
+            provider="小安在线模型",
+            allowed_hosts=["ai-gateway.vercel.sh"],
+        )
+
+
+def test_assistant_provider_requires_https_for_public_host():
+    with pytest.raises(TargetScopeError, match="HTTPS"):
+        validate_assistant_provider(
+            endpoint="http://api.deepseek.com/chat/completions",
+            provider="小安在线模型",
+            allowed_hosts=["api.deepseek.com"],
+        )
+

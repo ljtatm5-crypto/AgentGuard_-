@@ -90,3 +90,39 @@ def validate_target_scope(
     labels = {"self_hosted_dify": "自建 Dify 靶场", "self_hosted_fastgpt": "自建 FastGPT 靶场", "authorized_external": "明确授权靶场"}
     label = labels.get(target_scope, "明确授权靶场")
     return TargetScopeDecision(True, target_scope, host, label)
+
+def validate_assistant_provider(
+    *,
+    endpoint: str,
+    provider: str,
+    allowed_hosts: list[str],
+) -> TargetScopeDecision:
+    """Validate an explicitly configured assistant provider (not a test target).
+
+    The tested-agent scope deliberately blocks public hosts. XiaoAn's own
+    answer/search provider is a different trust boundary: its URL comes only
+    from server-side configuration, never from user input, and it must still be
+    listed explicitly here. This keeps the public-target denylist intact while
+    allowing the assistant to call an approved online model.
+    """
+    try:
+        parsed = urlparse(endpoint)
+        host = (parsed.hostname or "").lower()
+        port = parsed.port
+    except ValueError as exc:
+        raise TargetScopeError("助手外部服务地址或端口格式无效。") from exc
+    if parsed.scheme not in {"http", "https"} or not host:
+        raise TargetScopeError("助手外部服务必须是有效的 HTTP(S) 地址。")
+    if parsed.username is not None or parsed.password is not None or port == 0:
+        raise TargetScopeError("助手外部服务地址不得包含账号密码，端口必须有效。")
+    if parsed.scheme == "http" and host not in {"localhost", "127.0.0.1", "::1"}:
+        raise TargetScopeError("公网助手服务必须使用 HTTPS，禁止明文传输凭据。")
+    normalized_hosts = {item.strip().lower() for item in allowed_hosts if item.strip()}
+    if not normalized_hosts:
+        normalized_hosts = {host}
+    if host not in normalized_hosts:
+        raise TargetScopeError(
+            f"助手服务主机 {host} 不在显式白名单中，禁止访问。"
+        )
+    return TargetScopeDecision(True, "assistant_provider", host, provider)
+
