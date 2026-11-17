@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     xiaoan_llm_model: str = ""
     xiaoan_llm_api_key_env: str = ""
     xiaoan_llm_allowed_hosts: str = ""
+    xiaoan_llm_json_mode: bool = True
     xiaoan_embedding_url: str = ""
     xiaoan_embedding_model: str = ""
     xiaoan_embedding_api_key_env: str = ""
