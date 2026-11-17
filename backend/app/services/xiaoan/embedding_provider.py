@@ -10,7 +10,7 @@ from typing import Iterable
 import httpx
 
 from app.core.config import get_settings
-from app.core.target_scope import validate_target_scope
+from app.core.target_scope import validate_assistant_provider
 
 
 _TOKEN_RE = re.compile(r"[A-Za-z0-9_./:-]+|[\u4e00-\u9fff]{1,4}")
@@ -54,13 +54,10 @@ def embed_text(text: str) -> tuple[list[float], str]:
     if not api_key:
         return local_hash_embedding(text), "local_hash"
     try:
-        validate_target_scope(
+        validate_assistant_provider(
             endpoint=settings.xiaoan_embedding_url,
-            adapter="openai_compat",
-            target_scope="self_hosted_dify",
-            authorization_confirmed=True,
-            authorization_reference="XIAOAN-EMBEDDING",
-            allowed_hosts=settings.allowed_target_host_list,
+            provider="小安向量服务",
+            allowed_hosts=settings.xiaoan_embedding_allowed_host_list,
         )
         with httpx.Client(timeout=settings.remote_request_timeout_seconds, follow_redirects=False, trust_env=False) as client:
             response = client.post(

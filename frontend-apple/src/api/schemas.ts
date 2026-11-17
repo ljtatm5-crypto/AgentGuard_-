@@ -275,7 +275,7 @@ const assistantAnswerSchema = z.object({
   sources: z.array(assistantSourceSchema),
   limitations: z.array(z.string()),
   suggested_questions: z.array(z.string()),
-  mode: z.enum(['local_grounded', 'llm_grounded', 'mock_grounded']),
+  mode: z.enum(['local_grounded', 'llm_grounded', 'llm_general', 'mock_grounded']),
   model_used: z.string().nullable().optional(),
   confidence: z.number(),
 })
@@ -362,6 +362,9 @@ const capabilitiesSchema = z.object({
   private_reads_require_auth: z.boolean(),
   rate_limit_scope: z.string(),
   public_data_scope: z.string(),
+  xiaoan_enabled: z.boolean().optional(),
+  xiaoan_llm_enabled: z.boolean().optional(),
+  xiaoan_retrieval_mode: z.string().optional(),
 })
 
 export const schemas = {

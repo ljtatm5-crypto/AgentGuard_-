@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, useMotionValue, useReducedMotion, useSpring, useTransform } from 'motion/react'
 import { ArrowRight, FingerprintSimple, ShieldCheck } from '@phosphor-icons/react'
@@ -44,11 +44,11 @@ export default function WelcomePage() {
   const springButtonX = useSpring(buttonX, { stiffness: 260, damping: 20 })
   const springButtonY = useSpring(buttonY, { stiffness: 260, damping: 20 })
 
-  const enterSystem = () => {
+  const enterSystem = useCallback(() => {
     if (leaving) return
     setLeaving(true)
     timeout.current = window.setTimeout(() => navigate('/overview'), reduce ? 80 : 720)
-  }
+  }, [leaving, navigate, reduce])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -56,7 +56,7 @@ export default function WelcomePage() {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [leaving, reduce])
+  }, [enterSystem])
 
   useEffect(() => () => {
     if (timeout.current !== null) window.clearTimeout(timeout.current)
@@ -101,7 +101,7 @@ export default function WelcomePage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: .8, ease: [.22, 1, .36, 1] }}
         >
-          <span className="welcome-kicker"><ShieldCheck size={15} weight="duotone" />AGENT QUALITY & SECURITY</span>
+          <span className="welcome-kicker"><ShieldCheck size={16} weight="duotone" />AGENT QUALITY & SECURITY</span>
           <h1>
             <span>让每一次</span>
             <span>智能体决策，</span>
@@ -129,7 +129,7 @@ export default function WelcomePage() {
               whileTap={{ scale: .985 }}
             >
               <span>进入测试空间</span>
-              <span className="welcome-enter-icon"><ArrowRight size={18} weight="bold" /></span>
+              <span className="welcome-enter-icon"><ArrowRight size={19} weight="bold" /></span>
             </motion.button>
             <span className="welcome-key-hint">PRESS <kbd>ENTER</kbd></span>
           </div>
@@ -157,7 +157,7 @@ export default function WelcomePage() {
           </motion.div>
 
           <motion.div className="welcome-float-card welcome-float-card-a" animate={reduce ? undefined : { y: [0, -8, 0] }} transition={{ duration: 5.2, repeat: Infinity, ease: 'easeInOut' }}>
-            <FingerprintSimple size={19} weight="duotone" />
+            <FingerprintSimple size={20} weight="duotone" />
             <div><span>EVIDENCE</span><strong>证据可追溯</strong></div>
           </motion.div>
           <motion.div className="welcome-float-card welcome-float-card-b" animate={reduce ? undefined : { y: [0, 7, 0] }} transition={{ duration: 4.6, repeat: Infinity, ease: 'easeInOut' }}>

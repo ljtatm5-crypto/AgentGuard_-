@@ -8,7 +8,7 @@ import re
 import httpx
 
 from app.core.config import get_settings
-from app.core.target_scope import validate_target_scope
+from app.core.target_scope import validate_assistant_provider
 
 
 class XiaoAnLLMUnavailable(RuntimeError):
@@ -23,20 +23,17 @@ class XiaoAnLLM:
         self.model = settings.xiaoan_llm_model
         self.api_key_env = settings.xiaoan_llm_api_key_env
 
-    def complete_json(self, *, system: str, user: str) -> dict:
+    def complete_json(self, *, system: str, user: str, auth_token: str | None = None) -> dict:
         if not self.enabled:
             raise XiaoAnLLMUnavailable("小安模型未启用")
-        api_key = os.getenv(self.api_key_env, "") if self.api_key_env else ""
+        api_key = (auth_token or "").strip() or (os.getenv(self.api_key_env, "") if self.api_key_env else "")
         if not self.url or not self.model or not api_key:
             raise XiaoAnLLMUnavailable("小安模型地址、模型或凭据环境变量未配置")
         settings = get_settings()
-        validate_target_scope(
+        validate_assistant_provider(
             endpoint=self.url,
-            adapter="openai_compat",
-            target_scope="self_hosted_dify",
-            authorization_confirmed=True,
-            authorization_reference="XIAOAN-LLM",
-            allowed_hosts=settings.allowed_target_host_list,
+            provider="小安在线模型",
+            allowed_hosts=settings.xiaoan_llm_allowed_host_list,
         )
         with httpx.Client(timeout=settings.remote_request_timeout_seconds, follow_redirects=False, trust_env=False) as client:
             response = client.post(
@@ -45,6 +42,8 @@ class XiaoAnLLM:
                 json={
                     "model": self.model,
                     "temperature": 0.1,
+                    "max_tokens": 1400,
+                    "stream": False,
                     "response_format": {"type": "json_object"},
                     "messages": [
                         {"role": "system", "content": system},

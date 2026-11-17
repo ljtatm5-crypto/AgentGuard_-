@@ -61,7 +61,7 @@ class AssistantAnswer(BaseModel):
     sources: list[AssistantSource] = Field(default_factory=list)
     limitations: list[str] = Field(default_factory=list)
     suggested_questions: list[str] = Field(default_factory=list)
-    mode: Literal["local_grounded", "llm_grounded", "mock_grounded"] = "local_grounded"
+    mode: Literal["local_grounded", "llm_grounded", "llm_general", "mock_grounded"] = "local_grounded"
     model_used: str | None = None
     confidence: float = 0.5
 

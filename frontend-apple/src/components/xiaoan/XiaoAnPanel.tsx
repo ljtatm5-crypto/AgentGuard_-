@@ -3,7 +3,9 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import {
   ArrowRight,
   BookOpenText,
+  ChatCircleText,
   CheckCircle,
+  GraduationCap,
   PaperPlaneTilt,
   ShieldCheck,
   Sparkle,
@@ -22,6 +24,9 @@ import type {
   AssistantTutorialSummary,
 } from '@/types/api'
 import { getXiaoAnContext, XIAOAN_CONTEXT_EVENT } from '@/utils/xiaoanContext'
+
+type ThinkingStage = 'considering' | 'searching'
+type XiaoAnMode = 'qa' | 'teach'
 
 type ChatItem =
   | { id: string; role: 'assistant'; answer: AssistantAnswer; messageId?: string; context: AssistantContext }
@@ -85,9 +90,13 @@ export default function XiaoAnPanel() {
   const [open, setOpen] = useState(false)
   const [input, setInput] = useState('')
   const [sessionId, setSessionId] = useState<string | null>(null)
+  const [mode, setMode] = useState<XiaoAnMode>('qa')
   const [loading, setLoading] = useState(false)
+  const [thinkingStage, setThinkingStage] = useState<ThinkingStage>('considering')
   const [error, setError] = useState('')
   const [tutorials, setTutorials] = useState<AssistantTutorialSummary[]>([])
+  const [tutorialsLoading, setTutorialsLoading] = useState(false)
+  const [onlineModel, setOnlineModel] = useState<boolean | null>(null)
   const [tutorial, setTutorial] = useState<AssistantTutorial | null>(null)
   const [tutorialStep, setTutorialStep] = useState(0)
   const [context, setContext] = useState<AssistantContext>(() => compactContext(location.pathname, location.search))
@@ -108,13 +117,31 @@ export default function XiaoAnPanel() {
   }, [location.pathname, location.search])
 
   useEffect(() => {
+    if (!open || onlineModel !== null) return
+    api.getCapabilities()
+      .then(capabilities => setOnlineModel(Boolean(capabilities.xiaoan_llm_enabled)))
+      .catch(() => setOnlineModel(false))
+  }, [open, onlineModel])
+
+  useEffect(() => {
     if (!open || tutorials.length) return
-    api.listAssistantTutorials().then(setTutorials).catch(() => undefined)
+    let active = true
+    setTutorialsLoading(true)
+    api.listAssistantTutorials()
+      .then(items => { if (active) setTutorials(items) })
+      .catch(() => undefined)
+      .finally(() => { if (active) setTutorialsLoading(false) })
+    return () => { active = false }
   }, [open, tutorials.length])
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [messages, loading])
+
+  const orderedTutorials = useMemo(() => {
+    const current = pageKey(context.page)
+    return [...tutorials].sort((a, b) => Number(b.page === current) - Number(a.page === current))
+  }, [tutorials, context.page])
 
   const quickQuestions = useMemo(() => {
     const latest = [...messages].reverse().find(item => item.role === 'assistant') as Extract<ChatItem, { role: 'assistant' }> | undefined
@@ -128,19 +155,30 @@ export default function XiaoAnPanel() {
     setError('')
     setMessages(current => [...current, { id: `user-${Date.now()}`, role: 'user', text: trimmed }])
     setLoading(true)
+    setThinkingStage('considering')
+    const startedAt = Date.now()
+    const stageTimer = window.setTimeout(() => setThinkingStage('searching'), 480)
+    const settle = async () => {
+      const remaining = 900 - (Date.now() - startedAt)
+      if (remaining > 0) await new Promise(resolve => window.setTimeout(resolve, remaining))
+    }
     try {
       const response = await api.assistantChat({ session_id: sessionId, message: trimmed, context })
+      await settle()
       setSessionId(response.session_id)
       setMessages(current => [...current, { id: response.message_id, role: 'assistant', answer: response.answer, messageId: response.message_id, context: { ...context } }])
     } catch (e) {
+      await settle()
       setError(e instanceof ApiRequestError ? e.message : '小安暂时无法回答，请稍后重试')
     } finally {
+      window.clearTimeout(stageTimer)
       setLoading(false)
     }
   }
 
   async function openTutorial(id: string) {
     setError('')
+    setMode('teach')
     try {
       const data = await api.getAssistantTutorial(id)
       setTutorial(data)
@@ -155,10 +193,10 @@ export default function XiaoAnPanel() {
     await api.assistantFeedback({ message_id: messageId, rating }).catch(() => undefined)
   }
 
-  function go(route: string | null | undefined) {
+  function go(route: string | null | undefined, keepOpen = false) {
     if (!route || !route.startsWith('/')) return
     navigate(route)
-    setOpen(false)
+    if (!keepOpen) setOpen(false)
   }
 
   return (
@@ -185,13 +223,50 @@ export default function XiaoAnPanel() {
 
             <div className="xiaoan-context-bar">
               <ShieldCheck size={16} weight="duotone" aria-hidden="true" />
-              <span>{context.run_id || context.finding_id ? '已带入当前授权证据上下文' : '当前为基础教学问答'}</span>
-              <span className="xiaoan-mode">{context.run_id || context.finding_id ? '证据感知' : '知识检索'}</span>
+              <span>{context.run_id || context.finding_id ? '已带入当前授权证据上下文' : mode === 'teach' ? '当前为分步教学模式' : onlineModel ? '在线模型 · 工作区数据已接入' : '当前为本地知识问答'}</span>
+              <span className={`xiaoan-mode${onlineModel ? ' is-online' : ''}`}>{context.run_id || context.finding_id ? '证据感知' : mode === 'teach' ? '步骤引导' : onlineModel ? '在线模型' : '本地知识'}</span>
             </div>
 
-            {tutorial ? (
+            <div className="xiaoan-mode-switch" role="group" aria-label="小安工作模式">
+              <button type="button" className={mode === 'qa' ? 'active' : ''} aria-pressed={mode === 'qa'} onClick={() => setMode('qa')}>
+                <ChatCircleText size={15} weight="duotone" aria-hidden="true" /> 问答模式
+              </button>
+              <button type="button" className={mode === 'teach' ? 'active' : ''} aria-pressed={mode === 'teach'} onClick={() => setMode('teach')}>
+                <GraduationCap size={15} weight="duotone" aria-hidden="true" /> 教学模式
+              </button>
+            </div>
+
+            {mode === 'qa' ? (
+              <>
+                <div className="xiaoan-messages" data-testid="xiaoan-messages">
+                  {messages.map(item => item.role === 'user' ? (
+                    <div key={item.id} className="xiaoan-message user"><p>{item.text}</p></div>
+                  ) : (
+                    <AssistantMessage key={item.id} answer={item.answer} context={item.context} messageId={item.messageId} rated={item.messageId ? feedback[item.messageId] : undefined} onRate={rate} onNavigate={go} />
+                  ))}
+                  {loading && (
+                    <div className="xiaoan-message assistant xiaoan-thinking" role="status" aria-live="polite">
+                      <span /><span /><span />
+                      <small>{thinkingStage === 'considering' ? '小安正在考虑中…' : '正在检索已审核知识与当前证据…'}</small>
+                    </div>
+                  )}
+                  {error && <p className="form-error" role="alert">{error}</p>}
+                  <div ref={endRef} />
+                </div>
+
+                <div className="xiaoan-quick">
+                  {quickQuestions.slice(0, 4).map(question => <button key={question} type="button" disabled={loading} onClick={() => void send(question)}>{question}</button>)}
+                </div>
+
+                <form className="xiaoan-input" onSubmit={event => { event.preventDefault(); void send() }}>
+                  <label className="sr-only" htmlFor="xiaoan-question">问小安</label>
+                  <textarea id="xiaoan-question" value={input} onChange={event => setInput(event.target.value)} placeholder="问小安：下一步该怎么做？" rows={2} />
+                  <button type="submit" className="xiaoan-send" disabled={!input.trim() || loading} aria-label="发送问题"><PaperPlaneTilt size={18} weight="fill" /></button>
+                </form>
+              </>
+            ) : tutorial ? (
               <div className="xiaoan-tutorial" data-testid="xiaoan-tutorial">
-                <button type="button" className="xiaoan-back-link" onClick={() => setTutorial(null)}>返回对话</button>
+                <button type="button" className="xiaoan-back-link" onClick={() => setTutorial(null)}>返回教学模式</button>
                 <span className="xiaoan-eyebrow">跟着小安学 · 第 {tutorialStep + 1} / {tutorial.steps.length} 步</span>
                 <h3>{tutorial.steps[tutorialStep].title}</h3>
                 <p>{tutorial.steps[tutorialStep].detail}</p>
@@ -200,47 +275,42 @@ export default function XiaoAnPanel() {
                 </div>
                 <div className="xiaoan-tutorial-actions">
                   <button type="button" className="btn" disabled={tutorialStep === 0} onClick={() => setTutorialStep(value => Math.max(0, value - 1))}>上一步</button>
-                  <button type="button" className="btn btn-primary" onClick={() => go(tutorial.steps[tutorialStep].route)}>
+                  <button type="button" className="btn btn-primary" onClick={() => {
+                    const nextStep = Math.min(tutorialStep + 1, tutorial.steps.length - 1)
+                    const route = tutorial.steps[tutorialStep].route
+                    if (tutorialStep < tutorial.steps.length - 1) setTutorialStep(nextStep)
+                    go(route, true)
+                  }}>
                     {tutorial.steps[tutorialStep].action_label} <ArrowRight size={15} />
                   </button>
                   <button type="button" className="btn" disabled={tutorialStep >= tutorial.steps.length - 1} onClick={() => setTutorialStep(value => Math.min(tutorial.steps.length - 1, value + 1))}>下一步</button>
                 </div>
+                <p className="xiaoan-tutorial-note">点击操作会在左侧页面定位，并继续下一步教学。</p>
               </div>
             ) : (
-              <>
-                <div className="xiaoan-messages" data-testid="xiaoan-messages">
-                  {messages.map(item => item.role === 'user' ? (
-                    <div key={item.id} className="xiaoan-message user"><p>{item.text}</p></div>
-                  ) : (
-                    <AssistantMessage key={item.id} answer={item.answer} context={item.context} messageId={item.messageId} rated={item.messageId ? feedback[item.messageId] : undefined} onRate={rate} onNavigate={go} />
-                  ))}
-                  {loading && <div className="xiaoan-message assistant xiaoan-thinking"><span /><span /><span /><small>小安正在核对知识库与证据…</small></div>}
-                  {error && <p className="form-error" role="alert">{error}</p>}
-                  <div ref={endRef} />
-                </div>
-
-                <div className="xiaoan-quick">
-                  {quickQuestions.slice(0, 4).map(question => <button key={question} type="button" onClick={() => void send(question)}>{question}</button>)}
-                </div>
-
-                {tutorials.length > 0 && (
+              <div className="xiaoan-teach" data-testid="xiaoan-teach">
+                <span className="xiaoan-eyebrow"><GraduationCap size={15} weight="duotone" /> 教学模式</span>
+                <h3>跟着小安，按步骤完成一次操作</h3>
+                <p>选择一个主题，小安会说明每一步做什么、去哪里，以及如何核对结果与证据。</p>
+                {error && <p className="form-error" role="alert">{error}</p>}
+                {tutorialsLoading ? (
+                  <p className="xiaoan-teach-empty">正在加载教学流程…</p>
+                ) : orderedTutorials.length === 0 ? (
+                  <p className="xiaoan-teach-empty">暂时没有可用的教学流程，请切换到问答模式继续。</p>
+                ) : (
                   <div className="xiaoan-tutorial-list">
-                    <span className="xiaoan-eyebrow"><BookOpenText size={15} /> 教学流程</span>
-                    {tutorials.slice(0, 3).map(item => (
+                    {orderedTutorials.map(item => (
                       <button key={item.id} type="button" onClick={() => void openTutorial(item.id)}>
                         <span><strong>{item.title}</strong><small>{item.description}</small></span>
-                        <span>{item.step_count} 步 <ArrowRight size={13} /></span>
+                        <span>
+                          {item.page === pageKey(context.page) && <em className="xiaoan-page-tag">本页推荐</em>}
+                          {item.step_count} 步 <ArrowRight size={13} />
+                        </span>
                       </button>
                     ))}
                   </div>
                 )}
-
-                <form className="xiaoan-input" onSubmit={event => { event.preventDefault(); void send() }}>
-                  <label className="sr-only" htmlFor="xiaoan-question">问小安</label>
-                  <textarea id="xiaoan-question" value={input} onChange={event => setInput(event.target.value)} placeholder="问小安：下一步该怎么做？" rows={2} />
-                  <button type="submit" className="xiaoan-send" disabled={!input.trim() || loading} aria-label="发送问题"><PaperPlaneTilt size={18} weight="fill" /></button>
-                </form>
-              </>
+              </div>
             )}
           </div>
         </section>
@@ -261,8 +331,8 @@ function AssistantMessage({ answer, context, messageId, rated, onRate, onNavigat
     <article className="xiaoan-message assistant">
       <div className="xiaoan-answer-head">
         <span className="xiaoan-answer-mark"><Sparkle size={15} weight="fill" /></span>
-        <strong>{answer.mode === 'mock_grounded' ? '小安 · 示例回答' : answer.mode === 'llm_grounded' ? '小安 · 模型回答' : '小安 · 知识回答'}</strong>
-        {answer.confidence > 0 && <span>{Math.round(answer.confidence * 100)}% 置信度</span>}
+        <strong>{answer.mode === 'mock_grounded' ? '小安 · 示例回答' : answer.mode === 'llm_general' ? '小安 · 通用回答' : answer.mode === 'llm_grounded' ? '小安 · 模型回答' : '小安 · 知识回答'}</strong>
+        {answer.confidence >= 0.4 ? <span>{Math.round(answer.confidence * 100)}% 置信度</span> : <span>知识范围外</span>}
       </div>
       <p className="xiaoan-conclusion">{answer.conclusion}</p>
       {answer.steps.length > 0 && <ol className="xiaoan-steps">{answer.steps.map((step, index) => (

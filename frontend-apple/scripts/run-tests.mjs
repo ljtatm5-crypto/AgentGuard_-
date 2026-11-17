@@ -29,7 +29,8 @@ const PRESETS = {
   },
   // 真实 API 契约：需要本地 FastAPI（playwright.config 会在 API 模式下自动拉起）
   api: {
-    env: { VITE_USE_MOCK: 'false', PLAYWRIGHT_PORT: '5182', PLAYWRIGHT_ISOLATED: '1' },
+    // Keep the contract test deterministic even when a developer enables a local online model.
+    env: { VITE_USE_MOCK: 'false', PLAYWRIGHT_PORT: '5182', PLAYWRIGHT_ISOLATED: '1', AGENTGUARD_XIAOAN_LLM_ENABLED: 'false' },
     specs: ['e2e/api.spec.ts'],
   },
   // 重新生成演示截图

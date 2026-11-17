@@ -1,6 +1,7 @@
 """Controlled XiaoAn teaching and evidence API."""
 from __future__ import annotations
 
+import os
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -67,7 +68,14 @@ def chat(payload: AssistantChatRequest, request: Request, db: Session = Depends(
     user_message = AssistantMessage(session_id=session.id, role="user", content=payload.message, structured={}, sources=[])
     db.add(user_message)
     db.flush()
-    result = answer_question(db, question=payload.message, context=payload.context.model_dump(), principal=session.principal)
+    oidc_token = request.headers.get("x-vercel-oidc-token") or os.getenv("VERCEL_OIDC_TOKEN")
+    result = answer_question(
+        db,
+        question=payload.message,
+        context=payload.context.model_dump(),
+        principal=session.principal,
+        auth_token=oidc_token,
+    )
     answer = AssistantAnswer.model_validate(result)
     assistant_message = AssistantMessage(
         session_id=session.id, role="assistant", content=answer.conclusion,

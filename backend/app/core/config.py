@@ -36,9 +36,11 @@ class Settings(BaseSettings):
     xiaoan_llm_url: str = ""
     xiaoan_llm_model: str = ""
     xiaoan_llm_api_key_env: str = ""
+    xiaoan_llm_allowed_hosts: str = ""
     xiaoan_embedding_url: str = ""
     xiaoan_embedding_model: str = ""
     xiaoan_embedding_api_key_env: str = ""
+    xiaoan_embedding_allowed_hosts: str = ""
     xiaoan_embedding_dimensions: int = 256
     xiaoan_max_context_chars: int = 12000
     xiaoan_rate_limit_per_minute: int = 20
@@ -57,6 +59,14 @@ class Settings(BaseSettings):
     @property
     def allowed_target_host_list(self) -> list[str]:
         return [item.strip().lower() for item in self.allowed_target_hosts.split(",") if item.strip()]
+
+    @property
+    def xiaoan_llm_allowed_host_list(self) -> list[str]:
+        return [item.strip().lower() for item in self.xiaoan_llm_allowed_hosts.split(",") if item.strip()]
+
+    @property
+    def xiaoan_embedding_allowed_host_list(self) -> list[str]:
+        return [item.strip().lower() for item in self.xiaoan_embedding_allowed_hosts.split(",") if item.strip()]
 
 
 @lru_cache

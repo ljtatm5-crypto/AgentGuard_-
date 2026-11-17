@@ -127,10 +127,71 @@ export function buildMockDiagnosis(context: AssistantContext): AssistantDiagnosi
   }
 }
 
+const PRODUCT_SCOPE_PATTERN = /(agentguard|智测盾|小安|测试|用例|执行|任务|轨迹|事件|证据|判定|缺陷|攻击|注入|越权|权限|授权|接入|dify|fastgpt|rag|报告|precision|recall|f1|回归|修复|令牌|数据|安全|智能体|模型|页面|设置|总览|指标|规则|审计|api|key|入门|新手|第一次使用|开始使用|操作步骤)/i
+const CURATED_QUESTIONS = new Set(Object.values(questionMap).flat())
+const GREETING_PATTERN = /^(你好|hi|hello|嗨|在吗)[!！。?？\s]*$/i
+const THANKS_PATTERN = /(谢谢|感谢)/
+const IDENTITY_PATTERN = /(你是谁|你叫什么|介绍一下自己|能做什么|会什么|怎么用你)/i
+
+function baseMockAnswer(
+  page: string,
+  conclusion: string,
+  steps: AssistantAnswer['steps'],
+  confidence: number,
+  limitations: string[],
+): AssistantAnswer {
+  return {
+    conclusion,
+    steps,
+    evidence: [],
+    sources: [],
+    limitations,
+    suggested_questions: questionMap[page] || questionMap['/overview'],
+    mode: 'mock_grounded',
+    model_used: null,
+    confidence,
+  }
+}
+
+function learningAnswer(page: string): AssistantAnswer {
+  return baseMockAnswer(
+    page,
+    '这个问题我还在学习中。小安目前只基于 AgentGuard 已审核的产品知识回答，超出范围的提问不会凭空作答。',
+    [{ title: '换一个我能回答的问题', detail: '你可以问当前页面的操作、测试执行、轨迹证据、报告指标或修复回归；如果涉及某次运行，请先选中具体任务或缺陷。', route: page, action_label: '回到当前页面' }],
+    0.18,
+    ['当前为演示知识库回答，未调用外部模型；不确定的问题会明确说明。'],
+  )
+}
+
+function greetingAnswer(page: string): AssistantAnswer {
+  return baseMockAnswer(
+    page,
+    '你好，我是小安。我可以围绕当前页面带你完成 AgentGuard 的测试流程，也能结合选中的运行或缺陷解释证据。',
+    [{ title: '从当前页面开始', detail: '直接问当前页面的下一步，或先选中一条运行/缺陷记录让我解释证据。', route: page }],
+    1,
+    ['小安负责教学和建议；事实判定以 AgentGuard 固定规则和真实运行证据为准。'],
+  )
+}
+
+function identityAnswer(page: string): AssistantAnswer {
+  return baseMockAnswer(
+    page,
+    '我是小安，AgentGuard 的教学助手。我的职责是解释产品使用、测试执行、轨迹证据和修复回归，并在有授权证据时帮你定位事实。',
+    [{ title: '从当前页面继续', detail: '你可以直接问当前页面的下一步，或者选中一条运行/缺陷记录让我解释证据。', route: page }],
+    1,
+    ['小安不会替代固定规则做安全判定，也不会编造未观测到的事实。'],
+  )
+}
+
 export function buildMockAnswer(question: string, context: AssistantContext): AssistantAnswer {
   const page = context.page || '/overview'
   const hasEvidence = Boolean(context.run_id || context.finding_id)
   const diagnosis = hasEvidence ? buildMockDiagnosis(context) : null
+  const trimmed = question.trim()
+  if (IDENTITY_PATTERN.test(trimmed)) return identityAnswer(page)
+  if (!hasEvidence && GREETING_PATTERN.test(trimmed)) return greetingAnswer(page)
+  if (THANKS_PATTERN.test(trimmed)) return baseMockAnswer(page, '不客气。如果还需要，我可以继续解释当前页面的操作或某条证据。', [], 1, [])
+  if (!hasEvidence && !PRODUCT_SCOPE_PATTERN.test(trimmed) && !CURATED_QUESTIONS.has(trimmed)) return learningAnswer(page)
   const relevant = mockSources.filter(source => source.route === page || (/接入|Dify|FastGPT/i.test(question) && source.route === '/agents') || (/修复|回归|失败/.test(question) && source.route === '/findings'))
   const sources = (relevant.length ? relevant : mockSources).slice(0, 3)
   return {

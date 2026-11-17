@@ -257,6 +257,9 @@ export interface Capabilities {
   private_reads_require_auth: boolean
   rate_limit_scope: string
   public_data_scope: string
+  xiaoan_enabled?: boolean
+  xiaoan_llm_enabled?: boolean
+  xiaoan_retrieval_mode?: string
 }
 
 /** XiaoAn assistant contracts */
@@ -308,7 +311,7 @@ export interface AssistantAnswer {
   sources: AssistantSource[]
   limitations: string[]
   suggested_questions: string[]
-  mode: 'local_grounded' | 'llm_grounded' | 'mock_grounded'
+  mode: 'local_grounded' | 'llm_grounded' | 'llm_general' | 'mock_grounded'
   model_used?: string | null
   confidence: number
 }

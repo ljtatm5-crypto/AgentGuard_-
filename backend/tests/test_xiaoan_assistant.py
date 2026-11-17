@@ -14,7 +14,7 @@ from app.models.entities import Agent, Finding, TestCase, TestRun, TestSuite, Tr
 from app.security.access import SlidingWindowRateLimiter, WriteAccessMiddleware
 from app.services.xiaoan.knowledge_loader import ensure_assistant_schema, ensure_xiaoan_knowledge
 from app.services.xiaoan.retrieval import Passage, hybrid_search
-from app.services.xiaoan import knowledge_loader
+from app.services.xiaoan import answer_service, knowledge_loader
 
 
 def build_app(db: Session, *, allow_anonymous: bool = False, token: str = "operator-secret") -> FastAPI:
@@ -229,3 +229,103 @@ def test_curated_index_reconciles_title_route_and_retirement(monkeypatch):
         assert row.status == "indexed"
         assert row.access_level == "public"
         assert db.query(AssistantChunk).filter(AssistantChunk.document_id == document_id).count() == 1
+
+def test_off_topic_and_identity_answers_are_explicit():
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        ensure_xiaoan_knowledge(db)
+        with TestClient(build_app(db)) as client:
+            off_topic = client.post("/api/v2/assistant/chat", json={
+                "message": "今天天气怎么样？",
+                "context": {"page": "/overview"},
+            })
+            assert off_topic.status_code == 200, off_topic.text
+            answer = off_topic.json()["answer"]
+            assert answer["sources"] == []
+            assert "学习中" in answer["conclusion"]
+            assert answer["confidence"] < 0.4
+
+            identity = client.post("/api/v2/assistant/chat", json={
+                "message": "你是谁？",
+                "context": {"page": "/overview"},
+            })
+            assert identity.status_code == 200, identity.text
+            assert "小安" in identity.json()["answer"]["conclusion"]
+
+def test_workspace_snapshot_answers_with_live_data():
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        ensure_xiaoan_knowledge(db)
+        seed_evidence(db)
+        with TestClient(build_app(db)) as client:
+            response = client.post("/api/v2/assistant/chat", json={
+                "message": "当前有多少个智能体、运行和未关闭缺陷？",
+                "context": {"page": "/overview"},
+            })
+            assert response.status_code == 200, response.text
+            answer = response.json()["answer"]
+            assert answer["mode"] == "local_grounded"
+            assert answer["sources"] == []
+            assert "1 个智能体" in answer["conclusion"]
+            assert "1 次测试运行" in answer["conclusion"]
+            assert "1 个未关闭缺陷" in answer["conclusion"]
+
+
+def test_general_question_uses_online_model_when_enabled(monkeypatch):
+    class FakeLLM:
+        enabled = True
+        model = "fake-online-model"
+
+        def complete_json(self, *, system: str, user: str, auth_token: str | None = None) -> dict:
+            assert auth_token == "oidc-test-token"
+            return {
+                "conclusion": "这是一个通用知识回答。",
+                "steps": [{"title": "说明", "detail": "问题不属于 AgentGuard 产品知识库。"}],
+                "limitations": [],
+                "suggested_questions": [],
+            }
+
+    monkeypatch.setattr(answer_service, "get_xiaoan_llm", lambda: FakeLLM())
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        ensure_xiaoan_knowledge(db)
+        app = build_app(db)
+        with TestClient(app) as client:
+            response = client.post(
+                "/api/v2/assistant/chat",
+                json={"message": "红烧肉怎么做？", "context": {"page": "/overview"}},
+                headers={"x-vercel-oidc-token": "oidc-test-token"},
+            )
+            assert response.status_code == 200, response.text
+            answer = response.json()["answer"]
+            assert answer["mode"] == "llm_general"
+            assert answer["model_used"] == "fake-online-model"
+            assert answer["sources"] == []
+
+
+def test_online_model_failure_falls_back_to_grounded_local_answer(monkeypatch):
+    class FailingLLM:
+        enabled = True
+        model = "unavailable-model"
+
+        def complete_json(self, *, system: str, user: str, auth_token: str | None = None) -> dict:
+            raise RuntimeError("provider unavailable")
+
+    monkeypatch.setattr(answer_service, "get_xiaoan_llm", lambda: FailingLLM())
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        ensure_xiaoan_knowledge(db)
+        with TestClient(build_app(db)) as client:
+            response = client.post("/api/v2/assistant/chat", json={
+                "message": "如何接入 Dify？",
+                "context": {"page": "/agents"},
+            })
+            assert response.status_code == 200, response.text
+            answer = response.json()["answer"]
+            assert answer["mode"] == "local_grounded"
+            assert answer["sources"]
+

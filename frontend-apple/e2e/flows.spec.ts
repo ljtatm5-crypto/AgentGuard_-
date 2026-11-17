@@ -138,8 +138,15 @@ test('小安可基于当前页面教学并解释真实缺陷证据', async ({ pa
   await expect(page.getByTestId('xiaoan-messages')).toContainText('小安 · 示例回答')
   await expect(page.getByTestId('xiaoan-messages')).toContainText('引用来源')
 
+  await page.getByRole('button', { name: '教学模式' }).click()
+  await expect(page.getByTestId('xiaoan-teach')).toContainText('跟着小安')
   await page.getByRole('button', { name: /完成第一次智能体安全测试/ }).click()
   await expect(page.getByTestId('xiaoan-tutorial')).toContainText('第 1 / 4 步')
+  await page.getByRole('button', { name: /前往 Agent 资产/ }).click()
+  await expect(page.getByTestId('xiaoan-panel')).toBeVisible()
+  await expect(page.getByTestId('xiaoan-tutorial')).toContainText('第 2 / 4 步')
+  await page.getByRole('button', { name: '问答模式' }).click()
+  await expect(page.getByTestId('xiaoan-messages')).toBeVisible()
 
   await page.getByRole('button', { name: '关闭小安' }).click()
   await page.goto('/findings')
