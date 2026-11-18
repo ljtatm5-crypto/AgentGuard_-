@@ -570,7 +570,6 @@ def create_run(payload: RunCreate, db: Session = Depends(get_db)):
         db.commit()
         for index, (case, run, snapshot, fingerprint) in enumerate(prepared, start=1):
             run.status = "running"
-            db.flush()
             session_id = f"{task_id}:{case.id}"
             started = datetime.now(timezone.utc)
             try:
@@ -593,7 +592,6 @@ def create_run(payload: RunCreate, db: Session = Depends(get_db)):
                         if original_time:
                             event["timestamp"] = datetime.fromisoformat(original_time)
                     db.add(TraceEvent(run_id=run.id, **event))
-                db.flush()
                 verdict = judge_invocation(SimpleNamespace(**snapshot), invocation)
                 run.status = verdict["status"] if verdict["status"] in FINAL_STATUSES else "needs_review"
                 run.score = verdict.get("score")
