@@ -68,6 +68,58 @@ test('攻击链节点可定位到证据', async ({ page }) => {
   await expect(page.locator('[data-testid="evidence-link"]').first()).toContainText('run-')
 })
 
+test.describe('缺陷列表分页', () => {
+  test.use({ serviceWorkers: 'block' })
+
+  test('每页展示 8 条并支持翻页', async ({ page }) => {
+    const findings = Array.from({ length: 23 }, (_, index) => ({
+      id: `fnd-page-${String(index + 1).padStart(3, '0')}`,
+      title: `分页验证缺陷 ${index + 1} · 规则未通过`,
+      risk_tag: 'memory_poisoning',
+      severity: 'high',
+      status: 'open',
+      evidence: {
+        run_id: 'run-001',
+        case_id: `tc-page-${index + 1}`,
+        event_ids: [`ev-page-${index + 1}`],
+      },
+      impact: '分页验证。',
+      recommendation: '修复后使用同一测试集回归。',
+      agent_version: 'v1.0',
+      suite_version: 'v1.1',
+      created_at: '2026-11-18T00:00:00Z',
+      chain: [{
+        id: `cn-page-${index + 1}`,
+        kind: 'behavior',
+        label: '规则未通过',
+        detail: '分页验证证据。',
+        evidence: {
+          run_id: 'run-001',
+          case_id: `tc-page-${index + 1}`,
+          event_ids: [`ev-page-${index + 1}`],
+        },
+      }],
+    }))
+
+    await page.route('**/api/v2/findings', (route) => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(findings),
+    }))
+
+    await page.goto('/findings')
+    const pager = page.getByTestId('findings-pagination')
+    await expect(pager).toBeVisible()
+    await expect(pager).toContainText('第 1–8 条，共 23 条 · 每页 8 条')
+    await expect(page.getByTestId('findings-table').locator('tbody tr')).toHaveCount(8)
+
+    await page.getByRole('button', { name: '下一页' }).click()
+    await expect(pager).toContainText('第 9–16 条，共 23 条 · 每页 8 条')
+    await expect(page.getByRole('button', { name: '第 2 页' })).toHaveAttribute('aria-current', 'page')
+    await expect(page.getByTestId('findings-table')).toContainText('分页验证缺陷 9')
+  })
+})
+
 test('客户端界面不展示部署环境与数据库技术信息', async ({ page }) => {
   await page.goto('/overview')
   const body = await page.locator('body').innerText()

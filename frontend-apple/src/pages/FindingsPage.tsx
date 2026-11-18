@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { ArrowUpRight, X } from '@phosphor-icons/react'
+import { useEffect, useState } from 'react'
+import { ArrowUpRight, CaretLeft, CaretRight, X } from '@phosphor-icons/react'
 import { Link } from 'react-router-dom'
 import { api } from '@/api/client'
 import { AsyncBoundary } from '@/components/AsyncBoundary'
@@ -16,14 +16,49 @@ const KIND_LABEL: Record<string, string> = {
   fix: '修复',
 }
 
+const PAGE_SIZE = 8
+
+function paginationItems(currentPage: number, totalPages: number): Array<number | 'ellipsis'> {
+  if (totalPages <= 7) return Array.from({ length: totalPages }, (_, index) => index + 1)
+
+  const items: Array<number | 'ellipsis'> = [1]
+  const start = Math.max(2, currentPage - 1)
+  const end = Math.min(totalPages - 1, currentPage + 1)
+  if (start > 2) items.push('ellipsis')
+  for (let page = start; page <= end; page += 1) items.push(page)
+  if (end < totalPages - 1) items.push('ellipsis')
+  items.push(totalPages)
+  return items
+}
+
 export default function FindingsPage() {
   const { state, retry } = useAsync(() => api.listFindings(), [])
   const [selected, setSelected] = useState<string | null>(null)
   const [selectedNodeId, setSelectedNodeId] = useState('')
+  const [page, setPage] = useState(1)
   const chain = useAsync(
     () => (selected ? api.getFindingChain(selected) : Promise.resolve(null)),
     [selected],
   )
+  const findings = state.phase === 'ready' ? state.data : []
+  const totalPages = Math.max(1, Math.ceil(findings.length / PAGE_SIZE))
+  const currentPage = Math.min(page, totalPages)
+  const pageStart = (currentPage - 1) * PAGE_SIZE
+  const pageFindings = findings.slice(pageStart, pageStart + PAGE_SIZE)
+  const rangeStart = findings.length === 0 ? 0 : pageStart + 1
+  const rangeEnd = Math.min(pageStart + PAGE_SIZE, findings.length)
+
+  useEffect(() => {
+    if (page !== currentPage) setPage(currentPage)
+  }, [currentPage, page])
+
+  function changePage(nextPage: number) {
+    const clampedPage = Math.min(Math.max(nextPage, 1), totalPages)
+    if (clampedPage === currentPage) return
+    setPage(clampedPage)
+    setSelected(null)
+    setSelectedNodeId('')
+  }
 
   function openFinding(finding: Finding) {
     setSelected(finding.id)
@@ -47,6 +82,7 @@ export default function FindingsPage() {
         <h2>缺陷列表</h2>
         <AsyncBoundary state={state} isEmpty={(d) => d.length === 0} onRetry={retry}>
           {(data) => (
+            <>
             <div className="table-scroll" tabIndex={0} role="region" aria-label="缺陷列表">
             <table data-testid="findings-table">
               <thead>
@@ -61,7 +97,7 @@ export default function FindingsPage() {
                 </tr>
               </thead>
               <tbody>
-                {data.map((f) => (
+                {pageFindings.map((f) => (
                   <tr key={f.id} className={selected === f.id ? 'row-active' : undefined}>
                     <td className="mono">{f.id}</td>
                     <td>{f.title}</td>
@@ -85,6 +121,51 @@ export default function FindingsPage() {
               </tbody>
             </table>
             </div>
+            {data.length > PAGE_SIZE && (
+              <nav className="findings-pagination" aria-label="缺陷列表分页" data-testid="findings-pagination">
+                <span className="findings-pagination-summary" aria-live="polite">
+                  第 {rangeStart}–{rangeEnd} 条，共 {findings.length} 条 · 每页 {PAGE_SIZE} 条
+                </span>
+                <div className="findings-pagination-controls">
+                  <button
+                    type="button"
+                    className="pagination-page pagination-arrow"
+                    onClick={() => changePage(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    aria-label="上一页"
+                  >
+                    <CaretLeft size={15} aria-hidden="true" />
+                  </button>
+                  {paginationItems(currentPage, totalPages).map((item, index) => (
+                    item === 'ellipsis' ? (
+                      <span key={`ellipsis-${index}`} className="pagination-ellipsis" aria-hidden="true">…</span>
+                    ) : (
+                      <button
+                        key={item}
+                        type="button"
+                        className="pagination-page"
+                        onClick={() => changePage(item)}
+                        aria-label={`第 ${item} 页`}
+                        aria-current={item === currentPage ? 'page' : undefined}
+                        data-testid={`findings-page-${item}`}
+                      >
+                        {item}
+                      </button>
+                    )
+                  ))}
+                  <button
+                    type="button"
+                    className="pagination-page pagination-arrow"
+                    onClick={() => changePage(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    aria-label="下一页"
+                  >
+                    <CaretRight size={15} aria-hidden="true" />
+                  </button>
+                </div>
+              </nav>
+            )}
+            </>
           )}
         </AsyncBoundary>
       </section>
