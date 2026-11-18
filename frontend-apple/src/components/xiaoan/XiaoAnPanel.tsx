@@ -34,7 +34,7 @@ type ChatItem =
 
 const PAGE_QUESTIONS: Record<string, string[]> = {
   '/overview': ['第一次使用应该做什么？', 'AgentGuard 可以测试什么？', '如何完成一次完整测试？'],
-  '/agents': ['如何接入 Dify？', '如何接入 FastGPT？', '为什么授权验证失败？'],
+  '/agents': ['AgentGuard 智测盾是干什么的？', 'AgentGuard 可以测试什么？', '如何接入 Dify？'],
   '/test-suites': ['什么是 RAG 测试？', '什么是工具越权测试？', '如何编写预期行为？'],
   '/runs': ['如何阅读当前执行轨迹？', '解释这次测试为什么失败', '哪些事件可以证明工具被调用？'],
   '/findings': ['这条攻击链是否实际发生？', '为当前缺陷制定修复计划', '修复后应该测哪些用例？'],
