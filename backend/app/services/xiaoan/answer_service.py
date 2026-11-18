@@ -27,7 +27,7 @@ _DATA_QUERY_RE = re.compile(r"(多少|几个|数量|统计|概况|总览|最近|
 _DATA_ENTITY_RE = re.compile(r"(智能体|agent|测试集|任务|运行|缺陷|问题|通过率|失败|工作区)", re.I)
 PAGE_QUESTIONS: dict[str, list[str]] = {
     "/overview": ["第一次使用应该做什么？", "AgentGuard 可以测试什么？", "如何完成一次完整测试？"],
-    "/agents": ["如何接入 Dify？", "如何接入 FastGPT？", "为什么授权验证失败？"],
+    "/agents": ["AgentGuard 智测盾是干什么的？", "AgentGuard 可以测试什么？", "如何接入 Dify？"],
     "/test-suites": ["什么是 RAG 测试？", "什么是工具越权测试？", "如何编写预期行为？"],
     "/runs": ["如何阅读测试轨迹？", "为什么这次测试失败？", "哪些事件可以证明工具被调用？"],
     "/findings": ["这条攻击链是否实际发生？", "怎样修复这个问题？", "修复后应该测哪些用例？"],
