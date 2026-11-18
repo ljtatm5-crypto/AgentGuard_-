@@ -14,7 +14,7 @@ from sqlalchemy.pool import StaticPool
 from app.api.desktop import router
 from app.api.authorizations import router as authorizations_router
 from app.api.metrics import router as metrics_router
-from app.core.config import Settings
+from app.core.config import Settings, get_settings
 from app.db.session import Base, get_db
 from app.security.access import SlidingWindowRateLimiter, WriteAccessMiddleware
 from app.models.entities import Agent as AgentRecord, Finding, TraceEvent, TestCase as CaseRecord, TestRun as RunRecord, TestSuite as SuiteRecord
@@ -179,6 +179,7 @@ def test_real_execution_aggregate_evidence_rejudge_and_paired_metrics(desktop):
 
 def test_run_batches_persist_completed_cases_before_later_failure(desktop, monkeypatch):
     client, db = desktop
+    monkeypatch.setattr(get_settings(), 'run_batch_size', 5)
     original_commit = db.commit
     commits = 0
 

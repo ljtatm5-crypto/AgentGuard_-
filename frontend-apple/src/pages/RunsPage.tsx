@@ -33,6 +33,7 @@ export default function RunsPage() {
   const [agentId, setAgentId] = useState('')
   const [suiteId, setSuiteId] = useState('')
   const [launching, setLaunching] = useState(false)
+  const [launchElapsed, setLaunchElapsed] = useState(0)
   const [launchError, setLaunchError] = useState<string | null>(null)
   const [selectedCaseId, setSelectedCaseId] = useState('')
   const [selectedEventId, setSelectedEventId] = useState('')
@@ -103,6 +104,19 @@ export default function RunsPage() {
     }
   }
 
+  useEffect(() => {
+    if (!launching) {
+      setLaunchElapsed(0)
+      return
+    }
+    const startedAt = Date.now()
+    setLaunchElapsed(0)
+    const timer = window.setInterval(() => {
+      setLaunchElapsed(Math.floor((Date.now() - startedAt) / 1000))
+    }, 1000)
+    return () => window.clearInterval(timer)
+  }, [launching])
+
   async function launch() {
     setLaunchError(null)
     if (!agentId || !suiteId) {
@@ -153,9 +167,15 @@ export default function RunsPage() {
             </select>
           </label>
           <button type="submit" className="btn btn-primary" disabled={launching || assetsLoading || assetError} data-testid="launch-btn">
-            <Play size={16} weight="fill" aria-hidden="true" />{launching ? '启动中…' : '启动任务'}
+            <Play size={16} weight="fill" aria-hidden="true" />{launching ? `执行中 ${launchElapsed}s…` : '启动任务'}
           </button>
         </form>
+        {launching && (
+          <div className="launch-progress" role="status" aria-live="polite" data-testid="launch-progress">
+            <span className="launch-progress-track" aria-hidden="true"><span /></span>
+            <span>测试正在同步执行，请勿关闭页面。用例较多时通常需要 10–30 秒。</span>
+          </div>
+        )}
         {assetError && <div className="form-error" role="alert">资产或测试集加载失败。<button className="btn" onClick={() => { agents.retry(); suites.retry() }}>重新加载</button></div>}
         {launchError && <p className="form-error" role="alert" data-testid="launch-error">{launchError}</p>}
       </section>

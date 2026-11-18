@@ -23,7 +23,9 @@ class Settings(BaseSettings):
     write_rate_limit_per_minute: int = 30
     max_request_bytes: int = 1_048_576
     max_cases_per_run: int = 40
-    run_batch_size: int = 5
+    # One production commit per run avoids six Neon round-trips for a 26-case
+    # suite; pending rows are still persisted before execution starts.
+    run_batch_size: int = 40
     remote_request_timeout_seconds: float = 30.0
     audit_log_enabled: bool = True
     db_auto_create: bool = True

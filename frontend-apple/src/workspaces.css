@@ -3635,3 +3635,45 @@
     padding-bottom: 2px;
   }
 }
+
+
+/* Synchronous run feedback */
+.launch-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  color: var(--ink-soft);
+  font-size: 11px;
+}
+
+.launch-progress-track {
+  position: relative;
+  width: 96px;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--solid-muted);
+}
+
+.launch-progress-track > span {
+  position: absolute;
+  inset-block: 0;
+  width: 42%;
+  border-radius: inherit;
+  background: var(--accent);
+  animation: run-progress 1.25s ease-in-out infinite;
+}
+
+@keyframes run-progress {
+  from { transform: translateX(-110%); }
+  to { transform: translateX(340%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .launch-progress-track > span {
+    width: 100%;
+    animation: none;
+    opacity: .65;
+  }
+}
